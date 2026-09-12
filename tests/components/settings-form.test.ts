@@ -15,6 +15,16 @@ const SettingsHarness = defineComponent({
     <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" />`,
 })
 
+const TestHarness = defineComponent({
+  components: { SchemesSection },
+  setup() {
+    const settings = ref(cloneDefaultSettings())
+    const testScheme = async () => '方案配置可用'
+    return { settings, testScheme }
+  },
+  template: `<SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" />`,
+})
+
 describe('SettingsForm', () => {
   it('applies a color preset without replacing the settings object', async () => {
     const wrapper = mount(SettingsHarness)
@@ -77,5 +87,18 @@ describe('SettingsForm', () => {
     await deeplCard().get('button[title="删除"]').trigger('click')
     expect(wrapper.vm.settings.schemes).toHaveLength(1)
     expect(wrapper.find('[data-testid="scheme-card-deepl"]').exists()).toBe(false)
+  })
+
+  it('shows latency with a speed tone after a successful scheme test', async () => {
+    const wrapper = mount(TestHarness)
+
+    await wrapper.get('[data-testid="scheme-type"]').setValue('google')
+    await wrapper.get('[data-testid="add-scheme"]').trigger('click')
+    await wrapper.get('[data-testid="scheme-test-google"]').trigger('click')
+    await flushPromises()
+
+    const status = wrapper.get('[data-testid="scheme-card-google"] .settings-status')
+    expect(status.text()).toMatch(/^成功 · \d+ ms$/)
+    expect(status.classes()).toContain('fast')
   })
 })
