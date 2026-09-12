@@ -3,12 +3,17 @@ import { bubbleCssVariables } from '../core/bubble'
 import type { DictionaryResult } from '../core/dictionary'
 import type { BubbleSettings, RectLike } from '../core/types'
 
+export interface DictionaryRenderOptions {
+  /** 提供时在单词卡片右上角渲染朗读按钮（▶）。 */
+  onSpeak?: () => void
+}
+
 export interface BubbleRenderer {
   root: HTMLElement
   content: HTMLElement
   showLoading(message: string, sourceWord?: string): void
-  showDictionary(sourceWord: string, result: DictionaryResult): void
-  showText(text: string): void
+  showDictionary(sourceWord: string, result: DictionaryResult, options?: DictionaryRenderOptions): void
+  showText(text: string, sourceWord?: string): void
   showError(message: string, retry?: () => void): void
   prepareForMeasure(minWidth: number, maxWidth: number): void
   applyPlacement(placement: BubblePlacement): void
@@ -46,7 +51,7 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
     content,
     showLoading(message, sourceWord = '') {
       const nodes: Node[] = []
-      if (sourceWord && settings.showOriginal) nodes.push(wordNode(sourceWord))
+      if (sourceWord && settings.showOriginal) nodes.push(sourceNode(sourceWord))
       const loading = document.createElement('div')
       loading.className = 'muted'
       loading.textContent = message
@@ -54,9 +59,9 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
       bubble.setAttribute('aria-busy', 'true')
       replaceContent(nodes)
     },
-    showDictionary(sourceWord, result) {
+    showDictionary(sourceWord, result, options) {
       const nodes: Node[] = []
-      if (settings.showOriginal) nodes.push(wordNode(sourceWord, result.pronunciation))
+      if (settings.showOriginal) nodes.push(wordNode(sourceWord, result.pronunciation, Boolean(options?.onSpeak)))
       if (result.meanings.length) {
         for (const meaning of result.meanings) {
           const line = document.createElement('div')
@@ -68,6 +73,8 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
             line.append(pos)
           }
           line.append(document.createTextNode(meaning.translations.join('；')))
+          // 释义行 CSS 限单行省略，悬停通过原生 tooltip 看全文
+          line.title = meaning.translations.join('；')
           nodes.push(line)
         }
       } else {
@@ -75,13 +82,26 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
       }
       bubble.setAttribute('aria-busy', 'false')
       replaceContent(nodes)
+      if (options?.onSpeak) {
+        // 按钮固定在卡片右上角（absolute 于 .content），不随音标长短 / 原文换行跳动
+        const speak = document.createElement('button')
+        speak.type = 'button'
+        speak.className = 'speak'
+        speak.title = '朗读'
+        speak.textContent = '▶'
+        speak.addEventListener('click', options.onSpeak)
+        content.append(speak)
+      }
     },
-    showText(text) {
+    showText(text, sourceWord = '') {
+      const nodes: Node[] = []
+      if (sourceWord && settings.showOriginal) nodes.push(sourceNode(sourceWord))
       const div = document.createElement('div')
       div.className = 'sentence'
       div.textContent = text
+      nodes.push(div)
       bubble.setAttribute('aria-busy', 'false')
-      replaceContent([div])
+      replaceContent(nodes)
     },
     showError(message, retry) {
       const nodes: Node[] = [emptyNode(message)]
@@ -146,9 +166,9 @@ export function boundsFromRange(range: Range): RectLike | null {
   }
 }
 
-function wordNode(word: string, pronunciation = ''): HTMLElement {
+function wordNode(word: string, pronunciation = '', speakable = false): HTMLElement {
   const div = document.createElement('div')
-  div.className = 'word'
+  div.className = speakable ? 'word speakable' : 'word'
   div.textContent = word
   if (pronunciation) {
     const span = document.createElement('span')
@@ -157,6 +177,16 @@ function wordNode(word: string, pronunciation = ''): HTMLElement {
     div.append(span)
   }
   return div
+}
+
+function sourceNode(text: string): HTMLElement {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'source'
+  const inner = document.createElement('span')
+  inner.className = 'source-text'
+  inner.textContent = text
+  wrapper.append(inner)
+  return wrapper
 }
 
 function emptyNode(text: string): HTMLElement {
@@ -176,7 +206,7 @@ const bubbleStyle = `
   display: none;
   width: max-content;
   min-width: 160px;
-  max-width: calc(100vw - 16px);
+  max-width: min(290px, calc(100vw - 16px));
   overflow: visible;
   border: var(--af-bubble-border-width, 1px) solid var(--af-bubble-border, #d6dae1);
   border-radius: var(--af-bubble-radius, 8px);
@@ -248,6 +278,10 @@ const bubbleStyle = `
   font-size: calc(var(--af-bubble-font-size, 14px) + 1px);
   font-weight: 650;
 }
+/* 有朗读按钮时原文行右侧预留 22px，否则长单词会压到按钮上 */
+.word.speakable {
+  padding-right: 22px;
+}
 .pronunciation,
 .pos {
   font-size: max(11px, calc(var(--af-bubble-font-size, 14px) - 2px));
@@ -262,7 +296,28 @@ const bubbleStyle = `
 }
 .result {
   margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/*
+ * 原文行（自定义方案路径）刻意与 .word（词典 freedictionaryapi 兜底路径）用同一套标题样式：
+ * 字号 +1px、字重 650、无分隔线。两条渲染路径的观感必须一致，改动请同时改 .word。
+ */
+.source {
+  margin-bottom: 3px;
+}
+
+.source-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: calc(var(--af-bubble-font-size, 14px) + 1px);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
 .sentence {
   white-space: pre-wrap;
   word-break: break-word;
@@ -282,5 +337,27 @@ button {
 }
 button:hover {
   background: rgb(0 0 0 / 0.06);
+}
+.speak {
+  position: absolute;
+  top: calc(var(--af-bubble-padding, 10px) + 2px);
+  right: calc(var(--af-bubble-padding, 10px) - 2px);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--af-bubble-border, #d6dae1);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.speak:hover {
+  opacity: 1;
 }
 `

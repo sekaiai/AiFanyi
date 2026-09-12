@@ -96,7 +96,8 @@ watch(() => props.settings, async () => {
         <div v-if="settings.showOriginal" class="preview-word">
           loved<span class="preview-pronunciation">/lʌvd/</span>
         </div>
-        <div><span class="preview-pos">v.</span>爱；喜欢</div>
+        <div class="preview-result"><span class="preview-pos">v.</span>爱；喜欢</div>
+        <span class="preview-speak" aria-hidden="true">▶</span>
       </div>
       <span class="preview-arrow" aria-hidden="true"></span>
     </div>
@@ -155,11 +156,34 @@ watch(() => props.settings, async () => {
 
 .preview-word {
   margin-bottom: 3px;
+  padding-right: 22px;
   font-size: calc(var(--af-bubble-font-size) + 1px);
   font-weight: 650;
 }
 
+/* 与真实气泡的 .speak 保持一致的装饰性朗读按钮 */
+.preview-speak {
+  position: absolute;
+  top: calc(var(--af-bubble-padding) + 2px);
+  right: calc(var(--af-bubble-padding) - 2px);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--af-bubble-border);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
 .preview-pronunciation,
+.preview-result {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preview-pos {
   font-size: max(11px, calc(var(--af-bubble-font-size) - 2px));
   font-weight: 400;

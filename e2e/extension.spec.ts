@@ -93,9 +93,9 @@ test.describe('AiFanyi extension', () => {
       document.dispatchEvent(new Event('selectionchange'))
     })
 
-    await expect(page.locator('.aifanyi-bubble, .bubble').first()).toContainText(
-      '学习另一种语言',
-    )
+    const bubble = page.locator('.aifanyi-bubble, .bubble').first()
+    await expect(bubble).toContainText('学习另一种语言')
+    await expect(bubble).toContainText('Learning another language can help you understand different cultures.')
 
     await context.close()
   })
