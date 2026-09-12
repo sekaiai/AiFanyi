@@ -7,11 +7,16 @@ export const VOLCENGINE_TRANSLATE_SERVICE = 'translate'
 export const VOLCENGINE_DEFAULT_REGION = 'cn-north-1'
 
 const VOLCENGINE_TIMEOUT_MS = 15000
-const SIGNED_HEADERS = 'host;x-content-sha256;x-date'
+
+// 该值同时参与签名与实发请求头，必须逐字节一致；改动需同步 CanonicalHeaders。
+const VOLCENGINE_CONTENT_TYPE = 'application/json'
+// 火山引擎要求：请求中存在 Content-Type 头域时，CanonicalHeaders 必须包含它。
+// 顺序需按字典序（content-type < host < x-content-sha256 < x-date）。
+const SIGNED_HEADERS = 'content-type;host;x-content-sha256;x-date'
 
 const TARGET_CODES: Record<string, string> = {
   '简体中文': 'zh',
-  '繁體中文': 'zh',
+  '繁體中文': 'zh-Hant',
   English: 'en',
   日本語: 'ja',
   한국어: 'ko',
@@ -47,21 +52,28 @@ export async function createVolcengineAuthorization(
   host = new URL(VOLCENGINE_TRANSLATE_ENDPOINT).host,
   now = new Date(),
 ): Promise<{ authorization: string; xDate: string; bodyHash: string }> {
+  // 凭证统一规范化：控制台复制 AK/SK 常带尾随空格或换行，带空白会让签名静默算错
+  // （AK 被 trim 后服务端能识别账号并进入验签，最终报 SignatureDoesNotMatch）。
+  const accessKey = accessKeyId.trim()
+  const secretKey = secretAccessKey.trim()
+  const serviceRegion = region.trim() || VOLCENGINE_DEFAULT_REGION
   const xDate = formatVolcengineDate(now)
   const shortDate = xDate.slice(0, 8)
   const bodyHash = await sha256Hex(body)
   const canonicalQuery = `Action=${VOLCENGINE_TRANSLATE_ACTION}&Version=${VOLCENGINE_TRANSLATE_VERSION}`
-  const canonicalHeaders = `host:${host}\n` + `x-content-sha256:${bodyHash}\n` + `x-date:${xDate}\n`
+  const canonicalHeaders = `content-type:${VOLCENGINE_CONTENT_TYPE}\n`
+    + `host:${host}\n`
+    + `x-content-sha256:${bodyHash}\n`
+    + `x-date:${xDate}\n`
   const canonicalRequest = `POST\n/\n${canonicalQuery}\n${canonicalHeaders}\n${SIGNED_HEADERS}\n${bodyHash}`
-  const serviceRegion = region.trim() || VOLCENGINE_DEFAULT_REGION
   const scope = `${shortDate}/${serviceRegion}/${VOLCENGINE_TRANSLATE_SERVICE}/request`
   const stringToSign = `HMAC-SHA256\n${xDate}\n${scope}\n${await sha256Hex(canonicalRequest)}`
-  const kDate = await hmacSha256(shortDate, secretAccessKey)
+  const kDate = await hmacSha256(shortDate, secretKey)
   const kRegion = await hmacSha256(serviceRegion, kDate)
   const kService = await hmacSha256(VOLCENGINE_TRANSLATE_SERVICE, kRegion)
   const kSigning = await hmacSha256('request', kService)
   const signature = bytesToHex(await hmacSha256(stringToSign, kSigning))
-  const authorization = `HMAC-SHA256 Credential=${accessKeyId.trim()}/${scope}, SignedHeaders=${SIGNED_HEADERS}, Signature=${signature}`
+  const authorization = `HMAC-SHA256 Credential=${accessKey}/${scope}, SignedHeaders=${SIGNED_HEADERS}, Signature=${signature}`
   return { authorization, xDate, bodyHash }
 }
 
@@ -86,7 +98,7 @@ export async function requestVolcengineTranslation(
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'Content-Type': 'application/json',
+        'Content-Type': VOLCENGINE_CONTENT_TYPE,
         Authorization: signed.authorization,
         'X-Date': signed.xDate,
         'X-Content-Sha256': signed.bodyHash,
@@ -104,7 +116,7 @@ export async function requestVolcengineTranslation(
     if (Object.keys(upstreamError).length) {
       const code = readString(upstreamError.Code) || readString(upstreamError.code) || '请求失败'
       const message = readString(upstreamError.Message) || readString(upstreamError.message) || '请求失败'
-      throw new Error(`火山引擎 ${code}：${message}`)
+      throw new Error(describeVolcengineError(code, message))
     }
     const resultRecord = readRecord(record.Result)
     const rawTranslations = record.TranslationList ?? resultRecord.TranslationList
@@ -141,4 +153,30 @@ function readRecord(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+/** 火山引擎错误码 → 可执行的排查指引。 */
+const VOLCENGINE_ERROR_GUIDES: Record<string, string> = {
+  SignatureDoesNotMatch: '签名校验失败。请确认 Secret Access Key 复制完整、首尾没有多余空格或换行，且 AK 与 SK 来自同一密钥对。',
+  InvalidClientTokenId: 'Access Key ID 不存在或已失效，请到「访问控制 → 密钥管理」重新生成。',
+  InvalidCredential: '凭证无效。请确认该密钥具备机器翻译权限，且账号已开通机器翻译服务。',
+  AccessDenied: '权限不足。请为该密钥授予机器翻译接口权限后重试。',
+  InvalidTimestamp: '请求时间无效。请校准本机系统时间（与标准时间偏差需在 15 分钟内）。',
+  SignatureExpired: '签名已过期。请校准本机系统时间后重试。',
+  MissingRequestInfo: '缺少必要请求信息。请确认「地域」填写为 cn-north-1。',
+}
+
+/** 仅收录已核实的数字错误码，其余按字符串 Code 匹配。 */
+const VOLCENGINE_NUMERIC_CODES: Record<string, string> = {
+  '100010': 'SignatureDoesNotMatch',
+  '100009': 'InvalidClientTokenId',
+  '100025': 'InvalidCredential',
+  '100006': 'InvalidTimestamp',
+  '100004': 'MissingRequestInfo',
+}
+
+export function describeVolcengineError(code: string, message: string): string {
+  const named = VOLCENGINE_ERROR_GUIDES[code] ? code : VOLCENGINE_NUMERIC_CODES[code]
+  const guide = named ? VOLCENGINE_ERROR_GUIDES[named] : ''
+  return guide ? `火山引擎 ${code}：${guide}` : `火山引擎 ${code}：${message}`
 }
