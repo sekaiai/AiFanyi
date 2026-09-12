@@ -1,0 +1,8 @@
+node_modules/
+.wxt/
+.output/
+dist-demo/
+playwright-report/
+test-results/
+coverage/
+*.log

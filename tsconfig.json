@@ -1,0 +1,24 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "types": ["node"]
+  },
+  "include": [
+    ".wxt/**/*.ts",
+    "entrypoints/**/*.ts",
+    "entrypoints/**/*.vue",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "demo/**/*.ts",
+    "demo/**/*.vue",
+    "tests/**/*.ts",
+    "vite.demo.config.ts",
+    "vitest.config.ts"
+  ]
+}
