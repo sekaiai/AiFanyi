@@ -1,5 +1,6 @@
 import type {
   AiSchemeSettings,
+  BaiduSchemeSettings,
   BubbleColorPreset,
   BubbleSettings,
   DeeplSchemeSettings,
@@ -7,6 +8,7 @@ import type {
   SchemeSettings,
   SchemeType,
   TranslationSettings,
+  VolcengineSchemeSettings,
 } from './types'
 
 export type { TranslationSettings } from './types'
@@ -170,6 +172,27 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
     }
     return scheme
   }
+  if (type === 'baidu') {
+    const scheme: BaiduSchemeSettings = {
+      id,
+      type,
+      enabled,
+      appId: readString(value.appId, ''),
+      secretKey: readString(value.secretKey, ''),
+    }
+    return scheme
+  }
+  if (type === 'volcengine') {
+    const scheme: VolcengineSchemeSettings = {
+      id,
+      type,
+      enabled,
+      accessKeyId: readString(value.accessKeyId, ''),
+      secretAccessKey: readString(value.secretAccessKey, ''),
+      region: readString(value.region, 'cn-north-1').trim() || 'cn-north-1',
+    }
+    return scheme
+  }
   if (type === 'ai') {
     const scheme: AiSchemeSettings = {
       id,
@@ -186,7 +209,7 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
 }
 
 function readSchemeType(value: unknown): SchemeType | null {
-  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'ai' ? value : null
+  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'baidu' || value === 'volcengine' || value === 'ai' ? value : null
 }
 
 export function validateAiUrl(url: string): string {

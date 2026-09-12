@@ -3,7 +3,7 @@ import type { ContentScriptContext } from 'wxt/utils/content-script-context'
 import { getBubblePlacement, getBubbleSizing } from '../src/core/bubble'
 import { LruCache } from '../src/core/lru'
 import { isSiteBlocked } from '../src/core/settings'
-import { createBrowserSettingsStorage } from '../src/extension/storage'
+import { createContentSettingsStorage } from '../src/extension/storage'
 import { classifySelection, getCaretFromPoint, getWordAtOffset, isIgnorableElement } from '../src/core/text'
 import { boundsFromRange, createBubbleRenderer } from '../src/extension/renderer'
 import type { ExtensionResponse } from '../src/core/messages'
@@ -24,7 +24,7 @@ export default defineContentScript({
 })
 
 async function run(ctx: ContentScriptContext): Promise<void> {
-  const storage = createBrowserSettingsStorage()
+  const storage = createContentSettingsStorage()
   let settings = await storage.load()
   const renderer = createBubbleRenderer(settings.bubble)
   const highlight = createHighlight()

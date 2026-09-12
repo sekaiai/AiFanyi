@@ -1,8 +1,8 @@
 import { browser } from 'wxt/browser'
-import { isExtensionMessage, toDisplayError } from '../src/core/messages'
+import { isExtensionMessage, isPublicSettingsRequest, toDisplayError, type PublicSettingsResponse } from '../src/core/messages'
 import { isSiteBlocked } from '../src/core/settings'
 import { runTranslation, translateWithScheme } from '../src/core/translate'
-import { createBrowserSettingsStorage } from '../src/extension/storage'
+import { createBrowserSettingsStorage, toContentSettings } from '../src/extension/storage'
 import type { ExtensionMessage, ExtensionResponse } from '../src/core/messages'
 import type { RequestId } from '../src/core/messages'
 import type { TranslateOutcome } from '../src/core/translate'
@@ -11,6 +11,8 @@ const storage = createBrowserSettingsStorage()
 const controllers = new Map<RequestId, AbortController>()
 
 export default defineBackground(() => {
+  restrictStorageToTrustedContexts()
+
   browser.runtime.onInstalled.addListener(({ reason }) => {
     if (reason === 'install') void browser.runtime.openOptionsPage()
   })
@@ -19,7 +21,14 @@ export default defineBackground(() => {
     void browser.runtime.openOptionsPage()
   })
 
-  browser.runtime.onMessage.addListener((message: unknown, sender): Promise<ExtensionResponse> | undefined => {
+  storage.subscribe((settings) => {
+    void browser.runtime.sendMessage({ type: 'settings.public.update', settings: toContentSettings(settings) }).catch(() => undefined)
+  })
+
+  browser.runtime.onMessage.addListener((message: unknown, sender): Promise<ExtensionResponse | PublicSettingsResponse> | undefined => {
+    if (isPublicSettingsRequest(message)) {
+      return storage.load().then((settings) => ({ type: 'settings.public.response', settings: toContentSettings(settings) }))
+    }
     if (!isExtensionMessage(message)) return undefined
     return handleMessage(message, sender.url)
   })
@@ -68,6 +77,13 @@ async function handleMessage(message: ExtensionMessage, senderUrl?: string): Pro
   } finally {
     controllers.delete(message.requestId)
   }
+}
+
+function restrictStorageToTrustedContexts(): void {
+  const localStorage = browser.storage.local as typeof browser.storage.local & {
+    setAccessLevel?: (options: { accessLevel: 'TRUSTED_CONTEXTS' | 'TRUSTED_AND_UNTRUSTED_CONTEXTS' }) => Promise<void>
+  }
+  void Promise.resolve(localStorage.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' })).catch(() => undefined)
 }
 
 function outcomeToResponse(outcome: TranslateOutcome, requestId: RequestId): ExtensionResponse {

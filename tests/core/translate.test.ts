@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cloneDefaultSettings } from '../../src/core/settings'
 import { hasRequiredConfig, runTranslation, translateWithScheme } from '../../src/core/translate'
+import { createBaiduSignature } from '../../src/core/baidu'
+import { md5Hex } from '../../src/core/md5'
+import { createVolcengineAuthorization, sha256Hex } from '../../src/core/volcengine'
 import type { SchemeSettings, TranslationSettings } from '../../src/core/types'
 
 const fetchMock = vi.fn()
@@ -8,6 +11,15 @@ const fetchMock = vi.fn()
 const deeplScheme: SchemeSettings = { id: 'deepl-1', type: 'deepl', enabled: true, authKey: 'dl-key', endpoint: 'free' }
 const googleScheme: SchemeSettings = { id: 'google-1', type: 'google', enabled: true }
 const cloudScheme: SchemeSettings = { id: 'cloud-1', type: 'googleCloud', enabled: true, apiKey: 'gcp-key' }
+const baiduScheme: SchemeSettings = { id: 'baidu-1', type: 'baidu', enabled: true, appId: 'app-id', secretKey: 'secret-key' }
+const volcengineScheme: SchemeSettings = {
+  id: 'volcengine-1',
+  type: 'volcengine',
+  enabled: true,
+  accessKeyId: 'ak-id',
+  secretAccessKey: 'secret-key',
+  region: 'cn-north-1',
+}
 const aiScheme: SchemeSettings = {
   id: 'ai-1',
   type: 'ai',
@@ -42,8 +54,35 @@ describe('hasRequiredConfig', () => {
     expect(hasRequiredConfig({ ...deeplScheme, authKey: ' ' })).toBe(false)
     expect(hasRequiredConfig(googleScheme)).toBe(true)
     expect(hasRequiredConfig({ ...cloudScheme, apiKey: '' })).toBe(false)
+    expect(hasRequiredConfig(baiduScheme)).toBe(true)
+    expect(hasRequiredConfig({ ...baiduScheme, secretKey: ' ' })).toBe(false)
+    expect(hasRequiredConfig(volcengineScheme)).toBe(true)
+    expect(hasRequiredConfig({ ...volcengineScheme, region: ' ' })).toBe(false)
     expect(hasRequiredConfig(aiScheme)).toBe(true)
     expect(hasRequiredConfig({ ...aiScheme, model: '' })).toBe(false)
+  })
+})
+
+describe('Baidu signing', () => {
+  it('calculates the standard MD5 digest', () => {
+    expect(md5Hex('abc')).toBe('900150983cd24fb0d6963f7d28e17f72')
+  })
+})
+
+describe('Volcengine signing', () => {
+  it('calculates SHA-256 and builds a V4 authorization header', async () => {
+    expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+    const signed = await createVolcengineAuthorization(
+      '{"TargetLanguage":"zh","TextList":["hello"]}',
+      'ak-id',
+      'secret-key',
+      'cn-north-1',
+      'translate.volcengineapi.com',
+      new Date('2024-01-02T03:04:05Z'),
+    )
+    expect(signed.xDate).toBe('20240102T030405Z')
+    expect(signed.bodyHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(signed.authorization).toMatch(/^HMAC-SHA256 Credential=ak-id\/20240102\/cn-north-1\/translate\/request, SignedHeaders=host;x-content-sha256;x-date, Signature=[a-f0-9]{64}$/)
   })
 })
 
@@ -90,6 +129,36 @@ describe('translateWithScheme', () => {
     expect(JSON.parse(String(requestInit(0).body))).toEqual({ q: 'hello', target: 'zh-CN', format: 'text' })
   })
 
+  it('signs Baidu requests and parses translated segments', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ trans_result: [{ src: 'hello', dst: '你好' }, { src: 'world', dst: '世界' }] }))
+
+    await expect(translateWithScheme(baiduScheme, 'hello world', '简体中文')).resolves.toEqual({ kind: 'text', text: '你好\n世界' })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://fanyi-api.baidu.com/api/trans/vip/translate')
+    expect(new Headers(requestInit(0).headers).get('content-type')).toContain('application/x-www-form-urlencoded')
+    const body = new URLSearchParams(String(requestInit(0).body))
+    expect(body.get('q')).toBe('hello world')
+    expect(body.get('from')).toBe('auto')
+    expect(body.get('to')).toBe('zh')
+    expect(body.get('appid')).toBe('app-id')
+    const salt = body.get('salt') ?? ''
+    expect(body.get('sign')).toBe(createBaiduSignature('app-id', 'hello world', salt, 'secret-key'))
+    expect(body.get('sign')).toMatch(/^[a-f0-9]{32}$/)
+  })
+
+  it('signs Volcengine requests and parses translated segments', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ TranslationList: [{ Translation: '你好' }, { Translation: '世界' }] }))
+
+    await expect(translateWithScheme(volcengineScheme, 'hello world', '简体中文')).resolves.toEqual({ kind: 'text', text: '你好\n世界' })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://translate.volcengineapi.com/?Action=TranslateText&Version=2020-06-01')
+    const headers = new Headers(requestInit(0).headers)
+    expect(headers.get('authorization')).toMatch(/^HMAC-SHA256 Credential=ak-id\//)
+    expect(headers.get('x-date')).toMatch(/^\d{8}T\d{6}Z$/)
+    expect(headers.get('x-content-sha256')).toMatch(/^[a-f0-9]{64}$/)
+    expect(JSON.parse(String(requestInit(0).body))).toEqual({ TargetLanguage: 'zh', TextList: ['hello world'] })
+  })
+
   it('maps the target language per provider', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ translations: [{ text: 'hello' }] }))
 
@@ -115,6 +184,12 @@ describe('translateWithScheme', () => {
 
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: { translations: [] } }))
     await expect(translateWithScheme(cloudScheme, 'hello', '简体中文')).rejects.toThrow('Google Cloud 返回内容为空。')
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ trans_result: [] }))
+    await expect(translateWithScheme(baiduScheme, 'hello', '简体中文')).rejects.toThrow('百度翻译返回内容为空。')
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ TranslationList: [] }))
+    await expect(translateWithScheme(volcengineScheme, 'hello', '简体中文')).rejects.toThrow('火山引擎返回内容为空。')
   })
 })
 

@@ -9,6 +9,7 @@ import {
   validateAiUrl,
 } from '../../src/core/settings'
 import { classifySelection, getWordAtOffset, normalizeSourceText } from '../../src/core/text'
+import { toContentSettings } from '../../src/extension/storage'
 
 describe('text classification', () => {
   it.each([
@@ -74,6 +75,31 @@ describe('settings', () => {
     expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['deepl', 'google'])
     expect(migrated.schemes[0]?.id).toBeTruthy()
     expect(migrated.schemes[1]?.id).toBe('g1')
+  })
+
+  it('keeps Baidu scheme credentials during migration', () => {
+    const migrated = migrateSettings({
+      schemes: [{ id: 'b1', type: 'baidu', enabled: true, appId: 'app', secretKey: 'key' }],
+    })
+    expect(migrated.schemes).toEqual([{ id: 'b1', type: 'baidu', enabled: true, appId: 'app', secretKey: 'key' }])
+  })
+
+  it('keeps Volcengine scheme credentials during migration', () => {
+    const migrated = migrateSettings({
+      schemes: [{ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' }],
+    })
+    expect(migrated.schemes).toEqual([{ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' }])
+  })
+
+  it('strips all provider credentials from content settings snapshots', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [
+      { id: 'a', type: 'ai', enabled: true, apiUrl: 'https://example.com', apiKey: 'secret', model: 'm', timeoutMs: 20000 },
+      { id: 'b', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-north-1' },
+    ]
+    const publicSettings = toContentSettings(settings)
+    expect(publicSettings.schemes).toEqual([])
+    expect(settings.schemes).toHaveLength(2)
   })
 
   it('validates AI URLs without accepting credentials or unsafe schemes', () => {

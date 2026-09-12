@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, shallowRef } from 'vue'
-import { TARGET_LANGUAGES, uid } from '../core/settings'
+import { computed, ref, shallowRef, toRaw } from 'vue'
+import { TARGET_LANGUAGES } from '../core/settings'
 import type { SchemeSettings, SchemeType } from '../core/types'
 import { hasRequiredConfig } from '../core/translate'
+import SchemeEditorModal from './SchemeEditorModal.vue'
 
 const schemes = defineModel<SchemeSettings[]>({ required: true })
 const targetLanguage = defineModel<string>('targetLanguage', { required: true })
@@ -14,14 +15,16 @@ const props = defineProps<{
 
 const SCHEME_TYPE_LABELS: Record<SchemeType, string> = {
   deepl: 'DeepL',
-  google: 'Google 翻译',
+  google: 'Google 翻译（免密钥）',
   googleCloud: 'Google Cloud',
+  baidu: '百度翻译',
+  volcengine: '火山引擎',
   ai: 'AI',
 }
 
-const newSchemeType = ref<SchemeType>('deepl')
-const shownSchemeKeys = ref<Record<string, boolean>>({})
 const testingSchemeId = shallowRef('')
+const editorVisible = ref(false)
+const editorDraft = ref<SchemeSettings | null>(null)
 
 interface SchemeTestOutcome {
   text: string
@@ -29,6 +32,7 @@ interface SchemeTestOutcome {
 }
 
 const schemeTestStatus = ref<Record<string, SchemeTestOutcome>>({})
+const schemeConfigured = computed(() => Object.fromEntries(schemes.value.map((scheme) => [scheme.id, hasRequiredConfig(scheme)])))
 
 function speedTone(ms: number): SchemeTestOutcome['tone'] {
   if (ms < 800) return 'fast'
@@ -36,13 +40,26 @@ function speedTone(ms: number): SchemeTestOutcome['tone'] {
   return 'slow'
 }
 
-function addScheme(): void {
-  const id = uid()
-  const type = newSchemeType.value
-  if (type === 'deepl') schemes.value.push({ id, type, enabled: true, authKey: '', endpoint: 'free' })
-  else if (type === 'google') schemes.value.push({ id, type, enabled: true })
-  else if (type === 'googleCloud') schemes.value.push({ id, type, enabled: true, apiKey: '' })
-  else schemes.value.push({ id, type, enabled: true, apiUrl: '', apiKey: '', model: '', timeoutMs: 20000 })
+function openAddScheme(): void {
+  editorDraft.value = null
+  editorVisible.value = true
+}
+
+function openEditScheme(scheme: SchemeSettings): void {
+  editorDraft.value = structuredClone(toRaw(scheme))
+  editorVisible.value = true
+}
+
+function closeEditor(): void {
+  editorVisible.value = false
+  editorDraft.value = null
+}
+
+function saveScheme(scheme: SchemeSettings): void {
+  const index = schemes.value.findIndex((item) => item.id === scheme.id)
+  if (index === -1) schemes.value.push(scheme)
+  else schemes.value.splice(index, 1, scheme)
+  closeEditor()
 }
 
 function removeScheme(id: string): void {
@@ -58,10 +75,6 @@ function moveScheme(id: string, offset: -1 | 1): void {
   const removed = list.splice(index, 1)[0]
   if (!removed) return
   list.splice(target, 0, removed)
-}
-
-function toggleSchemeKey(id: string): void {
-  shownSchemeKeys.value[id] = !shownSchemeKeys.value[id]
 }
 
 async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
@@ -90,6 +103,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
     <h2 class="section-title">翻译方案</h2>
     <p class="section-hint">按顺序依次尝试，排在最前面的优先使用；单词查询始终内置 freedictionaryapi 兜底。</p>
     <p v-if="demoMode" class="notice">在线演示中的 API 密钥只保存在当前页面内存，刷新后会消失。</p>
+    <p v-else class="notice security-notice">扩展密钥仅保存在本机受信任存储，由后台请求使用；网页内容脚本不会接收密钥。</p>
 
     <label class="field target-field">
       <span class="field-label">翻译目标语言</span>
@@ -101,52 +115,21 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
     <div class="scheme-list">
       <div v-for="(scheme, index) in schemes" :key="scheme.id" class="scheme-card" :data-testid="`scheme-card-${scheme.type}`">
         <div class="scheme-header">
-          <label class="switch-field scheme-switch">
-            <input v-model="scheme.enabled" type="checkbox" :data-testid="`scheme-toggle-${scheme.id}`" />
-            <span class="scheme-name">{{ SCHEME_TYPE_LABELS[scheme.type] }}</span>
-          </label>
+          <div class="scheme-title-row">
+            <label class="switch-field scheme-switch">
+              <input v-model="scheme.enabled" type="checkbox" :data-testid="`scheme-toggle-${scheme.id}`" />
+              <span class="scheme-name">{{ SCHEME_TYPE_LABELS[scheme.type] }}</span>
+            </label>
+            <span class="scheme-state" :class="schemeConfigured[scheme.id] ? 'configured' : 'incomplete'">
+              {{ schemeConfigured[scheme.id] ? '配置完成' : '待完善配置' }}
+            </span>
+          </div>
           <div class="scheme-actions">
             <button class="icon-button" type="button" title="上移" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
             <button class="icon-button" type="button" title="下移" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
+            <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" title="编辑" @click="openEditScheme(scheme)">✎</button>
             <button class="icon-button" type="button" title="删除" @click="removeScheme(scheme.id)">✕</button>
           </div>
-        </div>
-        <div class="scheme-body">
-          <template v-if="scheme.type === 'deepl'">
-            <label class="field"><span class="field-label">Auth Key</span><input v-model="scheme.authKey" type="password" autocomplete="off" placeholder="DeepL-Auth-Key" /></label>
-            <label class="field">
-              <span class="field-label">接口</span>
-              <select v-model="scheme.endpoint">
-                <option value="free">免费（api-free.deepl.com）</option>
-                <option value="pro">Pro（api.deepl.com）</option>
-              </select>
-            </label>
-          </template>
-          <p v-else-if="scheme.type === 'google'" class="field-hint">使用免费接口 translate.googleapis.com，无需额外配置。</p>
-          <template v-else-if="scheme.type === 'googleCloud'">
-            <label class="field wide key-field">
-              <span class="field-label">API Key</span>
-              <span class="key-row">
-                <input v-model="scheme.apiKey" :type="shownSchemeKeys[scheme.id] ? 'text' : 'password'" autocomplete="off" />
-                <button class="button button-secondary" type="button" @click="toggleSchemeKey(scheme.id)">{{ shownSchemeKeys[scheme.id] ? '隐藏' : '显示' }}</button>
-              </span>
-            </label>
-          </template>
-          <template v-else>
-            <label class="field wide"><span class="field-label">AI 地址</span><input v-model="scheme.apiUrl" placeholder="https://api.example.com/v1/chat/completions" /></label>
-            <label class="field"><span class="field-label">模型</span><input v-model="scheme.model" placeholder="gpt-4o-mini" /></label>
-            <label class="field key-field">
-              <span class="field-label">API 密钥</span>
-              <span class="key-row">
-                <input v-model="scheme.apiKey" :type="shownSchemeKeys[scheme.id] ? 'text' : 'password'" autocomplete="off" />
-                <button class="button button-secondary" type="button" @click="toggleSchemeKey(scheme.id)">{{ shownSchemeKeys[scheme.id] ? '隐藏' : '显示' }}</button>
-              </span>
-            </label>
-            <label class="range-field">
-              <span class="range-label">超时 <output>{{ Math.round(scheme.timeoutMs / 1000) }} s</output></span>
-              <input v-model.number="scheme.timeoutMs" type="range" min="5000" max="60000" step="1000" />
-            </label>
-          </template>
         </div>
         <div class="scheme-test">
           <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">测试</button>
@@ -163,14 +146,10 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
     </div>
 
     <div class="scheme-add">
-      <select v-model="newSchemeType" data-testid="scheme-type" class="add-select">
-        <option value="deepl">DeepL</option>
-        <option value="google">Google 翻译</option>
-        <option value="googleCloud">Google Cloud</option>
-        <option value="ai">AI</option>
-      </select>
-      <button class="button button-secondary" type="button" data-testid="add-scheme" @click="addScheme">添加方案</button>
+      <button class="button button-secondary add-button" type="button" data-testid="add-scheme" @click="openAddScheme">添加翻译方案</button>
     </div>
+
+    <SchemeEditorModal :visible="editorVisible" :initial-scheme="editorDraft" :demo-mode="demoMode" @close="closeEditor" @save="saveScheme" />
   </section>
 </template>
 
@@ -360,6 +339,13 @@ input[type="range"] {
   gap: 12px;
 }
 
+.scheme-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
 .scheme-name {
   font-size: 13px;
   font-weight: 640;
@@ -367,6 +353,23 @@ input[type="range"] {
 
 .scheme-switch {
   gap: 8px;
+}
+
+.scheme-state {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.scheme-state.configured {
+  background: color-mix(in srgb, var(--af-accent) 14%, transparent);
+  color: var(--af-accent);
+}
+
+.scheme-state.incomplete {
+  background: var(--af-control-hover);
+  color: var(--af-muted);
 }
 
 .scheme-actions {
@@ -398,16 +401,6 @@ input[type="range"] {
   opacity: 0.45;
 }
 
-.scheme-body {
-  display: grid;
-  gap: 10px 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.scheme-body .field.wide {
-  grid-column: 1 / -1;
-}
-
 .scheme-test {
   display: flex;
   align-items: center;
@@ -425,24 +418,13 @@ input[type="range"] {
   margin-top: 12px;
 }
 
-.add-select {
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
-}
-
-.add-select:focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
+.add-button {
+  width: 100%;
 }
 
 @media (max-width: 760px) {
-  .scheme-body {
-    grid-template-columns: 1fr;
+  .scheme-header {
+    align-items: flex-start;
   }
 }
 </style>

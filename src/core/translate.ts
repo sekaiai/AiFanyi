@@ -1,4 +1,6 @@
 import { requestAiTranslation } from './ai'
+import { requestBaiduTranslation } from './baidu'
+import { requestVolcengineTranslation } from './volcengine'
 import { lookupDictionary, type DictionaryResult } from './dictionary'
 import { extractSingleWord, normalizeSourceText } from './text'
 import type {
@@ -43,6 +45,10 @@ export function hasRequiredConfig(scheme: SchemeSettings): boolean {
       return true
     case 'googleCloud':
       return Boolean(scheme.apiKey.trim())
+    case 'baidu':
+      return Boolean(scheme.appId.trim() && scheme.secretKey.trim())
+    case 'volcengine':
+      return Boolean(scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim())
     case 'ai':
       return Boolean(scheme.apiUrl.trim() && scheme.apiKey.trim() && scheme.model.trim())
   }
@@ -62,6 +68,10 @@ export async function translateWithScheme(
       return { kind: 'text', text: await translateWithGoogle(source, targetLanguage, signal) }
     case 'googleCloud':
       return { kind: 'text', text: await translateWithGoogleCloud(scheme, source, targetLanguage, signal) }
+    case 'baidu':
+      return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
+    case 'volcengine':
+      return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':
       return { kind: 'text', text: await requestAiTranslation(source, scheme, targetLanguage, signal) }
   }

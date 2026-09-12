@@ -1,4 +1,5 @@
 import type { DictionaryResult } from './dictionary'
+import type { TranslationSettings } from './types'
 
 export type RequestId = string | number
 
@@ -6,6 +7,10 @@ export type ExtensionMessage =
   | { type: 'translation.request'; requestId: RequestId; text: string }
   | { type: 'translation.cancel'; requestId: RequestId }
   | { type: 'settings.testScheme'; requestId: RequestId; schemeId: string }
+
+export type PublicSettingsRequest = { type: 'settings.public.request' }
+export type PublicSettingsUpdate = { type: 'settings.public.update'; settings: TranslationSettings }
+export type PublicSettingsResponse = { type: 'settings.public.response'; settings: TranslationSettings }
 
 export type ExtensionResponse =
   | { ok: true; requestId: RequestId; kind: 'dictionary'; result: DictionaryResult }
@@ -26,6 +31,14 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
   if (message.type === 'translation.cancel') return true
   if (message.type === 'settings.testScheme') return typeof message.schemeId === 'string'
   return message.type === 'translation.request' && typeof message.text === 'string'
+}
+
+export function isPublicSettingsRequest(value: unknown): value is PublicSettingsRequest {
+  return typeof value === 'object' && value !== null && (value as Record<string, unknown>).type === 'settings.public.request'
+}
+
+export function isPublicSettingsUpdate(value: unknown): value is PublicSettingsUpdate {
+  return typeof value === 'object' && value !== null && (value as Record<string, unknown>).type === 'settings.public.update'
 }
 
 export function toDisplayError(error: unknown): DisplayError {

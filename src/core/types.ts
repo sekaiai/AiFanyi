@@ -28,7 +28,7 @@ export interface BubbleSettings {
   textAlign: BubbleTextAlign
 }
 
-export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'ai'
+export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'volcengine' | 'ai'
 
 interface SchemeBase {
   id: string
@@ -51,6 +51,19 @@ export interface GoogleCloudSchemeSettings extends SchemeBase {
   apiKey: string
 }
 
+export interface BaiduSchemeSettings extends SchemeBase {
+  type: 'baidu'
+  appId: string
+  secretKey: string
+}
+
+export interface VolcengineSchemeSettings extends SchemeBase {
+  type: 'volcengine'
+  accessKeyId: string
+  secretAccessKey: string
+  region: string
+}
+
 export interface AiSchemeSettings extends SchemeBase {
   type: 'ai'
   apiUrl: string
@@ -59,7 +72,7 @@ export interface AiSchemeSettings extends SchemeBase {
   timeoutMs: number
 }
 
-export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | AiSchemeSettings
+export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
 
 export interface TranslationSettings {
   version: 2
