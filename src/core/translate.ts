@@ -1,14 +1,16 @@
 import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
 import { requestVolcengineTranslation } from './volcengine'
-import { lookupDictionary, type DictionaryResult } from './dictionary'
+import { lookupDictionary } from './dictionary'
 import { extractSingleWord, normalizeSourceText } from './text'
+import { lookupWord, toFreeDictionaryResult, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
   DeeplSchemeSettings,
   GoogleCloudSchemeSettings,
   SchemeSettings,
   TranslationSettings,
+  WordSourceId,
 } from './types'
 
 const SCHEME_TIMEOUT_MS = 15000
@@ -34,25 +36,42 @@ function targetCodes(targetLanguage: string): { deepl: string; google: string } 
 }
 
 export type TranslateOutcome =
-  | { kind: 'dictionary'; result: DictionaryResult }
+  | { kind: 'dictionary'; result: WordResult }
   | { kind: 'text'; text: string }
 
+export interface WordLookupContext {
+  sources?: WordSourceId[]
+  probe?: WordProbeState | null
+}
+
 export function hasRequiredConfig(scheme: SchemeSettings): boolean {
+  return describeMissingConfig(scheme) === null
+}
+
+/** 返回方案缺失的必填项提示；配置齐全时返回 null。 */
+export function describeMissingConfig(scheme: SchemeSettings): string | null {
   switch (scheme.type) {
     case 'deepl':
-      return Boolean(scheme.authKey.trim())
+      return scheme.authKey.trim() ? null : '请填写 Auth Key'
     case 'google':
-      return true
+      return null
     case 'googleCloud':
-      return Boolean(scheme.apiKey.trim())
+      return scheme.apiKey.trim() ? null : '请填写 API Key'
     case 'baidu':
-      return Boolean(scheme.appId.trim() && scheme.secretKey.trim())
+      return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
     case 'volcengine':
-      return Boolean(scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim())
+      return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
+        ? null
+        : '请填写 Access Key ID、Secret Access Key 与地域'
     case 'ai':
-      return Boolean(scheme.apiUrl.trim() && scheme.apiKey.trim() && scheme.model.trim())
+      return scheme.apiUrl.trim() && scheme.apiKey.trim() && scheme.model.trim()
+        ? null
+        : '请填写 AI 地址、模型与 API 密钥'
   }
 }
+
+/** 各方案测试连通性时使用的固定探针文本。 */
+export const SCHEME_TEST_PHRASE = 'AiFanyi connection test.'
 
 export async function translateWithScheme(
   scheme: SchemeSettings,
@@ -81,7 +100,30 @@ export async function runTranslation(
   text: string,
   settings: TranslationSettings,
   signal?: AbortSignal,
+  wordContext?: WordLookupContext,
 ): Promise<TranslateOutcome> {
+  // 单词源池：单词优先走免费源池（四源平级轮换），不消耗「翻译方案」额度；
+  // 全部源都失败（或未启用任何源）时回落方案链。
+  const singleWord = extractSingleWord(text)
+  let poolTried = false
+  let poolError: unknown = null
+  if (singleWord && settings.word.enabled) {
+    poolTried = true
+    const enabledSources = (wordContext?.sources ?? [...WORD_SOURCE_IDS]).filter((source) => settings.word.sources[source] !== false)
+    try {
+      const result = await lookupWord(singleWord, {
+        sources: enabledSources,
+        targetLanguage: settings.targetLanguage,
+        accent: settings.word.accent,
+        probe: wordContext?.probe ?? null,
+      }, signal)
+      return { kind: 'dictionary', result }
+    } catch (error) {
+      if (isAbortError(error)) throw error
+      poolError = error
+    }
+  }
+
   const schemes = settings.schemes.filter((scheme) => scheme.enabled && hasRequiredConfig(scheme))
   let schemeError: unknown = null
   let schemeTried = false
@@ -95,18 +137,19 @@ export async function runTranslation(
     }
   }
 
-  const word = extractSingleWord(text)
-  if (word) {
+  // 单词池关闭时保留老的词典兜底（池开着就不重复打 freedictionaryapi：刚在池里试过）。
+  if (singleWord && !settings.word.enabled) {
     try {
-      return { kind: 'dictionary', result: await lookupDictionary(word, signal) }
+      return { kind: 'dictionary', result: toFreeDictionaryResult(await lookupDictionary(singleWord, signal)) }
     } catch (error) {
       if (isAbortError(error)) throw error
-      if (!schemeTried) throw error
+      if (!schemeTried && !poolTried) throw error
     }
   }
 
-  if (!schemeTried) throw new Error('请先在设置中添加翻译方案')
-  throw schemeError ?? new Error('翻译失败')
+  if (schemeTried) throw schemeError ?? new Error('翻译失败')
+  if (poolTried) throw poolError ?? new Error('单词查询失败')
+  throw new Error('请先在设置中添加翻译方案')
 }
 
 async function translateWithDeepl(

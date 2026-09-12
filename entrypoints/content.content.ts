@@ -2,10 +2,11 @@ import { browser } from 'wxt/browser'
 import type { ContentScriptContext } from 'wxt/utils/content-script-context'
 import { getBubblePlacement, getBubbleSizing } from '../src/core/bubble'
 import { LruCache } from '../src/core/lru'
-import { isSiteBlocked } from '../src/core/settings'
+import { isSiteBlocked, wordLookupDelay } from '../src/core/settings'
 import { createContentSettingsStorage } from '../src/extension/storage'
 import { classifySelection, getCaretFromPoint, getWordAtOffset, isIgnorableElement } from '../src/core/text'
 import { boundsFromRange, createBubbleRenderer } from '../src/extension/renderer'
+import { speakWord } from '../src/extension/speech'
 import type { ExtensionResponse } from '../src/core/messages'
 import type { TranslationSettings } from '../src/core/types'
 
@@ -41,6 +42,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
   let hoverTimer = 0
   let closeTimer = 0
   let selectionTimer = 0
+  let submitTimer = 0
 
   const unsubscribe = storage.subscribe((next) => {
     settings = next
@@ -90,7 +92,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
       currentRange = range
       currentText = word.word
       void submit('dictionary', word.word, range)
-    }, settings.hoverDelayMs)
+    }, wordLookupDelay(settings.hoverDelayMs))
   }, true)
 
   ctx.addEventListener(document, 'mousedown', () => {
@@ -155,12 +157,19 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     const action = classifySelection(selection.toString())
     if (action.type === 'empty') return
     window.clearTimeout(hoverTimer)
+    window.clearTimeout(submitTimer)
     hideHighlight(highlight)
     currentInteraction = 'selection'
     currentKind = action.type
     currentRange = range
     currentText = action.text
-    void submit(action.type, action.text, range)
+    // 划词查单词与悬停选词同一套延迟约束：遵守悬停延迟设置且最低 300ms；
+    // 句子 / 段落翻译保持即时（划词是主动操作）。
+    if (action.type === 'dictionary') {
+      submitTimer = window.setTimeout(() => void submit('dictionary', action.text, range), wordLookupDelay(settings.hoverDelayMs))
+    } else {
+      void submit(action.type, action.text, range)
+    }
   }
 
   async function submit(
@@ -177,7 +186,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
       renderResponse(cached, text, range)
       return
     }
-    renderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', kind === 'dictionary' ? text : '')
+    renderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', text)
     position(range)
     const response = await browser.runtime.sendMessage({
       type: 'translation.request',
@@ -197,9 +206,13 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     if (!response.ok) {
       renderer.showError(response.error.message, response.error.retryable && currentKind ? () => void submit(currentKind!, text, range) : undefined)
     } else if (response.kind === 'dictionary') {
-      renderer.showDictionary(text, response.result)
+      const wordResult = response.result
+      const speakable = settings.word.enabled && settings.word.speakEnabled
+      renderer.showDictionary(text, wordResult, speakable
+        ? { onSpeak: () => speakWord(text, settings.word.accent) }
+        : undefined)
     } else if (response.kind === 'text') {
-      renderer.showText(response.result)
+      renderer.showText(response.result, text)
     }
     position(range)
   }
@@ -233,6 +246,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
   function close(): void {
     abortRequest()
     window.clearTimeout(hoverTimer)
+    window.clearTimeout(submitTimer)
     window.clearTimeout(closeTimer)
     currentRange = null
     currentText = ''

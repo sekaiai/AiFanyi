@@ -9,6 +9,8 @@ export interface DictionaryResult {
   source: string
   pronunciation: string
   meanings: DictionaryMeaning[]
+  /** 展示用源名（单词源池填充；词典兜底为 'freedictionaryapi'）。 */
+  sourceLabel?: string
 }
 
 export async function lookupDictionary(word: string, signal?: AbortSignal): Promise<DictionaryResult> {

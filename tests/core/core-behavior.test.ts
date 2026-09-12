@@ -38,7 +38,7 @@ describe('settings', () => {
   it('migrates partial and invalid values safely', () => {
     const migrated = migrateSettings({ hoverDelayMs: 9999, bubble: { side: 'invalid', gap: -5 } })
     expect(migrated.version).toBe(2)
-    expect(migrated.hoverDelayMs).toBe(1000)
+    expect(migrated.hoverDelayMs).toBe(5000)
     expect(migrated.bubble.side).toBe('top')
     expect(migrated.bubble.gap).toBe(0)
     expect(migrated.schemes).toEqual([])

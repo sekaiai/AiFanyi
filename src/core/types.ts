@@ -74,6 +74,17 @@ export interface AiSchemeSettings extends SchemeBase {
 
 export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
 
+export type WordSourceId = 'youdao' | 'bing' | 'google' | 'freedictionaryapi'
+export type WordAccent = 'us' | 'uk'
+
+export interface WordQuerySettings {
+  /** 启用后，划选单个单词走免费源池，不再消耗「翻译方案」额度。 */
+  enabled: boolean
+  speakEnabled: boolean
+  accent: WordAccent
+  sources: Record<WordSourceId, boolean>
+}
+
 export interface TranslationSettings {
   version: 2
   enabled: boolean
@@ -84,6 +95,7 @@ export interface TranslationSettings {
   targetLanguage: string
   bubble: BubbleSettings
   schemes: SchemeSettings[]
+  word: WordQuerySettings
 }
 
 export interface RectLike {

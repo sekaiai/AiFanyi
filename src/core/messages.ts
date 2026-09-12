@@ -1,22 +1,41 @@
 import type { DictionaryResult } from './dictionary'
-import type { TranslationSettings } from './types'
+import type { SchemeSettings, TranslationSettings } from './types'
+import type { WordProbeState, WordResult } from './word-sources'
 
 export type RequestId = string | number
 
 export type ExtensionMessage =
   | { type: 'translation.request'; requestId: RequestId; text: string }
   | { type: 'translation.cancel'; requestId: RequestId }
-  | { type: 'settings.testScheme'; requestId: RequestId; schemeId: string }
+  | { type: 'settings.testScheme'; requestId: RequestId; scheme: SchemeSettings }
 
 export type PublicSettingsRequest = { type: 'settings.public.request' }
 export type PublicSettingsUpdate = { type: 'settings.public.update'; settings: TranslationSettings }
 export type PublicSettingsResponse = { type: 'settings.public.response'; settings: TranslationSettings }
 
+export type WordSourcesMessage =
+  | { type: 'wordSources.state'; requestId: RequestId }
+  | { type: 'wordSources.probe'; requestId: RequestId }
+
+export type WordSourcesResponse =
+  | { type: 'wordSources.state'; requestId: RequestId; state: WordProbeState }
+  | { type: 'wordSources.probe'; requestId: RequestId; state: WordProbeState }
+
 export type ExtensionResponse =
-  | { ok: true; requestId: RequestId; kind: 'dictionary'; result: DictionaryResult }
+  | { ok: true; requestId: RequestId; kind: 'dictionary'; result: WordResult }
   | { ok: true; requestId: RequestId; kind: 'text'; result: string }
   | { ok: true; requestId: RequestId; kind: 'cancelled' | 'tested' }
   | { ok: false; requestId: RequestId; error: DisplayError }
+
+/** 词典兜底结果的兼容包装：老调用点手写响应体时补齐 WordResult 必需字段。 */
+export function dictionaryResponse(requestId: RequestId, result: DictionaryResult): ExtensionResponse {
+  return {
+    ok: true,
+    requestId,
+    kind: 'dictionary',
+    result: { ...result, source: 'freedictionaryapi', sourceLabel: 'freedictionaryapi' },
+  }
+}
 
 export interface DisplayError {
   code: 'cancelled' | 'bad_config' | 'disabled' | 'blacklisted' | 'http' | 'timeout' | 'empty' | 'parse' | 'network' | 'unknown'
@@ -29,8 +48,20 @@ export function isExtensionMessage(value: unknown): value is ExtensionMessage {
   const message = value as Record<string, unknown>
   if (typeof message.requestId !== 'string' && typeof message.requestId !== 'number') return false
   if (message.type === 'translation.cancel') return true
-  if (message.type === 'settings.testScheme') return typeof message.schemeId === 'string'
+  if (message.type === 'settings.testScheme') return isSchemeSettings(message.scheme)
   return message.type === 'translation.request' && typeof message.text === 'string'
+}
+
+export function isWordSourcesMessage(value: unknown): value is WordSourcesMessage {
+  if (typeof value !== 'object' || value === null) return false
+  const type = (value as Record<string, unknown>).type
+  return type === 'wordSources.state' || type === 'wordSources.probe'
+}
+
+function isSchemeSettings(value: unknown): value is SchemeSettings {
+  if (typeof value !== 'object' || value === null) return false
+  const scheme = value as Record<string, unknown>
+  return typeof scheme.id === 'string' && typeof scheme.type === 'string'
 }
 
 export function isPublicSettingsRequest(value: unknown): value is PublicSettingsRequest {

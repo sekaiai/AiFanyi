@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { browser } from 'wxt/browser'
+import { onMounted, shallowRef } from 'vue'
 import { useSettingsModel } from '../composables/useSettingsModel'
-import type { ExtensionResponse } from '../core/messages'
+import type { ExtensionResponse, WordSourcesResponse } from '../core/messages'
+import type { SchemeSettings } from '../core/types'
+import type { WordProbeState } from '../core/word-sources'
 import { createBrowserSettingsStorage } from '../extension/storage'
 import DemoApp from '../demo/DemoApp.vue'
 import SchemesSection from './SchemesSection.vue'
@@ -9,11 +12,41 @@ import SettingsForm from './SettingsForm.vue'
 
 const { settings, stateLabel, reset } = useSettingsModel(createBrowserSettingsStorage())
 
-async function testScheme(schemeId: string): Promise<string> {
+const wordProbe = shallowRef<WordProbeState | null>(null)
+const probingWords = shallowRef(false)
+
+onMounted(async () => {
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'wordSources.state',
+      requestId: `word-state-${Date.now()}`,
+    }) as WordSourcesResponse
+    wordProbe.value = response.state
+  } catch {
+    // 后台不可达时保持 null（显示「未检测」）
+  }
+})
+
+async function probeWords(): Promise<void> {
+  probingWords.value = true
+  try {
+    const response = await browser.runtime.sendMessage({
+      type: 'wordSources.probe',
+      requestId: `word-probe-${Date.now()}`,
+    }) as WordSourcesResponse
+    wordProbe.value = response.state
+  } catch {
+    // 忽略：保留上一次的探测结果
+  } finally {
+    probingWords.value = false
+  }
+}
+
+async function testScheme(scheme: SchemeSettings): Promise<string> {
   const response = await browser.runtime.sendMessage({
     type: 'settings.testScheme',
-    requestId: `settings-${schemeId}-${Date.now()}`,
-    schemeId,
+    requestId: `settings-${scheme.id}-${Date.now()}`,
+    scheme,
   }) as ExtensionResponse
   if (!response.ok) throw new Error(response.error.message)
   return '方案配置可用'
@@ -42,7 +75,14 @@ async function requestDemo(
       </section>
     </div>
     <aside class="settings-column" aria-label="扩展设置">
-      <SettingsForm v-model="settings" :status="stateLabel" @reset="reset" />
+      <SettingsForm
+        v-model="settings"
+        :status="stateLabel"
+        :word-probe="wordProbe"
+        :probing="probingWords"
+        @reset="reset"
+        @probe-words="probeWords"
+      />
     </aside>
   </main>
 </template>

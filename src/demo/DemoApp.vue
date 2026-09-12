@@ -3,12 +3,14 @@ import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import SchemesSection from '../components/SchemesSection.vue'
 import SettingsForm from '../components/SettingsForm.vue'
 import { toDisplayError, type ExtensionResponse } from '../core/messages'
-import { cloneDefaultSettings, type TranslationSettings } from '../core/settings'
+import { cloneDefaultSettings, wordLookupDelay, type TranslationSettings } from '../core/settings'
 import { classifySelection, getCaretFromPoint } from '../core/text'
-import { runTranslation, translateWithScheme } from '../core/translate'
+import { runTranslation, SCHEME_TEST_PHRASE, translateWithScheme } from '../core/translate'
+import type { SchemeSettings } from '../core/types'
 import { LruCache } from '../core/lru'
 import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import { boundsFromRange, createBubbleRenderer } from '../extension/renderer'
+import { speakWord } from '../extension/speech'
 
 const props = withDefaults(defineProps<{
   settings?: TranslationSettings
@@ -33,6 +35,7 @@ let currentText = ''
 let requestId = 0
 let activeRequest = 0
 let hoverTimer = 0
+let submitTimer = 0
 
 const handleMouseMove = (event: MouseEvent) => {
   window.clearTimeout(hoverTimer)
@@ -54,7 +57,7 @@ const handleMouseMove = (event: MouseEvent) => {
     currentRange = range
     currentText = match[0]
     void requestTranslation('dictionary', match[0], range)
-  }, settings.value.hoverDelayMs)
+  }, wordLookupDelay(settings.value.hoverDelayMs))
 }
 
 const handleSelectionChange = () => window.setTimeout(handleSelection, 0)
@@ -89,12 +92,10 @@ function reset() {
   settings.value = cloneDefaultSettings()
 }
 
-async function testScheme(schemeId: string) {
-  const scheme = settings.value.schemes.find((item) => item.id === schemeId)
-  if (!scheme) throw new Error('未找到对应的翻译方案')
+async function testScheme(scheme: SchemeSettings) {
   status.value = '正在测试方案…'
   try {
-    await translateWithScheme(scheme, 'AiFanyi connection test.', settings.value.targetLanguage)
+    await translateWithScheme(scheme, SCHEME_TEST_PHRASE, settings.value.targetLanguage)
     status.value = '方案连接可用'
     return '方案连接可用'
   } catch (error) {
@@ -115,7 +116,13 @@ function handleSelection() {
   if (action.type === 'empty') return
   currentRange = range
   currentText = action.text
-  void requestTranslation(action.type, action.text, range)
+  // 与扩展端一致：划词查单词遵守悬停延迟设置且最低 300ms；句子翻译即时。
+  if (action.type === 'dictionary') {
+    window.clearTimeout(submitTimer)
+    submitTimer = window.setTimeout(() => void requestTranslation('dictionary', action.text, range), wordLookupDelay(settings.value.hoverDelayMs))
+  } else {
+    void requestTranslation(action.type, action.text, range)
+  }
 }
 
 async function requestTranslation(kind: 'dictionary' | 'ai', text: string, range: Range) {
@@ -151,8 +158,14 @@ async function translationResponse(id: number, text: string): Promise<ExtensionR
 
 function renderResponse(response: ExtensionResponse, sourceText: string, range: Range) {
   if (!renderer) return
-  if (response.ok && response.kind === 'dictionary') renderer.showDictionary(sourceText, response.result)
-  else if (response.ok && response.kind === 'text') renderer.showText(response.result)
+  if (response.ok && response.kind === 'dictionary') {
+    const wordResult = response.result
+    const speakable = settings.value.word.enabled && settings.value.word.speakEnabled
+    renderer.showDictionary(sourceText, wordResult, speakable
+      ? { onSpeak: () => speakWord(sourceText, settings.value.word.accent) }
+      : undefined)
+  }
+  else if (response.ok && response.kind === 'text') renderer.showText(response.result, sourceText)
   else if (!response.ok) renderer.showError(response.error.message, response.error.retryable ? () => void requestTranslation(classifySelection(sourceText).type === 'dictionary' ? 'dictionary' : 'ai', sourceText, range) : undefined)
   positionBubble(range)
 }

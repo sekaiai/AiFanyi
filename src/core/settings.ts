@@ -9,6 +9,9 @@ import type {
   SchemeType,
   TranslationSettings,
   VolcengineSchemeSettings,
+  WordAccent,
+  WordQuerySettings,
+  WordSourceId,
 } from './types'
 
 export type { TranslationSettings } from './types'
@@ -36,6 +39,14 @@ export const SHADOWS: Record<BubbleSettings['shadow'], string> = {
   soft: '0 6px 20px rgba(27, 34, 46, 0.12)',
   medium: '0 10px 30px rgba(27, 34, 46, 0.18)',
   strong: '0 16px 44px rgba(27, 34, 46, 0.26)',
+}
+
+/** 单词查询的最低触发延迟：无论悬停延迟设为多少，查单词至少等 300ms，避免扫过单词时连环打接口。 */
+export const WORD_LOOKUP_MIN_DELAY_MS = 300
+
+/** 单词查询的实际触发延迟：遵守悬停延迟设置，但不低于 300ms 下限。 */
+export function wordLookupDelay(hoverDelayMs: number): number {
+  return Math.max(hoverDelayMs, WORD_LOOKUP_MIN_DELAY_MS)
 }
 
 export const DEFAULT_SETTINGS: TranslationSettings = {
@@ -67,6 +78,12 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     textAlign: 'left',
   },
   schemes: [],
+  word: {
+    enabled: true,
+    speakEnabled: true,
+    accent: 'us',
+    sources: { youdao: true, bing: true, google: true, freedictionaryapi: true },
+  },
 }
 
 export function cloneDefaultSettings(): TranslationSettings {
@@ -99,7 +116,7 @@ export function migrateSettings(value: unknown): TranslationSettings {
     enabled: readBoolean(input.enabled, defaults.enabled),
     hoverEnabled: readBoolean(input.hoverEnabled, defaults.hoverEnabled),
     selectionEnabled: readBoolean(input.selectionEnabled, defaults.selectionEnabled),
-    hoverDelayMs: clampNumber(input.hoverDelayMs, 0, 1000, defaults.hoverDelayMs),
+    hoverDelayMs: clampNumber(input.hoverDelayMs, 0, 5000, defaults.hoverDelayMs),
     targetLanguage: readEnum(input.targetLanguage, TARGET_LANGUAGES, defaults.targetLanguage),
     siteBlacklist: Array.isArray(input.siteBlacklist)
       ? input.siteBlacklist.map((item) => String(item).trim()).filter(Boolean)
@@ -121,6 +138,23 @@ export function migrateSettings(value: unknown): TranslationSettings {
       lineHeight: clampNumber(bubble.lineHeight, 1, 2.4, defaults.bubble.lineHeight),
     },
     schemes: readSchemes(input, defaults.schemes),
+    word: readWordSettings(input.word, defaults.word),
+  }
+}
+
+const WORD_SOURCE_KEYS: readonly WordSourceId[] = ['youdao', 'bing', 'google', 'freedictionaryapi']
+
+function readWordSettings(value: unknown, fallback: WordQuerySettings): WordQuerySettings {
+  const raw = isRecord(value) ? value : {}
+  const rawSources = isRecord(raw.sources) ? raw.sources : {}
+  const sources = Object.fromEntries(
+    WORD_SOURCE_KEYS.map((key) => [key, readBoolean(rawSources[key], fallback.sources[key])]),
+  ) as WordQuerySettings['sources']
+  return {
+    enabled: readBoolean(raw.enabled, fallback.enabled),
+    speakEnabled: readBoolean(raw.speakEnabled, fallback.speakEnabled),
+    accent: readEnum<WordAccent>(raw.accent, ['us', 'uk'], fallback.accent),
+    sources,
   }
 }
 
@@ -187,8 +221,9 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
       id,
       type,
       enabled,
-      accessKeyId: readString(value.accessKeyId, ''),
-      secretAccessKey: readString(value.secretAccessKey, ''),
+      // 控制台复制常带尾随空白，参与签名的凭证必须干净，否则会报 SignatureDoesNotMatch。
+      accessKeyId: readString(value.accessKeyId, '').trim(),
+      secretAccessKey: readString(value.secretAccessKey, '').trim(),
       region: readString(value.region, 'cn-north-1').trim() || 'cn-north-1',
     }
     return scheme

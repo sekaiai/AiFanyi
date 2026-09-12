@@ -3,7 +3,7 @@ import { cloneDefaultSettings } from '../../src/core/settings'
 import { hasRequiredConfig, runTranslation, translateWithScheme } from '../../src/core/translate'
 import { createBaiduSignature } from '../../src/core/baidu'
 import { md5Hex } from '../../src/core/md5'
-import { createVolcengineAuthorization, sha256Hex } from '../../src/core/volcengine'
+import { createVolcengineAuthorization, sha256Hex, volcengineTargetCode } from '../../src/core/volcengine'
 import type { SchemeSettings, TranslationSettings } from '../../src/core/types'
 
 const fetchMock = vi.fn()
@@ -30,9 +30,12 @@ const aiScheme: SchemeSettings = {
   timeoutMs: 20000,
 }
 
-function settingsWithSchemes(schemes: SchemeSettings[]): TranslationSettings {
+function settingsWithSchemes(schemes: SchemeSettings[], options?: { wordPoolEnabled?: boolean }): TranslationSettings {
   const settings = cloneDefaultSettings()
   settings.schemes = schemes
+  // 默认关掉单词源池：这里绝大多数用例验证的是「方案链」语义，
+  // 单词源池的行为在下面的专属 describe 里单独覆盖。
+  settings.word.enabled = options?.wordPoolEnabled ?? false
   return settings
 }
 
@@ -70,19 +73,41 @@ describe('Baidu signing', () => {
 })
 
 describe('Volcengine signing', () => {
-  it('calculates SHA-256 and builds a V4 authorization header', async () => {
+  const fixedDate = new Date('2024-01-02T03:04:05Z')
+  const fixedBody = '{"TargetLanguage":"zh","TextList":["hello"]}'
+
+  const signFixed = (ak = 'ak-id', sk = 'secret-key', region = 'cn-north-1') =>
+    createVolcengineAuthorization(fixedBody, ak, sk, region, 'translate.volcengineapi.com', fixedDate)
+
+  it('hashes payloads with SHA-256 (lowercase hex)', async () => {
     expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
-    const signed = await createVolcengineAuthorization(
-      '{"TargetLanguage":"zh","TextList":["hello"]}',
-      'ak-id',
-      'secret-key',
-      'cn-north-1',
-      'translate.volcengineapi.com',
-      new Date('2024-01-02T03:04:05Z'),
-    )
+  })
+
+  // 固定值回归：期望值由独立实现（Node crypto 与 OpenSSL CLI）交叉复算得出。
+  // 签名串里 content-type 必须参与（火山引擎要求「请求中存在 Content-Type 时 CanonicalHeaders 必须包含它」），
+  // 任意一次改动如果动了换行、头顺序或派生链，这里会立刻失败。
+  it('derives a stable V4 authorization header', async () => {
+    const signed = await signFixed()
+
     expect(signed.xDate).toBe('20240102T030405Z')
-    expect(signed.bodyHash).toMatch(/^[a-f0-9]{64}$/)
-    expect(signed.authorization).toMatch(/^HMAC-SHA256 Credential=ak-id\/20240102\/cn-north-1\/translate\/request, SignedHeaders=host;x-content-sha256;x-date, Signature=[a-f0-9]{64}$/)
+    expect(signed.bodyHash).toBe('5b531d1f4a82214c5a0af857be50e3c162e19dbc2ba1ef04a591f5432ed3dc15')
+    expect(signed.authorization).toBe(
+      'HMAC-SHA256 Credential=ak-id/20240102/cn-north-1/translate/request, '
+      + 'SignedHeaders=content-type;host;x-content-sha256;x-date, '
+      + 'Signature=e564375a6e199743f85a5faea70a5c10e19deeaf155c7b30943a18a4e2e3d6b9',
+    )
+  })
+
+  it('normalizes whitespace around credentials before signing', async () => {
+    const clean = await signFixed()
+    const messy = await signFixed(' ak-id\n', 'secret-key \n', ' cn-north-1 ')
+
+    expect(messy.authorization).toBe(clean.authorization)
+  })
+
+  it('maps the traditional Chinese target to zh-Hant', () => {
+    expect(volcengineTargetCode('繁體中文')).toBe('zh-Hant')
+    expect(volcengineTargetCode('简体中文')).toBe('zh')
   })
 })
 
@@ -153,7 +178,9 @@ describe('translateWithScheme', () => {
 
     expect(fetchMock.mock.calls[0]?.[0]).toBe('https://translate.volcengineapi.com/?Action=TranslateText&Version=2020-06-01')
     const headers = new Headers(requestInit(0).headers)
-    expect(headers.get('authorization')).toMatch(/^HMAC-SHA256 Credential=ak-id\//)
+    expect(headers.get('authorization')).toMatch(/^HMAC-SHA256 Credential=ak-id\/\d{8}\/cn-north-1\/translate\/request, SignedHeaders=content-type;host;x-content-sha256;x-date, Signature=[a-f0-9]{64}$/)
+    // 签名值与实发值必须一致，否则网关重建 CanonicalHeaders 会报 SignatureDoesNotMatch。
+    expect(headers.get('content-type')).toBe('application/json')
     expect(headers.get('x-date')).toMatch(/^\d{8}T\d{6}Z$/)
     expect(headers.get('x-content-sha256')).toMatch(/^[a-f0-9]{64}$/)
     expect(JSON.parse(String(requestInit(0).body))).toEqual({ TargetLanguage: 'zh', TextList: ['hello world'] })
@@ -246,7 +273,7 @@ describe('runTranslation', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('falls back to the dictionary for single words when no schemes exist', async () => {
+  it('falls back to the dictionary for single words when the word pool is disabled and no schemes exist', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([
       {
         pronunciations: [{ type: 'ipa', text: '/həˈloʊ/' }],
@@ -259,9 +286,88 @@ describe('runTranslation', () => {
 
     expect(outcome).toEqual({
       kind: 'dictionary',
-      result: { source: 'hello', pronunciation: '/həˈloʊ/', meanings: [{ partOfSpeech: 'int.', translations: ['你好'] }] },
+      result: {
+        source: 'freedictionaryapi',
+        sourceLabel: 'freedictionaryapi',
+        pronunciation: '/həˈloʊ/',
+        meanings: [{ partOfSpeech: 'int.', translations: ['你好'] }],
+      },
     })
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://freedictionaryapi.com/api/v1/entries/en/hello?translations=true')
+  })
+
+  it('routes single words through the word pool without touching schemes when the pool is enabled', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      ec: {
+        word: [
+          {
+            usphone: 'lʌvd',
+            ukphone: 'lʌvd',
+            trs: [{ tr: [{ l: { i: ['v. 爱，热爱（love 的过去式和过去分词）'] } }] }],
+          },
+        ],
+      },
+    }))
+
+    const settings = settingsWithSchemes([deeplScheme], { wordPoolEnabled: true })
+    settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
+
+    const outcome = await runTranslation('loved', settings, undefined, {
+      // freedictionaryapi 置 false：四源平级后组内随机，用探测固定 youdao 打头
+      probe: { checkedAt: 1, results: { youdao: true, bing: false, google: false, freedictionaryapi: false } },
+    })
+
+    expect(outcome).toEqual({
+      kind: 'dictionary',
+      result: {
+        source: 'youdao',
+        sourceLabel: '有道词典',
+        pronunciation: '/lʌvd/',
+        meanings: [{ partOfSpeech: 'v.', translations: ['爱，热爱（love 的过去式和过去分词）'] }],
+      },
+    })
+    // 只打了一个请求：有道命中后立即返回，方案（DeepL）从未被调用
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://dict.youdao.com/jsonapi?q=loved')
+  })
+
+  it('falls back to the configured scheme after every word pool source fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('down', { status: 503 }))
+      .mockResolvedValueOnce(new Response('down', { status: 503 }))
+      .mockResolvedValueOnce(jsonResponse({ translations: [{ text: '你好' }] }))
+
+    const settings = settingsWithSchemes([deeplScheme], { wordPoolEnabled: true })
+    settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
+
+    const outcome = await runTranslation('loved', settings)
+
+    expect(outcome).toEqual({ kind: 'text', text: '你好' })
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    expect(String(fetchMock.mock.calls[2]?.[0])).toBe('https://api-free.deepl.com/v2/translate')
+  })
+
+  it('reports the pool error when all sources fail and no scheme exists', async () => {
+    fetchMock.mockResolvedValue(new Response('down', { status: 503 }))
+
+    const settings = settingsWithSchemes([], { wordPoolEnabled: true })
+    settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
+
+    await expect(runTranslation('loved', settings)).rejects.toThrow('单词查询失败：HTTP 503')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('falls back to the scheme when no word source is enabled at all', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ translations: [{ text: '你好' }] }))
+
+    const settings = settingsWithSchemes([deeplScheme], { wordPoolEnabled: true })
+    settings.word.sources = { youdao: false, bing: false, google: false, freedictionaryapi: false }
+
+    const outcome = await runTranslation('loved', settings)
+
+    expect(outcome).toEqual({ kind: 'text', text: '你好' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://api-free.deepl.com/v2/translate')
   })
 
   it('does not use the dictionary fallback for multi-word text', async () => {

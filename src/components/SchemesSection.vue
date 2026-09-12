@@ -9,17 +9,17 @@ const schemes = defineModel<SchemeSettings[]>({ required: true })
 const targetLanguage = defineModel<string>('targetLanguage', { required: true })
 
 const props = defineProps<{
-  testScheme?: (schemeId: string) => Promise<string>
+  testScheme?: (scheme: SchemeSettings) => Promise<string>
   demoMode?: boolean
 }>()
 
 const SCHEME_TYPE_LABELS: Record<SchemeType, string> = {
+  ai: '自定义AI',
+  baidu: '百度翻译',
+  volcengine: '火山引擎',
   deepl: 'DeepL',
   google: 'Google 翻译（免密钥）',
   googleCloud: 'Google Cloud',
-  baidu: '百度翻译',
-  volcengine: '火山引擎',
-  ai: 'AI',
 }
 
 const testingSchemeId = shallowRef('')
@@ -87,7 +87,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   schemeTestStatus.value[scheme.id] = { text: '正在测试...', tone: 'idle' }
   const startedAt = performance.now()
   try {
-    await props.testScheme(scheme.id)
+    await props.testScheme(scheme)
     const latencyMs = Math.round(performance.now() - startedAt)
     schemeTestStatus.value[scheme.id] = { text: `成功 · ${latencyMs} ms`, tone: speedTone(latencyMs) }
   } catch (error) {
@@ -149,7 +149,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
       <button class="button button-secondary add-button" type="button" data-testid="add-scheme" @click="openAddScheme">添加翻译方案</button>
     </div>
 
-    <SchemeEditorModal :visible="editorVisible" :initial-scheme="editorDraft" :demo-mode="demoMode" @close="closeEditor" @save="saveScheme" />
+    <SchemeEditorModal :visible="editorVisible" :initial-scheme="editorDraft" :test-scheme="testScheme" :demo-mode="demoMode" @close="closeEditor" @save="saveScheme" />
   </section>
 </template>
 
@@ -271,6 +271,7 @@ input[type="range"] {
   border-radius: 7px;
   font-weight: 600;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+  white-space: nowrap;
 }
 
 .button-secondary {
