@@ -78,7 +78,7 @@ async function handleTestAi(): Promise<void> {
         <label class="switch-field"><input v-model="settings.bubble.showArrow" type="checkbox" /> 显示箭头</label>
       </div>
       <label class="range-field">
-        <span class="range-label">悬停延迟 <output>{{ settings.hoverDelayMs }} ms</output></span>
+        <span class="range-label">鼠标悬停单词上 {{ settings.hoverDelayMs }}ms 后显示翻译 </span>
         <input v-model.number="settings.hoverDelayMs" type="range" min="0" max="1000" step="50" />
       </label>
       <label class="field">
@@ -90,36 +90,40 @@ async function handleTestAi(): Promise<void> {
     <section class="settings-section">
       <h2 class="section-title">位置</h2>
       <div class="control-grid two">
-        <label class="field">
-          <span class="field-label">方向</span>
-          <select v-model="settings.bubble.side" data-testid="bubble-side">
-            <option value="top">上</option>
-            <option value="bottom">下</option>
-            <option value="left">左</option>
-            <option value="right">右</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">对齐</span>
-          <select v-model="settings.bubble.align">
-            <option value="start">起始</option>
-            <option value="center">居中</option>
-            <option value="end">末端</option>
-          </select>
-          <span class="field-hint">{{ alignHint }}</span>
-        </label>
-        <label class="range-field">
-          <span class="range-label">间距 <output>{{ settings.bubble.gap }} px</output></span>
-          <input v-model.number="settings.bubble.gap" type="range" min="0" max="24" step="1" />
-        </label>
-        <label class="range-field">
-          <span class="range-label">水平微调 <output>{{ settings.bubble.offsetX }} px</output></span>
-          <input v-model.number="settings.bubble.offsetX" type="range" min="-80" max="80" step="1" />
-        </label>
-        <label class="range-field">
-          <span class="range-label">垂直微调 <output>{{ settings.bubble.offsetY }} px</output></span>
-          <input v-model.number="settings.bubble.offsetY" type="range" min="-80" max="80" step="1" />
-        </label>
+        <div class="control-col">
+          <label class="field">
+            <span class="field-label">方向</span>
+            <select v-model="settings.bubble.side" data-testid="bubble-side">
+              <option value="top">上</option>
+              <option value="bottom">下</option>
+              <option value="left">左</option>
+              <option value="right">右</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">对齐</span>
+            <select v-model="settings.bubble.align">
+              <option value="start">起始</option>
+              <option value="center">居中</option>
+              <option value="end">末端</option>
+            </select>
+            <span class="field-hint">{{ alignHint }}</span>
+          </label>
+        </div>
+        <div class="control-col">
+          <label class="range-field">
+            <span class="range-label">间距 <output>{{ settings.bubble.gap }} px</output></span>
+            <input v-model.number="settings.bubble.gap" type="range" min="0" max="24" step="1" />
+          </label>
+          <label class="range-field">
+            <span class="range-label">水平微调 <output>{{ settings.bubble.offsetX }} px</output></span>
+            <input v-model.number="settings.bubble.offsetX" type="range" min="-80" max="80" step="1" />
+          </label>
+          <label class="range-field">
+            <span class="range-label">垂直微调 <output>{{ settings.bubble.offsetY }} px</output></span>
+            <input v-model.number="settings.bubble.offsetY" type="range" min="-80" max="80" step="1" />
+          </label>
+        </div>
       </div>
     </section>
 
@@ -140,14 +144,6 @@ async function handleTestAi(): Promise<void> {
         <label class="field"><span class="field-label">背景</span><input v-model="settings.bubble.background" type="color" @input="markCustomColor" /></label>
         <label class="field"><span class="field-label">文字</span><input v-model="settings.bubble.textColor" type="color" @input="markCustomColor" /></label>
         <label class="field"><span class="field-label">边框</span><input v-model="settings.bubble.borderColor" type="color" @input="markCustomColor" /></label>
-        <label class="range-field">
-          <span class="range-label">边框宽度 <output>{{ settings.bubble.borderWidth }} px</output></span>
-          <input v-model.number="settings.bubble.borderWidth" type="range" min="0" max="3" step="1" />
-        </label>
-        <label class="range-field">
-          <span class="range-label">圆角 <output>{{ settings.bubble.radius }} px</output></span>
-          <input v-model.number="settings.bubble.radius" type="range" min="0" max="20" step="1" />
-        </label>
         <label class="field">
           <span class="field-label">阴影</span>
           <select v-model="settings.bubble.shadow">
@@ -156,6 +152,14 @@ async function handleTestAi(): Promise<void> {
             <option value="medium">适中</option>
             <option value="strong">明显</option>
           </select>
+        </label>
+        <label class="range-field">
+          <span class="range-label">边框宽度 <output>{{ settings.bubble.borderWidth }} px</output></span>
+          <input v-model.number="settings.bubble.borderWidth" type="range" min="0" max="3" step="1" />
+        </label>
+        <label class="range-field">
+          <span class="range-label">圆角 <output>{{ settings.bubble.radius }} px</output></span>
+          <input v-model.number="settings.bubble.radius" type="range" min="0" max="20" step="1" />
         </label>
         <label class="range-field">
           <span class="range-label">内边距 <output>{{ settings.bubble.padding }} px</output></span>
@@ -240,13 +244,16 @@ async function handleTestAi(): Promise<void> {
 .field :is(input:not([type="color"]), select, textarea) {
   width: 100%;
   min-width: 0;
-  min-height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--af-control-border);
   border-radius: 7px;
   background: var(--af-control-background);
   color: var(--af-text);
   transition: border-color 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out;
+}
+
+.field :is(input:not([type="color"]), select) {
+  min-height: 38px;
 }
 
 .field :is(input:not([type="color"]), select, textarea):hover {
@@ -378,15 +385,19 @@ async function handleTestAi(): Promise<void> {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.control-col {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  align-content: start;
+}
+
 .field,
 .range-field {
   display: grid;
   gap: 5px;
   min-width: 0;
-}
-
-.field.wide {
-  grid-column: 1 / -1;
+  align-content: start;
 }
 
 .field-label,
