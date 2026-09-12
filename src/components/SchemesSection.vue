@@ -22,7 +22,19 @@ const SCHEME_TYPE_LABELS: Record<SchemeType, string> = {
 const newSchemeType = ref<SchemeType>('deepl')
 const shownSchemeKeys = ref<Record<string, boolean>>({})
 const testingSchemeId = shallowRef('')
-const schemeTestStatus = ref<Record<string, string>>({})
+
+interface SchemeTestOutcome {
+  text: string
+  tone: 'fast' | 'mid' | 'slow' | 'error' | 'idle'
+}
+
+const schemeTestStatus = ref<Record<string, SchemeTestOutcome>>({})
+
+function speedTone(ms: number): SchemeTestOutcome['tone'] {
+  if (ms < 800) return 'fast'
+  if (ms < 2500) return 'mid'
+  return 'slow'
+}
 
 function addScheme(): void {
   const id = uid()
@@ -55,15 +67,18 @@ function toggleSchemeKey(id: string): void {
 async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   if (!props.testScheme) return
   if (!hasRequiredConfig(scheme)) {
-    schemeTestStatus.value[scheme.id] = '请先完善该方案配置'
+    schemeTestStatus.value[scheme.id] = { text: '请先完善该方案配置', tone: 'error' }
     return
   }
   testingSchemeId.value = scheme.id
-  schemeTestStatus.value[scheme.id] = '正在测试...'
+  schemeTestStatus.value[scheme.id] = { text: '正在测试...', tone: 'idle' }
+  const startedAt = performance.now()
   try {
-    schemeTestStatus.value[scheme.id] = await props.testScheme(scheme.id)
+    await props.testScheme(scheme.id)
+    const latencyMs = Math.round(performance.now() - startedAt)
+    schemeTestStatus.value[scheme.id] = { text: `成功 · ${latencyMs} ms`, tone: speedTone(latencyMs) }
   } catch (error) {
-    schemeTestStatus.value[scheme.id] = error instanceof Error ? error.message : '测试失败'
+    schemeTestStatus.value[scheme.id] = { text: error instanceof Error ? error.message : '测试失败', tone: 'error' }
   } finally {
     testingSchemeId.value = ''
   }
@@ -135,7 +150,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
         </div>
         <div class="scheme-test">
           <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">测试</button>
-          <span class="settings-status">{{ schemeTestStatus[scheme.id] ?? '' }}</span>
+          <span class="settings-status" :class="schemeTestStatus[scheme.id]?.tone">{{ schemeTestStatus[scheme.id]?.text ?? '' }}</span>
         </div>
       </div>
 
@@ -191,6 +206,19 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   margin: 4px 0 0;
   color: var(--af-muted);
   font-size: 12px;
+}
+
+.settings-status.fast {
+  color: oklch(55% 0.14 150);
+}
+
+.settings-status.mid {
+  color: oklch(62% 0.13 70);
+}
+
+.settings-status.slow,
+.settings-status.error {
+  color: oklch(55% 0.19 25);
 }
 
 .field,
