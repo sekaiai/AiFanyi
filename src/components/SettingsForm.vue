@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, shallowRef } from 'vue'
-import { applyColorPreset } from '../core/settings'
+import { COLOR_PRESETS } from '../core/settings'
 import type { BubbleColorPreset, TranslationSettings } from '../core/types'
 import BubblePreview from './BubblePreview.vue'
 
@@ -32,7 +32,8 @@ const alignHint = computed(() => ['top', 'bottom'].includes(settings.value.bubbl
   : '左右方向：上 / 中 / 下')
 
 function setColorPreset(value: BubbleColorPreset): void {
-  settings.value = applyColorPreset(settings.value, value)
+  settings.value.bubble.colorPreset = value
+  if (value !== 'custom') Object.assign(settings.value.bubble, COLOR_PRESETS[value])
 }
 
 function markCustomColor(): void {
@@ -60,7 +61,7 @@ async function handleTestAi(): Promise<void> {
         <h1 class="settings-title">AiFanyi</h1>
         <p class="settings-status">{{ status }}</p>
       </div>
-      <button type="button" @click="emit('reset')">恢复默认</button>
+      <button class="button button-secondary" type="button" @click="emit('reset')">恢复默认</button>
     </header>
 
     <section class="settings-section preview-section">
@@ -91,7 +92,7 @@ async function handleTestAi(): Promise<void> {
       <div class="control-grid two">
         <label class="field">
           <span class="field-label">方向</span>
-          <select v-model="settings.bubble.side">
+          <select v-model="settings.bubble.side" data-testid="bubble-side">
             <option value="top">上</option>
             <option value="bottom">下</option>
             <option value="left">左</option>
@@ -127,7 +128,7 @@ async function handleTestAi(): Promise<void> {
       <div class="control-grid two">
         <label class="field">
           <span class="field-label">颜色预设</span>
-          <select :value="settings.bubble.colorPreset" @change="setColorPreset(($event.target as HTMLSelectElement).value as BubbleColorPreset)">
+          <select data-testid="color-preset" :value="settings.bubble.colorPreset" @change="setColorPreset(($event.target as HTMLSelectElement).value as BubbleColorPreset)">
             <option value="paper">柔白</option>
             <option value="warm">暖黄</option>
             <option value="mint">薄荷</option>
@@ -203,25 +204,25 @@ async function handleTestAi(): Promise<void> {
 
     <section class="settings-section ai-section">
       <h2 class="section-title">AI</h2>
-      <p v-if="demoMode" class="notice">Demo 中 API Key 只保存在当前页面内存，刷新后会消失。</p>
+      <p v-if="demoMode" class="notice">在线演示中的 API 密钥只保存在当前页面内存，刷新后会消失。</p>
       <div class="control-grid two">
         <label class="field wide"><span class="field-label">AI 地址</span><input v-model="settings.ai.apiUrl" placeholder="https://api.example.com/v1/chat/completions" /></label>
         <label class="field"><span class="field-label">模型</span><input v-model="settings.ai.model" placeholder="gpt-4o-mini" /></label>
         <label class="field key-field">
-          <span class="field-label">API Key</span>
+          <span class="field-label">API 密钥</span>
           <span class="key-row">
             <input v-model="settings.ai.apiKey" :type="showKey ? 'text' : 'password'" autocomplete="off" />
-            <button type="button" @click="showKey = !showKey">{{ showKey ? '隐藏' : '显示' }}</button>
+            <button class="button button-secondary" type="button" @click="showKey = !showKey">{{ showKey ? '隐藏' : '显示' }}</button>
           </span>
         </label>
         <label class="range-field">
           <span class="range-label">超时 <output>{{ Math.round(settings.ai.timeoutMs / 1000) }} s</output></span>
           <input v-model.number="settings.ai.timeoutMs" type="range" min="5000" max="60000" step="1000" />
         </label>
-        <label class="field wide"><span class="field-label">Prompt</span><textarea v-model="settings.ai.prompt" /></label>
+        <label class="field wide"><span class="field-label">提示词</span><textarea v-model="settings.ai.prompt" /></label>
       </div>
       <div class="ai-actions">
-        <button class="primary" type="button" :disabled="testing || !testAi" @click="handleTestAi">测试 AI 配置</button>
+        <button class="button button-primary" type="button" :disabled="testing || !testAi" @click="handleTestAi">测试 AI 配置</button>
         <span class="settings-status">{{ testStatus }}</span>
       </div>
     </section>
@@ -234,6 +235,98 @@ async function handleTestAi(): Promise<void> {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
   min-width: 0;
+}
+
+.field :is(input:not([type="color"]), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--af-control-border);
+  border-radius: 7px;
+  background: var(--af-control-background);
+  color: var(--af-text);
+  transition: border-color 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out;
+}
+
+.field :is(input:not([type="color"]), select, textarea):hover {
+  border-color: var(--af-control-border-hover);
+}
+
+.field :is(input:not([type="color"]), select, textarea):focus {
+  border-color: var(--af-accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--af-focus-ring);
+}
+
+.field textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.field input[type="color"] {
+  width: 100%;
+  height: 38px;
+  padding: 4px;
+  border: 1px solid var(--af-control-border);
+  border-radius: 7px;
+  background: var(--af-control-background);
+  cursor: pointer;
+}
+
+.field input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.field input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 4px;
+}
+
+.button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-weight: 600;
+  transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+}
+
+.button-secondary {
+  border-color: var(--af-control-border);
+  background: var(--af-control-background);
+  color: var(--af-text);
+}
+
+.button-secondary:hover {
+  border-color: var(--af-control-border-hover);
+  background: var(--af-control-hover);
+}
+
+.button-primary {
+  background: var(--af-accent);
+  color: var(--af-accent-contrast);
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--af-accent-hover);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.switch-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--af-accent);
+}
+
+.range-field input[type="range"] {
+  height: 22px;
+  margin: 0;
+  accent-color: var(--af-accent);
 }
 
 .settings-header {
@@ -320,13 +413,6 @@ async function handleTestAi(): Promise<void> {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-}
-
-.key-row button,
-.settings-header button,
-.ai-actions button {
-  min-height: 34px;
-  padding: 0 12px;
 }
 
 .ai-actions {

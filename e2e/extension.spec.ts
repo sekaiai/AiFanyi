@@ -153,4 +153,50 @@ test.describe('AiFanyi extension', () => {
     await expect(bubble).toBeHidden()
     await context.close()
   })
+
+  test('keeps the options demo visible and applies presets and all preview directions', async () => {
+    const { context, page, worker } = await launchExtension()
+    await context.route('https://freedictionaryapi.com/**', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ entries: [{ partOfSpeech: 'pronoun', senses: [{ translations: [{ language: 'zh', word: '某人' }] }] }] }),
+      })
+    })
+    const optionsUrl = await worker.evaluate(() => chrome.runtime.getURL('/options.html'))
+    await page.goto(optionsUrl)
+
+    await expect(page.getByRole('heading', { name: '翻译交互演示' })).toBeVisible()
+    await page.getByTestId('color-preset').selectOption('night')
+    await expect(page.getByTestId('bubble-preview')).toHaveCSS('background-color', 'rgb(32, 36, 45)')
+
+    const preview = page.getByTestId('bubble-preview')
+    const source = page.locator('.preview-source')
+    for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+      await page.getByTestId('bubble-side').selectOption(side)
+      await expect(preview).toHaveAttribute('data-side', side)
+      const bubbleBox = await preview.boundingBox()
+      const sourceBox = await source.boundingBox()
+      expect(bubbleBox).not.toBeNull()
+      expect(sourceBox).not.toBeNull()
+      if (side === 'top') expect(bubbleBox!.y + bubbleBox!.height).toBeLessThanOrEqual(sourceBox!.y)
+      if (side === 'bottom') expect(bubbleBox!.y).toBeGreaterThanOrEqual(sourceBox!.y + sourceBox!.height)
+      if (side === 'left') expect(bubbleBox!.x + bubbleBox!.width).toBeLessThanOrEqual(sourceBox!.x)
+      if (side === 'right') expect(bubbleBox!.x).toBeGreaterThanOrEqual(sourceBox!.x + sourceBox!.width)
+    }
+
+    await page.locator('.reading-copy p').first().evaluate((element) => {
+      const text = element.firstChild
+      if (!text) throw new Error('演示文本不可用')
+      const range = document.createRange()
+      range.setStart(text, 0)
+      range.setEnd(text, 7)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    await expect(page.locator('#aifanyi-shadow-host .bubble')).toContainText('某人')
+
+    await context.close()
+  })
 })

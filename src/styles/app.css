@@ -7,6 +7,13 @@
   --af-soft: oklch(96% 0.008 260);
   --af-line: oklch(86% 0.01 260);
   --af-accent: oklch(59% 0.16 250);
+  --af-accent-hover: oklch(53% 0.16 250);
+  --af-accent-contrast: oklch(99% 0.005 250);
+  --af-focus-ring: oklch(68% 0.13 250 / 0.24);
+  --af-control-background: oklch(99.5% 0.003 260);
+  --af-control-hover: oklch(97% 0.008 260);
+  --af-control-border: oklch(82% 0.012 260);
+  --af-control-border-hover: oklch(68% 0.03 250);
 }
 
 * {
@@ -45,6 +52,11 @@ button {
 .app-shell {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
+  min-height: 100vh;
+}
+
+.demo-surface {
+  min-width: 0;
   min-height: 100vh;
 }
 

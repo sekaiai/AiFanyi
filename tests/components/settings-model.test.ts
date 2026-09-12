@@ -83,6 +83,30 @@ describe('useSettingsModel', () => {
     expect(wrapper.get('[data-testid="status"]').text()).toBe('已自动保存')
   })
 
+  it('serializes rapid saves so an older write cannot overwrite a newer setting', async () => {
+    let finishFirstSave: (() => void) | undefined
+    const { storage } = createStorage()
+    vi.mocked(storage.save)
+      .mockImplementationOnce(() => new Promise<void>((resolve) => {
+        finishFirstSave = resolve
+      }))
+      .mockResolvedValue(undefined)
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await flushPromises()
+
+    await wrapper.find('input[name="hoverDelay"]').setValue('300')
+    await wrapper.find('input[name="hoverDelay"]').setValue('400')
+    await flushPromises()
+
+    expect(storage.save).toHaveBeenCalledTimes(1)
+    finishFirstSave?.()
+    await flushPromises()
+
+    expect(storage.save).toHaveBeenCalledTimes(2)
+    expect(storage.save).toHaveBeenLastCalledWith(expect.objectContaining({ hoverDelayMs: 400 }))
+    expect(wrapper.get('[data-testid="status"]').text()).toBe('已自动保存')
+  })
+
   it('restores default settings when reset is clicked', async () => {
     const initial = cloneDefaultSettings()
     initial.hoverDelayMs = 700
@@ -97,5 +121,28 @@ describe('useSettingsModel', () => {
     expect(
       (wrapper.find('input[name="hoverDelay"]').element as HTMLInputElement).value,
     ).toBe('200')
+  })
+
+  it('keeps defaults and reports a load failure', async () => {
+    const { storage } = createStorage()
+    vi.mocked(storage.load).mockRejectedValueOnce(new Error('storage unavailable'))
+
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="status"]').text()).toBe('设置加载失败，已使用默认设置')
+    expect((wrapper.find('input[name="hoverDelay"]').element as HTMLInputElement).value).toBe('200')
+  })
+
+  it('reports a reset failure without leaving the form in a loading state', async () => {
+    const { storage } = createStorage()
+    vi.mocked(storage.reset).mockRejectedValueOnce(new Error('storage unavailable'))
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await flushPromises()
+
+    await wrapper.get('[data-testid="reset"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="status"]').text()).toBe('恢复默认失败，请稍后重试')
   })
 })

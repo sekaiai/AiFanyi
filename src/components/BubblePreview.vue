@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { bubbleCssVariables, getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import type { BubbleVisualSettings } from '../core/settings'
 
 const props = defineProps<{
   settings: BubbleVisualSettings
 }>()
+
+const stageRef = useTemplateRef<HTMLElement>('stage')
+const sourceRef = useTemplateRef<HTMLElement>('source')
+const bubbleRef = useTemplateRef<HTMLElement>('bubble')
+const measurements = shallowRef({
+  stageWidth: 496,
+  stageHeight: 172,
+  source: { left: 236, right: 278, top: 135, bottom: 159 },
+  bubbleWidth: 210,
+  bubbleHeight: 74,
+})
+let observer: ResizeObserver | undefined
 
 const sourcePosition = computed(() => {
   const side = props.settings.side
@@ -16,17 +28,17 @@ const sourcePosition = computed(() => {
 })
 
 const placement = computed(() => {
-  const stageWidth = 496
-  const stageHeight = 172
-  const source = {
-    left: sourcePosition.value.left === '24%' ? 115 : sourcePosition.value.left === '76%' ? 365 : 236,
-    right: sourcePosition.value.left === '24%' ? 157 : sourcePosition.value.left === '76%' ? 407 : 278,
-    top: sourcePosition.value.top === '16%' ? 22 : sourcePosition.value.top === '84%' ? 135 : 78,
-    bottom: sourcePosition.value.top === '16%' ? 46 : sourcePosition.value.top === '84%' ? 159 : 102,
-  }
-  const sizing = getBubbleSizing(source.right - source.left, stageWidth, props.settings.side)
-  const width = Math.min(210, sizing.maxWidth)
-  return getBubblePlacement(source, width, 74, stageWidth, stageHeight, props.settings)
+  const current = measurements.value
+  const sizing = getBubbleSizing(current.source.right - current.source.left, current.stageWidth, props.settings.side)
+  const width = Math.min(current.bubbleWidth, sizing.maxWidth)
+  return getBubblePlacement(
+    current.source,
+    width,
+    current.bubbleHeight,
+    current.stageWidth,
+    current.stageHeight,
+    props.settings,
+  )
 })
 
 const bubbleStyle = computed(() => ({
@@ -38,12 +50,48 @@ const bubbleStyle = computed(() => ({
   '--af-arrow-x': `${placement.value.arrowX}px`,
   '--af-arrow-y': `${placement.value.arrowY}px`,
 }))
+
+function measure(): void {
+  const stage = stageRef.value
+  const source = sourceRef.value
+  const bubble = bubbleRef.value
+  if (!stage || !source || !bubble) return
+  const stageRect = stage.getBoundingClientRect()
+  const sourceRect = source.getBoundingClientRect()
+  measurements.value = {
+    stageWidth: stage.clientWidth,
+    stageHeight: stage.clientHeight,
+    source: {
+      left: sourceRect.left - stageRect.left,
+      right: sourceRect.right - stageRect.left,
+      top: sourceRect.top - stageRect.top,
+      bottom: sourceRect.bottom - stageRect.top,
+    },
+    bubbleWidth: bubble.offsetWidth,
+    bubbleHeight: bubble.offsetHeight,
+  }
+}
+
+onMounted(() => {
+  observer = new ResizeObserver(measure)
+  if (stageRef.value) observer.observe(stageRef.value)
+  if (sourceRef.value) observer.observe(sourceRef.value)
+  if (bubbleRef.value) observer.observe(bubbleRef.value)
+  measure()
+})
+
+onUnmounted(() => observer?.disconnect())
+
+watch(() => props.settings, async () => {
+  await nextTick()
+  measure()
+}, { deep: true, flush: 'post' })
 </script>
 
 <template>
-  <div class="preview-stage">
-    <span class="preview-source" :style="sourcePosition">loved</span>
-    <div class="preview-bubble" :data-side="placement.side" :data-arrow="String(settings.showArrow)" :style="bubbleStyle">
+  <div ref="stage" class="preview-stage">
+    <span ref="source" class="preview-source" :style="sourcePosition">loved</span>
+    <div ref="bubble" class="preview-bubble" data-testid="bubble-preview" :data-side="placement.side" :data-arrow="String(settings.showArrow)" :style="bubbleStyle">
       <div class="preview-content">
         <div v-if="settings.showOriginal" class="preview-word">
           loved<span class="preview-pronunciation">/lʌvd/</span>

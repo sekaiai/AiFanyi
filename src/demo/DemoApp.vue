@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import SettingsForm from '../components/SettingsForm.vue'
 import type { ExtensionResponse } from '../core/messages'
-import { cloneSettings, DEFAULT_SETTINGS, sanitizeSettings, validateAiEndpoint, type TranslationSettings } from '../core/settings'
+import { cloneSettings, DEFAULT_SETTINGS, validateAiEndpoint, type TranslationSettings } from '../core/settings'
 import { classifyText } from '../core/text'
 import { buildPrompt } from '../core/prompt'
 import { DICTIONARY_API_BASE, parseDictionaryResult } from '../core/dictionary'
@@ -10,8 +10,22 @@ import { LruCache } from '../core/lru'
 import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import { boundsFromRange, createBubbleRenderer } from '../extension/renderer'
 
-const settings = ref<TranslationSettings>(cloneSettings())
-const status = shallowRef('Demo 设置仅保存在内存')
+const props = withDefaults(defineProps<{
+  settings?: TranslationSettings
+  showSettings?: boolean
+  request?: (kind: 'dictionary' | 'ai', text: string, requestId: number) => Promise<ExtensionResponse>
+}>(), {
+  showSettings: true,
+})
+
+const localSettings = ref<TranslationSettings>(cloneSettings())
+const settings = computed({
+  get: () => props.settings ?? localSettings.value,
+  set: (value: TranslationSettings) => {
+    if (!props.settings) localSettings.value = value
+  },
+})
+const status = shallowRef('演示设置仅保存在内存')
 const cache = new LruCache<string, ExtensionResponse>(80)
 let renderer: ReturnType<typeof createBubbleRenderer> | null = null
 let currentRange: Range | null = null
@@ -43,23 +57,32 @@ const handleMouseMove = (event: MouseEvent) => {
   }, settings.value.hoverDelayMs)
 }
 
+const handleSelectionChange = () => window.setTimeout(handleSelection, 0)
+const handleViewportChange = () => {
+  if (currentRange && renderer?.isVisible()) positionBubble(currentRange)
+}
+
 onMounted(() => {
   renderer = createBubbleRenderer(settings.value.bubble)
-  document.addEventListener('selectionchange', () => window.setTimeout(handleSelection, 0))
+  document.addEventListener('selectionchange', handleSelectionChange)
   document.addEventListener('mousemove', handleMouseMove)
+  window.addEventListener('scroll', handleViewportChange, true)
+  window.addEventListener('resize', handleViewportChange)
 })
 
 onUnmounted(() => {
   window.clearTimeout(hoverTimer)
+  document.removeEventListener('selectionchange', handleSelectionChange)
   document.removeEventListener('mousemove', handleMouseMove)
+  window.removeEventListener('scroll', handleViewportChange, true)
+  window.removeEventListener('resize', handleViewportChange)
   renderer?.destroy()
 })
 
 watch(settings, (value) => {
-  settings.value = sanitizeSettings(value)
-  renderer?.applySettings(settings.value.bubble)
+  renderer?.applySettings(value.bubble)
   if (currentRange && renderer?.isVisible()) positionBubble(currentRange)
-  status.value = 'Demo 设置已更新'
+  status.value = '演示设置已更新'
 }, { deep: true })
 
 function reset() {
@@ -100,7 +123,11 @@ async function requestTranslation(kind: 'dictionary' | 'ai', text: string, range
   }
   renderer.showLoading(kind === 'dictionary' ? '正在查询释义…' : '正在翻译…', kind === 'dictionary' ? text : '')
   positionBubble(range)
-  const response = kind === 'dictionary' ? await lookupDictionary(id, text) : await translateWithAi(id, text)
+  const response = props.request
+    ? await props.request(kind, text, id)
+    : kind === 'dictionary'
+      ? await lookupDictionary(id, text)
+      : await translateWithAi(id, text)
   if (id !== activeRequest || text !== currentText) return
   cache.set(cacheKey, response)
   renderResponse(response, text, range)
@@ -120,7 +147,7 @@ async function translateWithAi(id: number, text: string): Promise<ExtensionRespo
   const ai = settings.value.ai
   const endpointError = validateAiEndpoint(ai.apiUrl)
   if (endpointError || !ai.apiKey || !ai.model) {
-    return { ok: false, requestId: id, error: { code: 'bad_config', message: '请先填写可用的 AI 地址、API Key 和模型。', retryable: false } }
+    return { ok: false, requestId: id, error: { code: 'bad_config', message: '请先填写可用的 AI 地址、API 密钥和模型。', retryable: false } }
   }
   try {
     const response = await fetch(ai.apiUrl, {
@@ -173,9 +200,9 @@ function getCaretFromPoint(x: number, y: number): { node: Node; offset: number }
 </script>
 
 <template>
-  <div class="app-shell">
+  <div :class="showSettings ? 'app-shell' : 'demo-surface'">
     <main id="reading-area" class="demo-pane">
-      <h1>Translation Demo</h1>
+      <h1>翻译交互演示</h1>
       <p class="tip">悬停或选中单词查词典；选中多个词、句子或段落自动使用 AI。</p>
       <div class="reading-copy">
         <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
@@ -185,7 +212,7 @@ function getCaretFromPoint(x: number, y: number): { node: Node; offset: number }
         <pre><code>const message = "代码区默认不触发翻译";</code></pre>
       </div>
     </main>
-    <aside class="settings-panel" aria-label="Demo 设置">
+    <aside v-if="showSettings" class="settings-panel" aria-label="演示设置">
       <SettingsForm v-model="settings" :status="status" :test-ai="testAi" demo-mode @reset="reset" />
     </aside>
   </div>

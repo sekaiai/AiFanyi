@@ -8,7 +8,7 @@ export { buildPrompt } from './prompt'
 export async function requestAiTranslation(text: string, settings: AiSettings, signal?: AbortSignal): Promise<string> {
   const source = normalizeSourceText(text)
   if (!source) throw new Error('翻译内容为空。')
-  if (!settings.apiKey.trim()) throw new Error('请填写 API Key。')
+  if (!settings.apiKey.trim()) throw new Error('请填写 API 密钥。')
   if (!settings.model.trim()) throw new Error('请填写模型。')
 
   const endpoint = validateAiUrl(settings.apiUrl)
