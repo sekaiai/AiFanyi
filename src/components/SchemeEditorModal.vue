@@ -2,11 +2,13 @@
 import { computed, onUnmounted, ref, toRaw, watch } from 'vue'
 import { uid } from '../core/settings'
 import { SCHEME_GUIDES } from '../core/scheme-guides'
+import { describeMissingConfig } from '../core/translate'
 import type { SchemeSettings, SchemeType } from '../core/types'
 
 const props = defineProps<{
   visible: boolean
   initialScheme: SchemeSettings | null
+  testScheme?: ((scheme: SchemeSettings) => Promise<string>) | undefined
   demoMode?: boolean
 }>()
 
@@ -16,13 +18,21 @@ const emit = defineEmits<{
 }>()
 
 const draft = ref<SchemeSettings>(createScheme('deepl'))
-const shownSecret = ref(false)
+const guideExpanded = ref(true)
+const saving = ref(false)
+const saveError = ref('')
 const guide = computed(() => SCHEME_GUIDES[draft.value.type])
 
+// 弹窗每次开合都作废上一次保存尝试，避免"测试还在进行时关闭弹窗，结果回来后仍写入方案"。
+let saveAttempt = 0
+
 watch(() => props.visible, (visible) => {
+  saveAttempt += 1
   if (visible) {
     draft.value = props.initialScheme ? structuredClone(toRaw(props.initialScheme)) : createScheme('deepl')
-    shownSecret.value = false
+    guideExpanded.value = true
+    saving.value = false
+    saveError.value = ''
     document.addEventListener('keydown', handleKeydown)
   } else {
     document.removeEventListener('keydown', handleKeydown)
@@ -47,7 +57,8 @@ function createScheme(type: SchemeType, id = uid(), enabled = true): SchemeSetti
 function handleTypeChange(type: SchemeType): void {
   if (type === draft.value.type) return
   draft.value = createScheme(type, draft.value.id, draft.value.enabled)
-  shownSecret.value = false
+  guideExpanded.value = true
+  saveError.value = ''
 }
 
 function handleKeydown(event: KeyboardEvent): void {
@@ -58,8 +69,33 @@ function close(): void {
   emit('close')
 }
 
-function save(): void {
-  emit('save', structuredClone(toRaw(draft.value)))
+async function save(): Promise<void> {
+  if (saving.value) return
+  const attempt = ++saveAttempt
+  const scheme = structuredClone(toRaw(draft.value))
+
+  const missing = describeMissingConfig(scheme)
+  if (missing) {
+    saveError.value = missing
+    return
+  }
+
+  saveError.value = ''
+  if (props.testScheme) {
+    saving.value = true
+    try {
+      await props.testScheme(scheme)
+    } catch (error) {
+      if (attempt !== saveAttempt) return
+      saving.value = false
+      saveError.value = `接口测试未通过：${error instanceof Error ? error.message : '未知错误'}`
+      return
+    }
+    if (attempt !== saveAttempt) return
+    saving.value = false
+  }
+
+  emit('save', scheme)
 }
 </script>
 
@@ -76,14 +112,15 @@ function save(): void {
 
       <div class="modal-body">
         <label class="field wide">
-          <span class="field-label">方案类型</span>
+          <span class="field-label">翻译方案</span>
           <select :value="draft.type" data-testid="scheme-editor-type" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
+            <option value="ai">自定义 AI</option>
+            <option value="baidu">百度翻译</option>
+            <option value="volcengine">火山引擎</option>
             <option value="deepl">DeepL</option>
             <option value="google">Google 翻译（免密钥）</option>
             <option value="googleCloud">Google Cloud</option>
-            <option value="baidu">百度翻译</option>
-            <option value="volcengine">火山引擎</option>
-            <option value="ai">AI</option>
+    
           </select>
         </label>
 
@@ -101,10 +138,7 @@ function save(): void {
         <template v-else-if="draft.type === 'googleCloud'">
           <label class="field wide">
             <span class="field-label">API Key</span>
-            <span class="key-row">
-              <input v-model="draft.apiKey" :type="shownSecret ? 'text' : 'password'" autocomplete="off" />
-              <button class="button button-secondary" type="button" @click="shownSecret = !shownSecret">{{ shownSecret ? '隐藏' : '显示' }}</button>
-            </span>
+            <input v-model="draft.apiKey" type="password" autocomplete="off" />
           </label>
         </template>
         <template v-else-if="draft.type === 'baidu'">
@@ -112,10 +146,7 @@ function save(): void {
           <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" placeholder="百度翻译 AppID" /></label>
           <label class="field">
             <span class="field-label">密钥</span>
-            <span class="key-row">
-              <input v-model="draft.secretKey" :type="shownSecret ? 'text' : 'password'" autocomplete="off" placeholder="百度翻译密钥" />
-              <button class="button button-secondary" type="button" @click="shownSecret = !shownSecret">{{ shownSecret ? '隐藏' : '显示' }}</button>
-            </span>
+            <input v-model="draft.secretKey" type="password" autocomplete="off" placeholder="百度翻译密钥" />
           </label>
         </template>
         <template v-else-if="draft.type === 'volcengine'">
@@ -123,10 +154,7 @@ function save(): void {
           <label class="field"><span class="field-label">访问密钥 ID（Access Key ID）</span><input v-model="draft.accessKeyId" autocomplete="off" placeholder="火山引擎 Access Key ID" /></label>
           <label class="field">
             <span class="field-label">访问密钥（Secret Access Key）</span>
-            <span class="key-row">
-              <input v-model="draft.secretAccessKey" :type="shownSecret ? 'text' : 'password'" autocomplete="off" placeholder="火山引擎 Secret Access Key" />
-              <button class="button button-secondary" type="button" @click="shownSecret = !shownSecret">{{ shownSecret ? '隐藏' : '显示' }}</button>
-            </span>
+            <input v-model="draft.secretAccessKey" type="password" autocomplete="off" placeholder="火山引擎 Secret Access Key" />
           </label>
           <label class="field wide"><span class="field-label">地域</span><input v-model="draft.region" autocomplete="off" placeholder="cn-north-1" /></label>
         </template>
@@ -135,10 +163,7 @@ function save(): void {
           <label class="field"><span class="field-label">模型</span><input v-model="draft.model" placeholder="gpt-4o-mini" /></label>
           <label class="field">
             <span class="field-label">API 密钥</span>
-            <span class="key-row">
-              <input v-model="draft.apiKey" :type="shownSecret ? 'text' : 'password'" autocomplete="off" />
-              <button class="button button-secondary" type="button" @click="shownSecret = !shownSecret">{{ shownSecret ? '隐藏' : '显示' }}</button>
-            </span>
+            <input v-model="draft.apiKey" type="password" autocomplete="off" />
           </label>
           <label class="range-field wide">
             <span class="range-label">超时 <output>{{ Math.round(draft.timeoutMs / 1000) }} 秒</output></span>
@@ -147,27 +172,30 @@ function save(): void {
         </template>
       </div>
 
-      <section class="scheme-guide" aria-labelledby="scheme-guide-title">
-        <div class="guide-heading">
-          <div>
-            <p class="guide-kicker">新手指南</p>
-            <h3 id="scheme-guide-title">{{ guide.title }}配置指南</h3>
-          </div>
+      <section class="scheme-guide" data-testid="scheme-guide" :data-expanded="guideExpanded ? 'true' : 'false'">
+        <button
+          class="guide-toggle"
+          type="button"
+          data-testid="scheme-guide-toggle"
+          :aria-expanded="guideExpanded"
+          aria-controls="scheme-guide-body"
+          @click="guideExpanded = !guideExpanded"
+        >
+          <span class="guide-toggle-label">新手指南 ·</span>
+          <span class="guide-toggle-title">{{ guide.title }}配置步骤与官方入口</span>
           <span class="guide-badge">{{ draft.type === 'google' ? '无需密钥' : '密钥仅本地保存' }}</span>
-        </div>
-        <div class="guide-note">
-          <h4>优点与注意事项</h4>
-          <p><strong>优点：</strong>{{ guide.recommendation }} <strong>注意事项：</strong>{{ guide.requirements }}</p>
-        </div>
-        <div class="guide-columns">
+          <span class="guide-chevron" aria-hidden="true"></span>
+        </button>
+        <div v-show="guideExpanded" id="scheme-guide-body" class="guide-body" data-testid="scheme-guide-body">
+          <p class="guide-tagline">{{ guide.tagline }}</p>
           <div>
-            <h4>怎么用</h4>
+            <p class="guide-block-label">怎么用</p>
             <ol class="guide-steps">
               <li v-for="step in guide.steps" :key="step">{{ step }}</li>
             </ol>
           </div>
           <div>
-            <h4>官方入口</h4>
+            <p class="guide-block-label">官方入口</p>
             <ul class="guide-links">
               <li v-for="link in guide.links" :key="link.href"><a :href="link.href" target="_blank" rel="noopener noreferrer">{{ link.label }} ↗</a></li>
             </ul>
@@ -177,8 +205,16 @@ function save(): void {
 
       <p v-if="demoMode" class="modal-notice">在线演示中的密钥只保存在当前页面内存，刷新后会消失。</p>
       <div class="modal-footer">
+        <p v-if="saveError" class="save-error" role="alert" data-testid="scheme-editor-error">{{ saveError }}</p>
         <button class="button button-secondary" type="button" data-testid="scheme-editor-cancel" @click="close">取消</button>
-        <button class="button button-primary" type="button" data-testid="scheme-editor-save" @click="save">保存方案</button>
+        <button
+          class="button button-primary"
+          type="button"
+          data-testid="scheme-editor-save"
+          :disabled="saving"
+          :aria-busy="saving"
+          @click="save"
+        >{{ saving ? '正在测试接口...' : '保存方案' }}</button>
       </div>
     </section>
   </div>
@@ -292,101 +328,135 @@ function save(): void {
   box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
-.key-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
 .scheme-guide {
-  margin: 0 20px 18px;
-  padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--af-accent) 26%, var(--af-line));
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--af-accent) 5%, var(--af-panel));
+  border-top: 1px solid var(--af-line);
+  transition: background 160ms ease-out;
 }
 
-.guide-heading {
+.scheme-guide[data-expanded="true"] {
+  background: color-mix(in srgb, var(--af-accent) 4%, var(--af-panel));
+}
+
+.guide-toggle {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 20px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
-.guide-kicker {
-  margin: 0 0 3px;
+.guide-toggle:hover {
+  background: var(--af-control-hover);
+}
+
+.guide-toggle-label {
+  flex: none;
   color: var(--af-accent);
   font-size: 11px;
   font-weight: 720;
   letter-spacing: .08em;
 }
 
-.guide-heading h3 {
-  margin: 0;
-  font-size: 14px;
+.guide-toggle-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guide-chevron {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: 2px;
+  border-right: 1.5px solid var(--af-muted);
+  border-bottom: 1.5px solid var(--af-muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease-out;
+}
+
+.scheme-guide[data-expanded="true"] .guide-chevron {
+  transform: rotate(45deg);
 }
 
 .guide-badge {
   flex: none;
-  padding: 4px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--af-accent) 12%, transparent);
   color: var(--af-accent);
   font-size: 11px;
+  white-space: nowrap;
 }
 
-.guide-note {
-  margin: 0 0 14px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--af-accent) 8%, transparent);
+.guide-body {
+  display: grid;
+  gap: 14px;
+  padding: 2px 20px 18px;
 }
 
-.guide-note h4 {
-  margin-bottom: 5px;
-}
-
-.guide-note p {
+.guide-tagline {
   margin: 0;
   color: var(--af-muted);
   font-size: 12px;
   line-height: 1.6;
 }
 
-.guide-note strong {
-  color: var(--af-text);
-  font-weight: 650;
-}
-
-.guide-columns {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: minmax(0, 1.35fr) minmax(180px, .85fr);
-}
-
-.scheme-guide h4 {
+.guide-block-label {
   margin: 0 0 7px;
-  color: var(--af-text);
-  font-size: 12px;
+  color: var(--af-muted);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .04em;
 }
 
-.guide-steps,
-.guide-links {
+.guide-steps {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.guide-steps li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
   color: var(--af-muted);
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.6;
+}
+
+.guide-steps li::before {
+  counter-increment: step;
+  content: counter(step);
+  color: var(--af-accent);
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.75;
 }
 
 .guide-links {
-  padding-left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .guide-links a {
   color: var(--af-accent);
+  font-size: 12px;
   text-decoration: none;
 }
 
@@ -414,12 +484,27 @@ function save(): void {
   border-top: 1px solid var(--af-line);
 }
 
+.save-error {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0 auto 0 0;
+  color: oklch(55% 0.19 25);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .button {
   min-height: 36px;
   padding: 0 13px;
   border: 1px solid transparent;
   border-radius: 7px;
+  white-space: nowrap;
   font-weight: 600;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
 }
 
 .button-secondary {
@@ -454,8 +539,26 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
-  .guide-columns {
-    grid-template-columns: 1fr;
+  .modal-footer {
+    flex-wrap: wrap;
+  }
+
+  .save-error {
+    flex: 1 0 100%;
+    margin-right: 0;
+  }
+
+  .guide-toggle {
+    gap: 6px;
+    padding: 6px 14px;
+  }
+
+  .guide-toggle-title {
+    font-size: 12px;
+  }
+
+  .guide-body {
+    padding: 2px 14px 16px;
   }
 }
 </style>

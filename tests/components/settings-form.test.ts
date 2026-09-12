@@ -19,8 +19,14 @@ const TestHarness = defineComponent({
   components: { SchemesSection },
   setup() {
     const settings = ref(cloneDefaultSettings())
-    const testScheme = async () => '方案配置可用'
-    return { settings, testScheme }
+    const failure = ref('')
+    const calls = ref(0)
+    const testScheme = async () => {
+      calls.value += 1
+      if (failure.value) throw new Error(failure.value)
+      return '方案配置可用'
+    }
+    return { settings, testScheme, failure, calls }
   },
   template: `<SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" />`,
 })
@@ -58,6 +64,9 @@ describe('SettingsForm', () => {
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('ai')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="https://api.example.com/v1/chat/completions"]').setValue('https://api.example.com/v1/chat/completions')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="gpt-4o-mini"]').setValue('gpt-4o-mini')
+    await wrapper.get('[data-testid="scheme-editor"] input[type="password"]').setValue('sk-test')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('google')
@@ -74,6 +83,8 @@ describe('SettingsForm', () => {
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('baidu')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="百度翻译 AppID"]').setValue('app-id')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="百度翻译密钥"]').setValue('secret-key')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
 
     const card = wrapper.get('[data-testid="scheme-card-baidu"]')
@@ -81,11 +92,10 @@ describe('SettingsForm', () => {
     expect(card.text()).not.toContain('secret-key')
 
     await card.get('button[title="编辑"]').trigger('click')
-    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="百度翻译 AppID"]').setValue('app-id')
-    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="百度翻译密钥"]').setValue('secret-key')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="百度翻译 AppID"]').setValue('app-id-edited')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
 
-    expect(wrapper.vm.settings.schemes[0]).toMatchObject({ type: 'baidu', appId: 'app-id', secretKey: 'secret-key' })
+    expect(wrapper.vm.settings.schemes[0]).toMatchObject({ type: 'baidu', appId: 'app-id-edited', secretKey: 'secret-key' })
   })
 
   it('adds and edits a Volcengine scheme without exposing credentials in the card', async () => {
@@ -93,6 +103,8 @@ describe('SettingsForm', () => {
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('volcengine')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="火山引擎 Access Key ID"]').setValue('ak-id')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="火山引擎 Secret Access Key"]').setValue('secret-key')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
 
     const card = wrapper.get('[data-testid="scheme-card-volcengine"]')
@@ -100,8 +112,6 @@ describe('SettingsForm', () => {
     expect(card.text()).not.toContain('secret-key')
 
     await card.get('button[title="编辑"]').trigger('click')
-    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="火山引擎 Access Key ID"]').setValue('ak-id')
-    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="火山引擎 Secret Access Key"]').setValue('secret-key')
     await wrapper.get('[data-testid="scheme-editor"] input[placeholder="cn-north-1"]').setValue('cn-beijing')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
 
@@ -112,18 +122,39 @@ describe('SettingsForm', () => {
     const wrapper = mount(SettingsHarness)
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
-    const deeplText = wrapper.get('[data-testid="scheme-editor"]').text()
-    expect(deeplText).toContain('DeepL配置指南')
-    expect(deeplText).toContain('申请 API 账户')
-    expect(deeplText).toContain('每月 50 万字符')
-    expect(deeplText.indexOf('优点与注意事项')).toBeLessThan(deeplText.indexOf('怎么用'))
+
+    // jsdom 的 getComputedStyle 对 display 返回空串，wrapper.isVisible() 在这里不可靠，
+    // 因此直接断言 v-show 写入的内联样式。
+    const isGuideCollapsed = () => (wrapper.get('[data-testid="scheme-guide-body"]').attributes('style') ?? '').includes('display: none')
+
+    const toggle = wrapper.get('[data-testid="scheme-guide-toggle"]')
+    expect(toggle.text()).toContain('新手指南')
+    expect(toggle.text()).toContain('DeepL配置步骤与官方入口')
+    expect(toggle.text()).toContain('密钥仅本地保存')
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(isGuideCollapsed()).toBe(false)
+
+    const guideText = wrapper.get('[data-testid="scheme-guide-body"]').text()
+    expect(guideText).toContain('句子和段落读起来更自然 · 每月 50 万字符免费')
+    expect(guideText).toContain('怎么用')
+    expect(guideText).toContain('官方入口')
+    expect(guideText).toContain('申请 API 账户')
+    expect(guideText.indexOf('怎么用')).toBeLessThan(guideText.indexOf('官方入口'))
+    expect(guideText).not.toContain('优点')
+    expect(guideText).not.toContain('注意事项')
+
+    await toggle.trigger('click')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(isGuideCollapsed()).toBe(true)
 
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('volcengine')
     const editorText = wrapper.get('[data-testid="scheme-editor"]').text()
-    expect(editorText).toContain('火山引擎配置指南')
-    expect(editorText).toContain('密钥管理控制台')
-    expect(editorText).toContain('优点')
-    expect(editorText).toContain('注意事项')
+    expect(editorText).toContain('火山引擎配置步骤与官方入口')
+    expect(editorText).toContain('密钥管理页面（拿 AK/SK）')
+    expect(editorText).toContain('国内接入顺畅')
+    // 切换方案类型后指南回到默认的展开态
+    expect(wrapper.get('[data-testid="scheme-guide-toggle"]').attributes('aria-expanded')).toBe('true')
+    expect(isGuideCollapsed()).toBe(false)
   })
 
   it('reorders, toggles and removes scheme cards', async () => {
@@ -134,6 +165,7 @@ describe('SettingsForm', () => {
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('deepl')
+    await wrapper.get('[data-testid="scheme-editor"] input[placeholder="DeepL-Auth-Key"]').setValue('deepl-key')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
 
@@ -158,11 +190,48 @@ describe('SettingsForm', () => {
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('google')
     await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
+    await flushPromises()
     await wrapper.get('[data-testid="scheme-test-google"]').trigger('click')
     await flushPromises()
 
     const status = wrapper.get('[data-testid="scheme-card-google"] .settings-status')
     expect(status.text()).toMatch(/^成功 · \d+ ms$/)
     expect(status.classes()).toContain('fast')
+  })
+
+  it('keeps the editor open and shows the reason when the pre-save test fails', async () => {
+    const wrapper = mount(TestHarness)
+
+    await wrapper.get('[data-testid="add-scheme"]').trigger('click')
+    await wrapper.get('[data-testid="scheme-editor-type"]').setValue('google')
+    wrapper.vm.failure = 'HTTP 401'
+    await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.calls).toBe(1)
+    expect(wrapper.vm.settings.schemes).toHaveLength(0)
+    expect(wrapper.find('[data-testid="scheme-editor"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="scheme-editor-error"]').text()).toBe('接口测试未通过：HTTP 401')
+
+    wrapper.vm.failure = ''
+    await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.calls).toBe(2)
+    expect(wrapper.vm.settings.schemes.map((scheme) => scheme.type)).toEqual(['google'])
+    expect(wrapper.find('[data-testid="scheme-editor"]').exists()).toBe(false)
+  })
+
+  it('reports missing fields before calling the test endpoint', async () => {
+    const wrapper = mount(TestHarness)
+
+    await wrapper.get('[data-testid="add-scheme"]').trigger('click')
+    await wrapper.get('[data-testid="scheme-editor-type"]').setValue('deepl')
+    await wrapper.get('[data-testid="scheme-editor-save"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="scheme-editor-error"]').text()).toBe('请填写 Auth Key')
+    expect(wrapper.vm.calls).toBe(0)
+    expect(wrapper.vm.settings.schemes).toHaveLength(0)
   })
 })
