@@ -1,9 +1,19 @@
-import type { BubbleColorPreset, BubbleSettings, TranslationSettings } from './types'
+import type {
+  AiSchemeSettings,
+  BubbleColorPreset,
+  BubbleSettings,
+  DeeplSchemeSettings,
+  GoogleCloudSchemeSettings,
+  SchemeSettings,
+  SchemeType,
+  TranslationSettings,
+} from './types'
 
-export type { BubbleSettings as BubbleVisualSettings, TranslationSettings } from './types'
+export type { TranslationSettings } from './types'
 
 export const SETTINGS_STORAGE_KEY = 'aifanyi.settings.v1'
 export const MAX_TRANSLATION_TEXT_LENGTH = 5000
+export const TARGET_LANGUAGES = ['简体中文', '繁體中文', 'English', '日本語', '한국어', 'Français', 'Deutsch', 'Español', 'Русский'] as const
 
 export const COLOR_PRESETS: Record<Exclude<BubbleColorPreset, 'custom'>, Pick<BubbleSettings, 'background' | 'textColor' | 'borderColor'>> = {
   paper: { background: '#fbfbfc', textColor: '#30323a', borderColor: '#d6dae1' },
@@ -27,7 +37,7 @@ export const SHADOWS: Record<BubbleSettings['shadow'], string> = {
 }
 
 export const DEFAULT_SETTINGS: TranslationSettings = {
-  version: 1,
+  version: 2,
   enabled: true,
   siteBlacklist: [],
   hoverEnabled: true,
@@ -54,31 +64,28 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     lineHeight: 1.55,
     textAlign: 'left',
   },
-  ai: {
-    apiUrl: '',
-    apiKey: '',
-    model: '',
-    prompt: '请把下面内容翻译成简体中文，只返回译文，不要解释：\n\n{text}',
-    timeoutMs: 20000,
-  },
+  schemes: [],
 }
 
 export function cloneDefaultSettings(): TranslationSettings {
   return structuredClone(DEFAULT_SETTINGS)
 }
 
-export function cloneSettings(settings: TranslationSettings = DEFAULT_SETTINGS): TranslationSettings {
-  return structuredClone(settings)
-}
-
-export function sanitizeSettings(value: unknown): TranslationSettings {
-  return migrateSettings(value)
+export function uid(): string {
+  const crypto = globalThis.crypto
+  if (crypto && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID()
+    } catch {
+      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+    }
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export function migrateSettings(value: unknown): TranslationSettings {
   const input = isRecord(value) ? value : {}
   const rawBubble = isRecord(input.bubble) ? input.bubble : {}
-  const rawAi = isRecord(input.ai) ? input.ai : {}
   const defaults = cloneDefaultSettings()
   const bubble = { ...defaults.bubble, ...rawBubble } as BubbleSettings
   const preset = bubble.colorPreset !== 'custom' && bubble.colorPreset in COLOR_PRESETS
@@ -86,14 +93,12 @@ export function migrateSettings(value: unknown): TranslationSettings {
     : null
 
   return {
-    ...defaults,
-    ...input,
-    version: 1,
+    version: 2,
     enabled: readBoolean(input.enabled, defaults.enabled),
     hoverEnabled: readBoolean(input.hoverEnabled, defaults.hoverEnabled),
     selectionEnabled: readBoolean(input.selectionEnabled, defaults.selectionEnabled),
     hoverDelayMs: clampNumber(input.hoverDelayMs, 0, 1000, defaults.hoverDelayMs),
-    targetLanguage: readString(input.targetLanguage, defaults.targetLanguage),
+    targetLanguage: readEnum(input.targetLanguage, TARGET_LANGUAGES, defaults.targetLanguage),
     siteBlacklist: Array.isArray(input.siteBlacklist)
       ? input.siteBlacklist.map((item) => String(item).trim()).filter(Boolean)
       : defaults.siteBlacklist,
@@ -113,23 +118,75 @@ export function migrateSettings(value: unknown): TranslationSettings {
       fontSize: clampNumber(bubble.fontSize, 10, 28, defaults.bubble.fontSize),
       lineHeight: clampNumber(bubble.lineHeight, 1, 2.4, defaults.bubble.lineHeight),
     },
-    ai: {
-      ...defaults.ai,
-      ...rawAi,
-      apiUrl: readString(rawAi.apiUrl, defaults.ai.apiUrl),
-      apiKey: readString(rawAi.apiKey, defaults.ai.apiKey),
-      model: readString(rawAi.model, defaults.ai.model),
-      prompt: readString(rawAi.prompt, defaults.ai.prompt),
-      timeoutMs: clampNumber(rawAi.timeoutMs, 5000, 60000, defaults.ai.timeoutMs),
-    },
+    schemes: readSchemes(input, defaults.schemes),
   }
 }
 
-export function applyColorPreset(settings: TranslationSettings, preset: BubbleColorPreset): TranslationSettings {
-  const next = structuredClone(settings)
-  next.bubble.colorPreset = preset
-  if (preset !== 'custom') Object.assign(next.bubble, COLOR_PRESETS[preset])
-  return next
+function readSchemes(input: Record<string, unknown>, fallback: SchemeSettings[]): SchemeSettings[] {
+  if (Array.isArray(input.schemes)) {
+    return input.schemes
+      .map((item) => sanitizeScheme(item))
+      .filter((scheme): scheme is SchemeSettings => scheme !== null)
+  }
+  const rawAi = isRecord(input.ai) ? input.ai : null
+  if (!rawAi) return fallback
+  const apiUrl = readString(rawAi.apiUrl, '')
+  const apiKey = readString(rawAi.apiKey, '')
+  if (!apiUrl.trim() && !apiKey.trim()) return fallback
+  const scheme: AiSchemeSettings = {
+    id: uid(),
+    type: 'ai',
+    enabled: true,
+    apiUrl,
+    apiKey,
+    model: readString(rawAi.model, ''),
+    timeoutMs: clampNumber(rawAi.timeoutMs, 5000, 60000, 20000),
+  }
+  return [scheme]
+}
+
+function sanitizeScheme(value: unknown): SchemeSettings | null {
+  if (!isRecord(value)) return null
+  const type = readSchemeType(value.type)
+  if (!type) return null
+  const id = readString(value.id, '').trim() || uid()
+  const enabled = readBoolean(value.enabled, true)
+  if (type === 'deepl') {
+    const scheme: DeeplSchemeSettings = {
+      id,
+      type,
+      enabled,
+      authKey: readString(value.authKey, ''),
+      endpoint: value.endpoint === 'pro' ? 'pro' : 'free',
+    }
+    return scheme
+  }
+  if (type === 'googleCloud') {
+    const scheme: GoogleCloudSchemeSettings = {
+      id,
+      type,
+      enabled,
+      apiKey: readString(value.apiKey, ''),
+    }
+    return scheme
+  }
+  if (type === 'ai') {
+    const scheme: AiSchemeSettings = {
+      id,
+      type,
+      enabled,
+      apiUrl: readString(value.apiUrl, ''),
+      apiKey: readString(value.apiKey, ''),
+      model: readString(value.model, ''),
+      timeoutMs: clampNumber(value.timeoutMs, 5000, 60000, 20000),
+    }
+    return scheme
+  }
+  return { id, type, enabled }
+}
+
+function readSchemeType(value: unknown): SchemeType | null {
+  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'ai' ? value : null
 }
 
 export function validateAiUrl(url: string): string {
@@ -139,24 +196,6 @@ export function validateAiUrl(url: string): string {
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('AI 地址必须是 http 或 https')
   if (!parsed.hostname || parsed.username || parsed.password) throw new Error('AI 地址格式不安全')
   return parsed.toString()
-}
-
-export function validateAiEndpoint(url: string): string {
-  try {
-    validateAiUrl(url)
-    return ''
-  } catch (error) {
-    return error instanceof Error ? error.message : 'AI 地址格式不正确'
-  }
-}
-
-export function isInjectableUrl(pageUrl: string): boolean {
-  try {
-    const url = new URL(pageUrl)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
 }
 
 export function isSiteBlocked(pageUrl: string, blacklist: string[]): boolean {
@@ -175,8 +214,6 @@ export function isSiteBlocked(pageUrl: string, blacklist: string[]): boolean {
     return url.href.toLowerCase().includes(item)
   })
 }
-
-export const isSiteBlacklisted = isSiteBlocked
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null

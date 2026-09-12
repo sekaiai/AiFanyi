@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import SchemesSection from '../components/SchemesSection.vue'
 import SettingsForm from '../components/SettingsForm.vue'
-import type { ExtensionResponse } from '../core/messages'
-import { cloneSettings, DEFAULT_SETTINGS, validateAiEndpoint, type TranslationSettings } from '../core/settings'
-import { classifyText } from '../core/text'
-import { buildPrompt } from '../core/prompt'
-import { DICTIONARY_API_BASE, parseDictionaryResult } from '../core/dictionary'
+import { toDisplayError, type ExtensionResponse } from '../core/messages'
+import { cloneDefaultSettings, type TranslationSettings } from '../core/settings'
+import { classifySelection, getCaretFromPoint } from '../core/text'
+import { runTranslation, translateWithScheme } from '../core/translate'
 import { LruCache } from '../core/lru'
 import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import { boundsFromRange, createBubbleRenderer } from '../extension/renderer'
@@ -13,12 +13,12 @@ import { boundsFromRange, createBubbleRenderer } from '../extension/renderer'
 const props = withDefaults(defineProps<{
   settings?: TranslationSettings
   showSettings?: boolean
-  request?: (kind: 'dictionary' | 'ai', text: string, requestId: number) => Promise<ExtensionResponse>
+  request?: (text: string, requestId: number) => Promise<ExtensionResponse>
 }>(), {
   showSettings: true,
 })
 
-const localSettings = ref<TranslationSettings>(cloneSettings())
+const localSettings = ref<TranslationSettings>(cloneDefaultSettings())
 const settings = computed({
   get: () => props.settings ?? localSettings.value,
   set: (value: TranslationSettings) => {
@@ -86,15 +86,22 @@ watch(settings, (value) => {
 }, { deep: true })
 
 function reset() {
-  settings.value = cloneSettings(DEFAULT_SETTINGS)
+  settings.value = cloneDefaultSettings()
 }
 
-async function testAi() {
-  status.value = '正在测试 AI…'
-  const response = await translateWithAi(Date.now(), 'hello')
-  status.value = response.ok ? 'AI 连接可用' : response.error.message
-  if (!response.ok) throw new Error(response.error.message)
-  return 'AI 连接可用'
+async function testScheme(schemeId: string) {
+  const scheme = settings.value.schemes.find((item) => item.id === schemeId)
+  if (!scheme) throw new Error('未找到对应的翻译方案')
+  status.value = '正在测试方案…'
+  try {
+    await translateWithScheme(scheme, 'AiFanyi connection test.', settings.value.targetLanguage)
+    status.value = '方案连接可用'
+    return '方案连接可用'
+  } catch (error) {
+    const message = toDisplayError(error).message
+    status.value = message
+    throw new Error(message)
+  }
 }
 
 function handleSelection() {
@@ -104,7 +111,7 @@ function handleSelection() {
   const range = selection.getRangeAt(0).cloneRange()
   const target = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement
   if (!target?.closest('#reading-area') || target.closest('pre, code, input, textarea, [contenteditable]')) return
-  const action = classifyText(selection.toString())
+  const action = classifySelection(selection.toString())
   if (action.type === 'empty') return
   currentRange = range
   currentText = action.text
@@ -124,57 +131,29 @@ async function requestTranslation(kind: 'dictionary' | 'ai', text: string, range
   renderer.showLoading(kind === 'dictionary' ? '正在查询释义…' : '正在翻译…', kind === 'dictionary' ? text : '')
   positionBubble(range)
   const response = props.request
-    ? await props.request(kind, text, id)
-    : kind === 'dictionary'
-      ? await lookupDictionary(id, text)
-      : await translateWithAi(id, text)
+    ? await props.request(text, id)
+    : await translationResponse(id, text)
   if (id !== activeRequest || text !== currentText) return
   cache.set(cacheKey, response)
   renderResponse(response, text, range)
 }
 
-async function lookupDictionary(id: number, text: string): Promise<ExtensionResponse> {
+async function translationResponse(id: number, text: string): Promise<ExtensionResponse> {
   try {
-    const response = await fetch(`${DICTIONARY_API_BASE}/entries/en/${encodeURIComponent(text.trim().toLowerCase())}?translations=true`)
-    if (!response.ok) return { ok: false, requestId: id, error: { code: 'http', message: `词典查询失败：HTTP ${response.status}`, retryable: true } }
-    return { ok: true, requestId: id, kind: 'dictionary', result: parseDictionaryResult(await response.json()) }
-  } catch {
-    return { ok: false, requestId: id, error: { code: 'network', message: '词典查询失败。', retryable: true } }
-  }
-}
-
-async function translateWithAi(id: number, text: string): Promise<ExtensionResponse> {
-  const ai = settings.value.ai
-  const endpointError = validateAiEndpoint(ai.apiUrl)
-  if (endpointError || !ai.apiKey || !ai.model) {
-    return { ok: false, requestId: id, error: { code: 'bad_config', message: '请先填写可用的 AI 地址、API 密钥和模型。', retryable: false } }
-  }
-  try {
-    const response = await fetch(ai.apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ai.apiKey}` },
-      body: JSON.stringify({
-        model: ai.model,
-        messages: [{ role: 'user', content: buildPrompt(ai.prompt, text) }],
-        temperature: 0.1,
-        stream: false,
-      }),
-    })
-    if (!response.ok) return { ok: false, requestId: id, error: { code: 'http', message: `AI 翻译失败：HTTP ${response.status}`, retryable: true } }
-    const data = await response.json().catch(() => null)
-    const result = data?.choices?.[0]?.message?.content
-    if (typeof result !== 'string' || !result.trim()) return { ok: false, requestId: id, error: { code: 'empty', message: 'AI 返回内容为空。', retryable: true } }
-    return { ok: true, requestId: id, kind: 'ai', result: result.trim() }
-  } catch {
-    return { ok: false, requestId: id, error: { code: 'network', message: 'AI 翻译失败。', retryable: true } }
+    const outcome = await runTranslation(text, settings.value)
+    return outcome.kind === 'dictionary'
+      ? { ok: true, requestId: id, kind: 'dictionary', result: outcome.result }
+      : { ok: true, requestId: id, kind: 'text', result: outcome.text }
+  } catch (error) {
+    return { ok: false, requestId: id, error: toDisplayError(error) }
   }
 }
 
 function renderResponse(response: ExtensionResponse, sourceText: string, range: Range) {
   if (!renderer) return
   if (response.ok && response.kind === 'dictionary') renderer.showDictionary(sourceText, response.result)
-  else if (response.ok && response.kind === 'ai') renderer.showText(response.result)
-  else if (!response.ok) renderer.showError(response.error.message, response.error.retryable ? () => void requestTranslation(classifyText(sourceText).type === 'dictionary' ? 'dictionary' : 'ai', sourceText, range) : undefined)
+  else if (response.ok && response.kind === 'text') renderer.showText(response.result)
+  else if (!response.ok) renderer.showError(response.error.message, response.error.retryable ? () => void requestTranslation(classifySelection(sourceText).type === 'dictionary' ? 'dictionary' : 'ai', sourceText, range) : undefined)
   positionBubble(range)
 }
 
@@ -188,22 +167,13 @@ function positionBubble(range: Range) {
   const placement = getBubblePlacement(bounds, rect.width, rect.height, window.innerWidth, window.innerHeight, settings.value.bubble)
   renderer.applyPlacement(placement)
 }
-
-function getCaretFromPoint(x: number, y: number): { node: Node; offset: number } | null {
-  if (document.caretRangeFromPoint) {
-    const range = document.caretRangeFromPoint(x, y)
-    return range ? { node: range.startContainer, offset: range.startOffset } : null
-  }
-  const position = document.caretPositionFromPoint?.(x, y)
-  return position ? { node: position.offsetNode, offset: position.offset } : null
-}
 </script>
 
 <template>
   <div :class="showSettings ? 'app-shell' : 'demo-surface'">
     <main id="reading-area" class="demo-pane">
       <h1>翻译交互演示</h1>
-      <p class="tip">悬停或选中单词查词典；选中多个词、句子或段落自动使用 AI。</p>
+      <p class="tip">悬停或选中单词查词典；选中多个词、句子或段落时按翻译方案顺序翻译。</p>
       <div class="reading-copy">
         <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
         <p>Learning another language can help you understand different cultures and communicate with people around the world.</p>
@@ -213,7 +183,8 @@ function getCaretFromPoint(x: number, y: number): { node: Node; offset: number }
       </div>
     </main>
     <aside v-if="showSettings" class="settings-panel" aria-label="演示设置">
-      <SettingsForm v-model="settings" :status="status" :test-ai="testAi" demo-mode @reset="reset" />
+      <SettingsForm v-model="settings" :status="status" @reset="reset" />
+      <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" demo-mode />
     </aside>
   </div>
 </template>

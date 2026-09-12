@@ -1,4 +1,4 @@
-export const DICTIONARY_API_BASE = 'https://freedictionaryapi.com/api/v1'
+const DICTIONARY_API_BASE = 'https://freedictionaryapi.com/api/v1'
 
 export interface DictionaryMeaning {
   partOfSpeech: string

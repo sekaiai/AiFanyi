@@ -1,24 +1,18 @@
 <script setup lang="ts">
-import { computed, shallowRef } from 'vue'
+import { computed } from 'vue'
 import { COLOR_PRESETS } from '../core/settings'
 import type { BubbleColorPreset, TranslationSettings } from '../core/types'
 import BubblePreview from './BubblePreview.vue'
 
 const settings = defineModel<TranslationSettings>({ required: true })
 
-const props = defineProps<{
+defineProps<{
   status: string
-  testAi?: () => Promise<string>
-  demoMode?: boolean
 }>()
 
 const emit = defineEmits<{
   reset: []
 }>()
-
-const showKey = shallowRef(false)
-const testing = shallowRef(false)
-const testStatus = shallowRef('')
 
 const blacklistText = computed({
   get: () => settings.value.siteBlacklist.join('\n'),
@@ -40,18 +34,6 @@ function markCustomColor(): void {
   settings.value.bubble.colorPreset = 'custom'
 }
 
-async function handleTestAi(): Promise<void> {
-  if (!props.testAi) return
-  testing.value = true
-  testStatus.value = '正在测试...'
-  try {
-    testStatus.value = await props.testAi()
-  } catch (error) {
-    testStatus.value = error instanceof Error ? error.message : '测试失败'
-  } finally {
-    testing.value = false
-  }
-}
 </script>
 
 <template>
@@ -205,31 +187,6 @@ async function handleTestAi(): Promise<void> {
         </label>
       </div>
     </section>
-
-    <section class="settings-section ai-section">
-      <h2 class="section-title">AI</h2>
-      <p v-if="demoMode" class="notice">在线演示中的 API 密钥只保存在当前页面内存，刷新后会消失。</p>
-      <div class="control-grid two">
-        <label class="field wide"><span class="field-label">AI 地址</span><input v-model="settings.ai.apiUrl" placeholder="https://api.example.com/v1/chat/completions" /></label>
-        <label class="field"><span class="field-label">模型</span><input v-model="settings.ai.model" placeholder="gpt-4o-mini" /></label>
-        <label class="field key-field">
-          <span class="field-label">API 密钥</span>
-          <span class="key-row">
-            <input v-model="settings.ai.apiKey" :type="showKey ? 'text' : 'password'" autocomplete="off" />
-            <button class="button button-secondary" type="button" @click="showKey = !showKey">{{ showKey ? '隐藏' : '显示' }}</button>
-          </span>
-        </label>
-        <label class="range-field">
-          <span class="range-label">超时 <output>{{ Math.round(settings.ai.timeoutMs / 1000) }} s</output></span>
-          <input v-model.number="settings.ai.timeoutMs" type="range" min="5000" max="60000" step="1000" />
-        </label>
-        <label class="field wide"><span class="field-label">提示词</span><textarea v-model="settings.ai.prompt" /></label>
-      </div>
-      <div class="ai-actions">
-        <button class="button button-primary" type="button" :disabled="testing || !testAi" @click="handleTestAi">测试 AI 配置</button>
-        <span class="settings-status">{{ testStatus }}</span>
-      </div>
-    </section>
   </form>
 </template>
 
@@ -310,20 +267,6 @@ async function handleTestAi(): Promise<void> {
   background: var(--af-control-hover);
 }
 
-.button-primary {
-  background: var(--af-accent);
-  color: var(--af-accent-contrast);
-}
-
-.button-primary:hover:not(:disabled) {
-  background: var(--af-accent-hover);
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-}
-
 .switch-field input[type="checkbox"] {
   width: 16px;
   height: 16px;
@@ -352,8 +295,7 @@ async function handleTestAi(): Promise<void> {
 }
 
 .settings-status,
-.field-hint,
-.notice {
+.field-hint {
   margin: 4px 0 0;
   color: var(--af-muted);
   font-size: 12px;
@@ -365,8 +307,7 @@ async function handleTestAi(): Promise<void> {
   border-top: 1px solid var(--af-line);
 }
 
-.preview-section,
-.ai-section {
+.preview-section {
   grid-column: 1 / -1;
 }
 
@@ -420,19 +361,6 @@ async function handleTestAi(): Promise<void> {
   user-select: none;
 }
 
-.key-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-}
-
-.ai-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 14px;
-}
-
 input[type="range"] {
   width: 100%;
 }
@@ -443,9 +371,7 @@ input[type="range"] {
     grid-template-columns: 1fr;
   }
 
-  .preview-section,
-  .ai-section,
-  .field.wide {
+  .preview-section {
     grid-column: auto;
   }
 }

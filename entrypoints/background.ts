@@ -1,11 +1,11 @@
 import { browser } from 'wxt/browser'
-import { requestAiTranslation } from '../src/core/ai'
-import { lookupDictionary } from '../src/core/dictionary'
-import { isExtensionMessage } from '../src/core/messages'
-import { isSiteBlacklisted } from '../src/core/settings'
+import { isExtensionMessage, toDisplayError } from '../src/core/messages'
+import { isSiteBlocked } from '../src/core/settings'
+import { runTranslation, translateWithScheme } from '../src/core/translate'
 import { createBrowserSettingsStorage } from '../src/extension/storage'
-import type { DisplayError, ExtensionMessage, ExtensionMessageResponse } from '../src/core/messages'
+import type { ExtensionMessage, ExtensionResponse } from '../src/core/messages'
 import type { RequestId } from '../src/core/messages'
+import type { TranslateOutcome } from '../src/core/translate'
 
 const storage = createBrowserSettingsStorage()
 const controllers = new Map<RequestId, AbortController>()
@@ -19,13 +19,13 @@ export default defineBackground(() => {
     void browser.runtime.openOptionsPage()
   })
 
-  browser.runtime.onMessage.addListener((message: unknown, sender): Promise<ExtensionMessageResponse> | undefined => {
+  browser.runtime.onMessage.addListener((message: unknown, sender): Promise<ExtensionResponse> | undefined => {
     if (!isExtensionMessage(message)) return undefined
     return handleMessage(message, sender.url)
   })
 })
 
-async function handleMessage(message: ExtensionMessage, senderUrl?: string): Promise<ExtensionMessageResponse> {
+async function handleMessage(message: ExtensionMessage, senderUrl?: string): Promise<ExtensionResponse> {
   if (message.type === 'translation.cancel') {
     controllers.get(message.requestId)?.abort()
     controllers.delete(message.requestId)
@@ -36,7 +36,7 @@ async function handleMessage(message: ExtensionMessage, senderUrl?: string): Pro
   controllers.set(message.requestId, controller)
   try {
     const settings = await storage.load()
-    if (message.type !== 'settings.testAi' && (!settings.enabled || (senderUrl && isSiteBlacklisted(senderUrl, settings.siteBlacklist)))) {
+    if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
       return {
         ok: false,
         requestId: message.requestId,
@@ -48,14 +48,21 @@ async function handleMessage(message: ExtensionMessage, senderUrl?: string): Pro
       }
     }
 
-    if (message.type === 'dictionary.lookup') {
-      const dictionary = await lookupDictionary(message.text, controller.signal)
-      return { ok: true, requestId: message.requestId, kind: 'dictionary', result: dictionary }
+    if (message.type === 'settings.testScheme') {
+      const scheme = settings.schemes.find((item) => item.id === message.schemeId)
+      if (!scheme) {
+        return {
+          ok: false,
+          requestId: message.requestId,
+          error: { code: 'bad_config', message: '未找到对应的翻译方案', retryable: false },
+        }
+      }
+      const outcome = await translateWithScheme(scheme, 'AiFanyi connection test.', settings.targetLanguage, controller.signal)
+      return outcomeToResponse(outcome, message.requestId)
     }
 
-    const text = message.type === 'settings.testAi' ? 'AiFanyi connection test.' : message.text
-    const translation = await requestAiTranslation(text, settings.ai, controller.signal)
-    return { ok: true, requestId: message.requestId, kind: 'ai', result: translation }
+    const outcome = await runTranslation(message.text, settings, controller.signal)
+    return outcomeToResponse(outcome, message.requestId)
   } catch (error) {
     return { ok: false, requestId: message.requestId, error: toDisplayError(error) }
   } finally {
@@ -63,17 +70,8 @@ async function handleMessage(message: ExtensionMessage, senderUrl?: string): Pro
   }
 }
 
-function toDisplayError(error: unknown): DisplayError {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return { code: 'cancelled', message: '请求已取消', retryable: false }
-  }
-  if (error instanceof DOMException && error.name === 'TimeoutError') {
-    return { code: 'timeout', message: '请求超时，请稍后重试', retryable: true }
-  }
-  const raw = error instanceof Error ? error.message : '未知错误'
-  const message = raw.replace(/Bearer\s+[A-Za-z0-9._~+/-]+/g, 'Bearer [redacted]')
-  if (message.startsWith('HTTP')) return { code: 'http', message, retryable: true }
-  if (message.includes('JSON') || message.includes('为空')) return { code: 'parse', message, retryable: true }
-  if (message.includes('填写') || message.includes('地址')) return { code: 'bad_config', message, retryable: false }
-  return { code: 'network', message, retryable: true }
+function outcomeToResponse(outcome: TranslateOutcome, requestId: RequestId): ExtensionResponse {
+  return outcome.kind === 'dictionary'
+    ? { ok: true, requestId, kind: 'dictionary', result: outcome.result }
+    : { ok: true, requestId, kind: 'text', result: outcome.text }
 }

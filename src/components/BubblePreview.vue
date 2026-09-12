@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { bubbleCssVariables, getBubblePlacement, getBubbleSizing } from '../core/bubble'
-import type { BubbleVisualSettings } from '../core/settings'
+import type { BubbleSettings } from '../core/types'
 
 const props = defineProps<{
-  settings: BubbleVisualSettings
+  settings: BubbleSettings
 }>()
 
 const stageRef = useTemplateRef<HTMLElement>('stage')

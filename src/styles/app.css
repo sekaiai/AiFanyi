@@ -57,7 +57,6 @@ button {
 
 .demo-surface {
   min-width: 0;
-  min-height: 100vh;
 }
 
 .options-shell {
@@ -68,7 +67,7 @@ button {
 
 .demo-pane {
   min-width: 0;
-  padding: 48px 52px 80px;
+  padding: 48px 52px 20px;
   font-size: 18px;
   line-height: 1.8;
 }
@@ -124,6 +123,10 @@ button {
   border: 1px solid var(--af-line);
   border-radius: 8px;
   background: var(--af-panel);
+}
+
+.settings-panel > .schemes-section {
+  margin: 16px 20px 28px;
 }
 
 .settings-form {

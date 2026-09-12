@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser'
-import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, migrateSettings, sanitizeSettings, type TranslationSettings } from '../core/settings'
+import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, migrateSettings, type TranslationSettings } from '../core/settings'
 import type { SettingsStorageAdapter } from '../core/storage'
 
 export async function loadSettings(): Promise<TranslationSettings> {
@@ -8,7 +8,7 @@ export async function loadSettings(): Promise<TranslationSettings> {
 }
 
 export async function saveSettings(settings: TranslationSettings): Promise<void> {
-  await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: sanitizeSettings(settings) })
+  await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: migrateSettings(settings) })
 }
 
 export async function resetSettings(): Promise<TranslationSettings> {

@@ -1,6 +1,7 @@
-import type { BubblePlacement, Bounds } from '../core/bubble'
+import type { BubblePlacement } from '../core/bubble'
 import { bubbleCssVariables } from '../core/bubble'
-import type { BubbleSettings, DictionaryResult } from '../core/types'
+import type { DictionaryResult } from '../core/dictionary'
+import type { BubbleSettings, RectLike } from '../core/types'
 
 export interface BubbleRenderer {
   root: HTMLElement
@@ -133,7 +134,7 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
   return renderer
 }
 
-export function boundsFromRange(range: Range): Bounds | null {
+export function boundsFromRange(range: Range): RectLike | null {
   const rects = Array.from(range.getClientRects()).filter((rect) => rect.width && rect.height)
   const source = rects.length ? rects : [range.getBoundingClientRect()].filter((rect) => rect.width && rect.height)
   if (!source.length) return null

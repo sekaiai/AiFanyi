@@ -6,7 +6,7 @@ import {
   cloneDefaultSettings,
   isSiteBlocked,
   migrateSettings,
-  validateAiEndpoint,
+  validateAiUrl,
 } from '../../src/core/settings'
 import { classifySelection, getWordAtOffset, normalizeSourceText } from '../../src/core/text'
 
@@ -36,17 +36,50 @@ describe('text classification', () => {
 describe('settings', () => {
   it('migrates partial and invalid values safely', () => {
     const migrated = migrateSettings({ hoverDelayMs: 9999, bubble: { side: 'invalid', gap: -5 } })
-    expect(migrated.version).toBe(1)
+    expect(migrated.version).toBe(2)
     expect(migrated.hoverDelayMs).toBe(1000)
     expect(migrated.bubble.side).toBe('top')
     expect(migrated.bubble.gap).toBe(0)
-    expect(migrated.ai.apiKey).toBe('')
+    expect(migrated.schemes).toEqual([])
+  })
+
+  it('migrates v1 AI settings into an enabled scheme', () => {
+    const migrated = migrateSettings({
+      ai: { apiUrl: 'https://api.example.com/v1/chat/completions', apiKey: 'sk-x', model: 'm', timeoutMs: 8000 },
+    })
+    expect(migrated.schemes).toHaveLength(1)
+    expect(migrated.schemes[0]).toMatchObject({
+      type: 'ai',
+      enabled: true,
+      apiUrl: 'https://api.example.com/v1/chat/completions',
+      apiKey: 'sk-x',
+      model: 'm',
+      timeoutMs: 8000,
+    })
+  })
+
+  it('does not create a scheme when v1 AI settings are empty', () => {
+    const migrated = migrateSettings({ ai: { apiUrl: '', apiKey: '', model: '', timeoutMs: 20000 } })
+    expect(migrated.schemes).toEqual([])
+  })
+
+  it('drops unknown scheme types and backfills missing ids', () => {
+    const migrated = migrateSettings({
+      schemes: [
+        { type: 'deepl', enabled: true, authKey: 'k' },
+        { id: 'g1', type: 'google' },
+        { id: 'bad', type: 'nope' },
+      ],
+    })
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['deepl', 'google'])
+    expect(migrated.schemes[0]?.id).toBeTruthy()
+    expect(migrated.schemes[1]?.id).toBe('g1')
   })
 
   it('validates AI URLs without accepting credentials or unsafe schemes', () => {
-    expect(validateAiEndpoint('https://api.example.com/v1/chat/completions')).toBe('')
-    expect(validateAiEndpoint('javascript:alert(1)')).toContain('http')
-    expect(validateAiEndpoint('https://user:secret@example.com')).toContain('不安全')
+    expect(validateAiUrl('https://api.example.com/v1/chat/completions')).toBe('https://api.example.com/v1/chat/completions')
+    expect(() => validateAiUrl('javascript:alert(1)')).toThrow('AI 地址必须是 http 或 https')
+    expect(() => validateAiUrl('https://user:secret@example.com')).toThrow('AI 地址格式不安全')
   })
 
   it('matches exact, wildcard, and substring blacklist rules', () => {

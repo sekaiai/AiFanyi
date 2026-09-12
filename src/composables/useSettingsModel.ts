@@ -1,4 +1,4 @@
-import { computed, nextTick, onUnmounted, reactive, readonly, shallowRef, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, shallowRef, watch } from 'vue'
 import { cloneDefaultSettings, migrateSettings } from '../core/settings'
 import type { SettingsStorageAdapter } from '../core/storage'
 import type { TranslationSettings } from '../core/settings'
@@ -80,10 +80,7 @@ export function useSettingsModel(storage: SettingsStorageAdapter) {
 
   return {
     settings,
-    loading: readonly(loading),
-    saving: readonly(saving),
     stateLabel,
     reset,
-    unsubscribe,
   }
 }

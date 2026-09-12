@@ -36,7 +36,7 @@ const SettingsHarness = defineComponent({
     <form>
       <output data-testid="status">{{ stateLabel }}</output>
       <input name="hoverDelay" type="number" v-model.number="settings.hoverDelayMs" />
-      <input name="apiUrl" v-model="settings.ai.apiUrl" />
+      <input name="targetLanguage" v-model="settings.targetLanguage" />
       <button data-testid="reset" type="button" @click="reset">reset</button>
     </form>
   `,
@@ -77,7 +77,7 @@ describe('useSettingsModel', () => {
     const wrapper = mount(SettingsHarness, { props: { storage } })
     await flushPromises()
 
-    await wrapper.find('input[name="apiUrl"]').setValue('https://api.example.com/v1/chat/completions')
+    await wrapper.find('input[name="targetLanguage"]').setValue('English')
     await flushPromises()
 
     expect(wrapper.get('[data-testid="status"]').text()).toBe('已自动保存')

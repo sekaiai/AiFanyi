@@ -1,11 +1,12 @@
 import { browser } from 'wxt/browser'
 import type { ContentScriptContext } from 'wxt/utils/content-script-context'
-import { getBounds, getBubblePlacement, getBubbleSizing } from '../src/core/bubble'
-import { isSiteBlacklisted } from '../src/core/settings'
+import { getBubblePlacement, getBubbleSizing } from '../src/core/bubble'
+import { LruCache } from '../src/core/lru'
+import { isSiteBlocked } from '../src/core/settings'
 import { createBrowserSettingsStorage } from '../src/extension/storage'
-import { classifySelection, getWordAtOffset, isIgnorableElement } from '../src/core/text'
-import { createBubbleRenderer, type BubbleRenderer } from '../src/extension/renderer'
-import type { ExtensionMessageResponse } from '../src/core/messages'
+import { classifySelection, getCaretFromPoint, getWordAtOffset, isIgnorableElement } from '../src/core/text'
+import { boundsFromRange, createBubbleRenderer } from '../src/extension/renderer'
+import type { ExtensionResponse } from '../src/core/messages'
 import type { TranslationSettings } from '../src/core/types'
 
 const CLOSE_DELAY = 180
@@ -27,7 +28,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
   let settings = await storage.load()
   const renderer = createBubbleRenderer(settings.bubble)
   const highlight = createHighlight()
-  const cache = new Map<string, ExtensionMessageResponse>()
+  const cache = new LruCache<string, ExtensionResponse>(CACHE_LIMIT)
   let currentRange: Range | null = null
   let currentText = ''
   let currentKind: 'dictionary' | 'ai' | null = null
@@ -45,7 +46,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     settings = next
     renderer.applySettings(settings.bubble)
     if (!isActive(settings)) close()
-    else if (currentRange && renderer.isVisible()) position(renderer, settings, currentRange)
+    else if (currentRange && renderer.isVisible()) position(currentRange)
   })
 
   ctx.addEventListener(document, 'mousemove', (event) => {
@@ -88,7 +89,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
       currentKind = 'dictionary'
       currentRange = range
       currentText = word.word
-      void submit(renderer, settings, cache, 'dictionary', word.word, range)
+      void submit('dictionary', word.word, range)
     }, settings.hoverDelayMs)
   }, true)
 
@@ -111,11 +112,11 @@ async function run(ctx: ContentScriptContext): Promise<void> {
 
   ctx.addEventListener(window, 'scroll', () => {
     if (currentInteraction === 'hover') close()
-    else if (currentRange && renderer.isVisible()) position(renderer, settings, currentRange)
+    else if (currentRange && renderer.isVisible()) position(currentRange)
   }, true)
 
   ctx.addEventListener(window, 'resize', () => {
-    if (currentRange && renderer.isVisible()) position(renderer, settings, currentRange)
+    if (currentRange && renderer.isVisible()) position(currentRange)
   })
 
   ctx.addEventListener(document, 'keydown', (event) => {
@@ -159,13 +160,10 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     currentKind = action.type
     currentRange = range
     currentText = action.text
-    void submit(renderer, settings, cache, action.type, action.text, range)
+    void submit(action.type, action.text, range)
   }
 
   async function submit(
-    activeRenderer: BubbleRenderer,
-    activeSettings: TranslationSettings,
-    activeCache: Map<string, ExtensionMessageResponse>,
     kind: 'dictionary' | 'ai',
     text: string,
     range: Range,
@@ -174,39 +172,46 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     currentRequestId = requestId
     const cacheKey = `${kind}:${text.toLowerCase()}`
-    const cached = activeCache.get(cacheKey)
+    const cached = cache.get(cacheKey)
     if (cached) {
-      renderResponse(activeRenderer, activeSettings, activeCache, cached, text, range)
+      renderResponse(cached, text, range)
       return
     }
-    activeRenderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', kind === 'dictionary' ? text : '')
-    position(activeRenderer, activeSettings, range)
+    renderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', kind === 'dictionary' ? text : '')
+    position(range)
     const response = await browser.runtime.sendMessage({
-      type: kind === 'dictionary' ? 'dictionary.lookup' : 'translation.request',
+      type: 'translation.request',
       requestId,
       text,
-    }) as ExtensionMessageResponse
+    }) as ExtensionResponse
     if (response.requestId !== currentRequestId || text !== currentText) return
-    if (response.ok) putCache(activeCache, cacheKey, response)
-    renderResponse(activeRenderer, activeSettings, activeCache, response, text, range)
+    if (response.ok) cache.set(cacheKey, response)
+    renderResponse(response, text, range)
   }
 
   function renderResponse(
-    activeRenderer: BubbleRenderer,
-    activeSettings: TranslationSettings,
-    activeCache: Map<string, ExtensionMessageResponse>,
-    response: ExtensionMessageResponse,
+    response: ExtensionResponse,
     text: string,
     range: Range,
   ): void {
     if (!response.ok) {
-      activeRenderer.showError(response.error.message, response.error.retryable && currentKind ? () => void submit(activeRenderer, activeSettings, activeCache, currentKind!, text, range) : undefined)
+      renderer.showError(response.error.message, response.error.retryable && currentKind ? () => void submit(currentKind!, text, range) : undefined)
     } else if (response.kind === 'dictionary') {
-      activeRenderer.showDictionary(text, response.result)
-    } else if (response.kind === 'ai') {
-      activeRenderer.showText(response.result)
+      renderer.showDictionary(text, response.result)
+    } else if (response.kind === 'text') {
+      renderer.showText(response.result)
     }
-    position(activeRenderer, activeSettings, range)
+    position(range)
+  }
+
+  function position(range: Range): void {
+    const bounds = boundsFromRange(range)
+    if (!bounds) return
+    const sizing = getBubbleSizing(bounds.right - bounds.left, window.innerWidth, settings.bubble.side)
+    renderer.prepareForMeasure(sizing.minWidth, sizing.maxWidth)
+    const rect = renderer.root.getBoundingClientRect()
+    const placement = getBubblePlacement(bounds, rect.width, rect.height, window.innerWidth, window.innerHeight, settings.bubble)
+    renderer.applyPlacement(placement)
   }
 
   function leaveHoverWord(): void {
@@ -246,26 +251,8 @@ async function run(ctx: ContentScriptContext): Promise<void> {
   }
 }
 
-function position(renderer: BubbleRenderer, settings: TranslationSettings, range: Range): void {
-  const rects = Array.from(range.getClientRects()).filter((rect) => rect.width && rect.height)
-  const fallback = range.getBoundingClientRect()
-  const bounds = getBounds(rects.length ? rects : [fallback])
-  const sizing = getBubbleSizing(bounds.right - bounds.left, window.innerWidth, settings.bubble.side)
-  renderer.prepareForMeasure(sizing.minWidth, sizing.maxWidth)
-  const rect = renderer.root.getBoundingClientRect()
-  const placement = getBubblePlacement(bounds, rect.width, rect.height, window.innerWidth, window.innerHeight, settings.bubble)
-  renderer.applyPlacement(placement)
-}
-
 function isActive(settings: TranslationSettings): boolean {
-  return settings.enabled && !isSiteBlacklisted(location.href, settings.siteBlacklist)
-}
-
-function putCache(cache: Map<string, ExtensionMessageResponse>, key: string, response: ExtensionMessageResponse): void {
-  cache.set(key, response)
-  if (cache.size <= CACHE_LIMIT) return
-  const first = cache.keys().next().value
-  if (first) cache.delete(first)
+  return settings.enabled && !isSiteBlocked(location.href, settings.siteBlacklist)
 }
 
 function createHighlight(): HTMLSpanElement {
@@ -299,13 +286,4 @@ function hideHighlight(highlight: HTMLElement): void {
 function hasActiveSelection(): boolean {
   const selection = window.getSelection()
   return Boolean(selection && !selection.isCollapsed && selection.toString().trim())
-}
-
-function getCaretFromPoint(x: number, y: number): { node: Node; offset: number } | null {
-  if (document.caretRangeFromPoint) {
-    const range = document.caretRangeFromPoint(x, y)
-    return range ? { node: range.startContainer, offset: range.startOffset } : null
-  }
-  const position = document.caretPositionFromPoint?.(x, y)
-  return position ? { node: position.offsetNode, offset: position.offset } : null
 }

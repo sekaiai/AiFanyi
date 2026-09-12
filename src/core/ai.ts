@@ -1,11 +1,9 @@
 import { validateAiUrl } from './settings'
-import type { AiSettings } from './types'
+import type { AiSchemeSettings } from './types'
 import { normalizeSourceText } from './text'
 import { buildPrompt } from './prompt'
 
-export { buildPrompt } from './prompt'
-
-export async function requestAiTranslation(text: string, settings: AiSettings, signal?: AbortSignal): Promise<string> {
+export async function requestAiTranslation(text: string, settings: AiSchemeSettings, targetLanguage: string, signal?: AbortSignal): Promise<string> {
   const source = normalizeSourceText(text)
   if (!source) throw new Error('翻译内容为空。')
   if (!settings.apiKey.trim()) throw new Error('请填写 API 密钥。')
@@ -13,8 +11,7 @@ export async function requestAiTranslation(text: string, settings: AiSettings, s
 
   const endpoint = validateAiUrl(settings.apiUrl)
   const timeout = new AbortController()
-  const timeoutId = setTimeout(() => timeout.abort('timeout'), settings.timeoutMs)
-  const merged = mergeSignals(signal, timeout.signal)
+  const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), settings.timeoutMs)
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -24,11 +21,11 @@ export async function requestAiTranslation(text: string, settings: AiSettings, s
       },
       body: JSON.stringify({
         model: settings.model,
-        messages: [{ role: 'user', content: buildPrompt(settings.prompt, source) }],
+        messages: [{ role: 'user', content: buildPrompt(`请把下面内容翻译成${targetLanguage}，只返回译文，不要解释：\n\n{text}`, source) }],
         temperature: 0.1,
         stream: false,
       }),
-      signal: merged.signal,
+      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     const contentType = response.headers.get('content-type') ?? ''
@@ -38,7 +35,6 @@ export async function requestAiTranslation(text: string, settings: AiSettings, s
     return result
   } finally {
     clearTimeout(timeoutId)
-    merged.dispose()
   }
 }
 
@@ -60,21 +56,6 @@ export function readAssistantContent(payload: unknown): string {
     }
   }
   return ''
-}
-
-function mergeSignals(parent?: AbortSignal, timeout?: AbortSignal): { signal: AbortSignal; dispose: () => void } {
-  const controller = new AbortController()
-  const abortFromParent = () => controller.abort(parent?.reason ?? new DOMException('Cancelled', 'AbortError'))
-  const abortFromTimeout = () => controller.abort(new DOMException('Request timed out', 'TimeoutError'))
-  parent?.addEventListener('abort', abortFromParent, { once: true })
-  timeout?.addEventListener('abort', abortFromTimeout, { once: true })
-  return {
-    signal: controller.signal,
-    dispose: () => {
-      parent?.removeEventListener('abort', abortFromParent)
-      timeout?.removeEventListener('abort', abortFromTimeout)
-    },
-  }
 }
 
 function readRecord(value: unknown): Record<string, unknown> {

@@ -1,8 +1,8 @@
 import { FONT_STACKS, SHADOWS } from './settings'
 import type { BubbleSettings, RectLike } from './types'
 
-export const VIEWPORT_MARGIN = 8
-export const MIN_READABLE_WIDTH = 160
+const VIEWPORT_MARGIN = 8
+const MIN_READABLE_WIDTH = 160
 
 const OPPOSITE_SIDE = {
   top: 'bottom',
@@ -19,17 +19,6 @@ export interface BubblePlacement {
   height: number
   arrowX: number
   arrowY: number
-}
-
-export type Bounds = RectLike
-
-export function getBounds(rects: RectLike[]): RectLike {
-  return {
-    left: Math.min(...rects.map((rect) => rect.left)),
-    right: Math.max(...rects.map((rect) => rect.right)),
-    top: Math.min(...rects.map((rect) => rect.top)),
-    bottom: Math.max(...rects.map((rect) => rect.bottom)),
-  }
 }
 
 export function getBubbleSizing(rangeWidth: number, containerWidth: number, side: BubbleSettings['side']) {
@@ -81,7 +70,7 @@ export function getBubblePlacement(
   }
 }
 
-export function resolveBubbleSide(
+function resolveBubbleSide(
   side: BubbleSettings['side'],
   bounds: RectLike,
   bubbleWidth: number,
@@ -102,13 +91,13 @@ export function resolveBubbleSide(
   return spaces[opposite] > spaces[side] ? opposite : side
 }
 
-export function alignAxis(start: number, end: number, bubbleSize: number, alignment: BubbleSettings['align']): number {
+function alignAxis(start: number, end: number, bubbleSize: number, alignment: BubbleSettings['align']): number {
   if (alignment === 'center') return (start + end - bubbleSize) / 2
   if (alignment === 'end') return end - bubbleSize
   return start
 }
 
-export function clamp(value: number, min: number, max: number): number {
+function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(value, max))
 }
 

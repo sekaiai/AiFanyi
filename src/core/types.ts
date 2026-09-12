@@ -28,16 +28,41 @@ export interface BubbleSettings {
   textAlign: BubbleTextAlign
 }
 
-export interface AiSettings {
+export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'ai'
+
+interface SchemeBase {
+  id: string
+  type: SchemeType
+  enabled: boolean
+}
+
+export interface DeeplSchemeSettings extends SchemeBase {
+  type: 'deepl'
+  authKey: string
+  endpoint: 'free' | 'pro'
+}
+
+export interface GoogleSchemeSettings extends SchemeBase {
+  type: 'google'
+}
+
+export interface GoogleCloudSchemeSettings extends SchemeBase {
+  type: 'googleCloud'
+  apiKey: string
+}
+
+export interface AiSchemeSettings extends SchemeBase {
+  type: 'ai'
   apiUrl: string
   apiKey: string
   model: string
-  prompt: string
   timeoutMs: number
 }
 
+export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | AiSchemeSettings
+
 export interface TranslationSettings {
-  version: 1
+  version: 2
   enabled: boolean
   siteBlacklist: string[]
   hoverEnabled: boolean
@@ -45,24 +70,7 @@ export interface TranslationSettings {
   hoverDelayMs: number
   targetLanguage: string
   bubble: BubbleSettings
-  ai: AiSettings
-}
-
-export interface DictionaryMeaning {
-  partOfSpeech: string
-  translations: string[]
-}
-
-export interface DictionaryResult {
-  source: string
-  pronunciation: string
-  meanings: DictionaryMeaning[]
-}
-
-export interface TranslationError {
-  code: 'bad_config' | 'blacklisted' | 'cancelled' | 'disabled' | 'empty' | 'http' | 'network' | 'parse' | 'timeout' | 'unknown'
-  message: string
-  retryable: boolean
+  schemes: SchemeSettings[]
 }
 
 export interface RectLike {
