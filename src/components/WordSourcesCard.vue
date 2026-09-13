@@ -19,7 +19,7 @@ const emit = defineEmits<{
 function latencyText(source: WordSourceId): string {
   if (props.wordProbe?.results[source] === false) return '不可用'
   const ms = props.wordProbe?.latency?.[source]
-  return typeof ms === 'number' ? `${ms}ms` : '—'
+  return typeof ms === 'number' ? `${ms}ms` : ''
 }
 
 /** 按显示的值着色：可用绿、不可用红、未检测保持灰。 */
@@ -47,6 +47,7 @@ const wordProbeTime = computed(() => {
         :key="id"
         class="src-row"
         :class="{ off: !settings.word.sources[id] }"
+        :title="WORD_SOURCE_LABELS[id]"
       >
         <input
           v-model="settings.word.sources[id]"
@@ -61,7 +62,7 @@ const wordProbeTime = computed(() => {
 
     <div v-if="wordProbe !== undefined" class="source-foot">
       <button class="button button-secondary" type="button" data-testid="probe-words" :disabled="probing" @click="emit('probeWords')">
-        {{ probing ? '检测中…' : '重新检测' }}
+        {{ probing ? '检测中…' : '检测连通率' }}
       </button>
       <span v-if="wordProbeTime" class="source-time">{{ wordProbeTime }}</span>
     </div>
@@ -149,8 +150,8 @@ const wordProbeTime = computed(() => {
 
 /* 源行：【checkbox | 名称 | 延迟】，延迟恒显，一行排四个源 */
 .src-rows {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
   gap: 4px 16px;
   margin-top: 10px;
 }
@@ -179,6 +180,7 @@ const wordProbeTime = computed(() => {
   color: var(--af-muted);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .src-row .latency.ok {
   color: oklch(55% 0.14 150);
@@ -187,7 +189,7 @@ const wordProbeTime = computed(() => {
   color: oklch(55% 0.19 25);
 }
 .src-row.off {
-  opacity: 0.45;
+  opacity: 0.85;
 }
 
 .source-foot {
@@ -259,10 +261,5 @@ const wordProbeTime = computed(() => {
 
 
 
-/* 窄屏源行退回单列 */
-@media (max-width: 760px) {
-  .src-rows {
-    grid-template-columns: 1fr;
-  }
-}
+
 </style>
