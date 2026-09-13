@@ -8,7 +8,7 @@ import {
   migrateSettings,
   validateAiUrl,
 } from '../../src/core/settings'
-import { classifySelection, getWordAtOffset, normalizeSourceText } from '../../src/core/text'
+import { classifySelection, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
 import { toContentSettings } from '../../src/extension/storage'
 
 describe('text classification', () => {
@@ -32,6 +32,23 @@ describe('text classification', () => {
     expect(normalizeSourceText(`  hello\n world  `)).toBe('hello world')
     expect(normalizeSourceText('x'.repeat(MAX_TRANSLATION_TEXT_LENGTH + 10))).toHaveLength(MAX_TRANSLATION_TEXT_LENGTH)
   })
+
+  // 悬停与划词共用基础排除（脚本/控件/编辑器等），差异只在 pre/code：
+  // 悬停忽略代码区避免阅读代码时被打断，划词保持可用以便显式翻译。
+  it('lets explicit selection opt into code blocks that hover ignores', () => {
+    const code = document.createElement('code')
+    expect(isIgnorableElement(code)).toBe(true)
+    expect(isSelectionIgnorableElement(code)).toBe(false)
+    expect(isIgnorableElement(document.createElement('p'))).toBe(false)
+    expect(isSelectionIgnorableElement(document.createElement('p'))).toBe(false)
+  })
+
+  it('ignores controls and editable regions for both hover and selection', () => {
+    expect(isIgnorableElement(document.createElement('button'))).toBe(true)
+    expect(isSelectionIgnorableElement(document.createElement('button'))).toBe(true)
+    expect(isIgnorableElement(document.createElement('input'))).toBe(true)
+    expect(isSelectionIgnorableElement(document.createElement('input'))).toBe(true)
+  })
 })
 
 describe('settings', () => {
@@ -42,6 +59,10 @@ describe('settings', () => {
     expect(migrated.bubble.side).toBe('top')
     expect(migrated.bubble.gap).toBe(0)
     expect(migrated.schemes).toEqual([])
+  })
+
+  it('keeps expanded target languages during migration', () => {
+    expect(migrateSettings({ targetLanguage: 'ไทย' }).targetLanguage).toBe('ไทย')
   })
 
   it('migrates v1 AI settings into an enabled scheme', () => {

@@ -4,8 +4,9 @@ import { getBubblePlacement, getBubbleSizing } from '../src/core/bubble'
 import { LruCache } from '../src/core/lru'
 import { isSiteBlocked, wordLookupDelay } from '../src/core/settings'
 import { createContentSettingsStorage } from '../src/extension/storage'
-import { classifySelection, getCaretFromPoint, getWordAtOffset, isIgnorableElement } from '../src/core/text'
+import { classifySelection, getCaretFromPoint, getWordAtOffset, hasActiveSelection, isIgnorableElement, isSelectionIgnorableElement } from '../src/core/text'
 import { boundsFromRange, createBubbleRenderer } from '../src/extension/renderer'
+import { createHighlight, hideHighlight, showHighlight } from '../src/extension/highlight'
 import { speakWord } from '../src/extension/speech'
 import type { ExtensionResponse } from '../src/core/messages'
 import type { TranslationSettings } from '../src/core/types'
@@ -34,6 +35,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
   let currentText = ''
   let currentKind: 'dictionary' | 'ai' | null = null
   let currentRequestId = ''
+  let inflightKey = ''
   let currentInteraction: 'hover' | 'selection' | null = null
   let hoveredTarget: { node: Text; start: number; end: number } | null = null
   let pointerDown = false
@@ -153,7 +155,8 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     }
     const range = selection.getRangeAt(0).cloneRange()
     const target = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement
-    if (isIgnorableElement(target)) return
+    // 显式划词比悬停宽松：pre/code 也允许翻译（悬停仍忽略代码区）
+    if (isSelectionIgnorableElement(target)) return
     const action = classifySelection(selection.toString())
     if (action.type === 'empty') return
     window.clearTimeout(hoverTimer)
@@ -177,25 +180,35 @@ async function run(ctx: ContentScriptContext): Promise<void> {
     text: string,
     range: Range,
   ): Promise<void> {
+    const cacheKey = `${kind}:${text.toLowerCase()}`
+    // ponytail: 同文本同类型请求在途时直接复用，不重复发起消息
+    if (inflightKey === cacheKey) {
+      position(range)
+      return
+    }
     abortRequest()
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
     currentRequestId = requestId
-    const cacheKey = `${kind}:${text.toLowerCase()}`
     const cached = cache.get(cacheKey)
     if (cached) {
       renderResponse(cached, text, range)
       return
     }
+    inflightKey = cacheKey
     renderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', text)
     position(range)
-    const response = await browser.runtime.sendMessage({
-      type: 'translation.request',
-      requestId,
-      text,
-    }) as ExtensionResponse
-    if (response.requestId !== currentRequestId || text !== currentText) return
-    if (response.ok) cache.set(cacheKey, response)
-    renderResponse(response, text, range)
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: 'translation.request',
+        requestId,
+        text,
+      }) as ExtensionResponse
+      if (response.requestId !== currentRequestId || text !== currentText) return
+      if (response.ok) cache.set(cacheKey, response)
+      renderResponse(response, text, range)
+    } finally {
+      if (inflightKey === cacheKey) inflightKey = ''
+    }
   }
 
   function renderResponse(
@@ -259,6 +272,7 @@ async function run(ctx: ContentScriptContext): Promise<void> {
   }
 
   function abortRequest(): void {
+    inflightKey = ''
     if (!currentRequestId) return
     void browser.runtime.sendMessage({ type: 'translation.cancel', requestId: currentRequestId })
     currentRequestId = ''
@@ -269,35 +283,3 @@ function isActive(settings: TranslationSettings): boolean {
   return settings.enabled && !isSiteBlocked(location.href, settings.siteBlacklist)
 }
 
-function createHighlight(): HTMLSpanElement {
-  const highlight = document.createElement('span')
-  Object.assign(highlight.style, {
-    position: 'fixed',
-    zIndex: '2147483646',
-    display: 'none',
-    borderRadius: '3px',
-    background: 'rgba(79,132,232,.22)',
-    pointerEvents: 'none',
-  })
-  document.documentElement.append(highlight)
-  return highlight
-}
-
-function showHighlight(highlight: HTMLElement, rect: DOMRect): void {
-  Object.assign(highlight.style, {
-    display: 'block',
-    left: `${rect.left}px`,
-    top: `${rect.top}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-  })
-}
-
-function hideHighlight(highlight: HTMLElement): void {
-  highlight.style.display = 'none'
-}
-
-function hasActiveSelection(): boolean {
-  const selection = window.getSelection()
-  return Boolean(selection && !selection.isCollapsed && selection.toString().trim())
-}

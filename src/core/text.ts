@@ -35,8 +35,23 @@ export function getWordAtOffset(text: string, offset: number): { word: string; s
   return null
 }
 
+// 交互排除的基础集合：脚本/样式/输入控件/按钮/插件自身节点（悬停与划词都排除）。
+const IGNORED_BASE_SELECTOR = 'script, style, textarea, input, select, option, button, [contenteditable], #aifanyi-shadow-host, #aifanyi-word-highlight'
+
+/** 悬停（隐式触发）额外排除代码区：扫过代码时不该连环弹泡。 */
 export function isIgnorableElement(element: Element | null): boolean {
-  return Boolean(element?.closest('script, style, textarea, input, select, option, button, [contenteditable], pre, code, #aifanyi-shadow-host, #aifanyi-word-highlight'))
+  return Boolean(element?.closest(`${IGNORED_BASE_SELECTOR}, pre, code`))
+}
+
+/** 显式划词比悬停宽松：代码区（pre/code）也允许翻译。 */
+export function isSelectionIgnorableElement(element: Element | null): boolean {
+  return Boolean(element?.closest(IGNORED_BASE_SELECTOR))
+}
+
+/** 当前是否存在非折叠的选区文本（有选区时悬停让位给划词）。 */
+export function hasActiveSelection(): boolean {
+  const selection = window.getSelection()
+  return Boolean(selection && !selection.isCollapsed && selection.toString().trim())
 }
 
 export function getCaretFromPoint(x: number, y: number): { node: Node; offset: number } | null {
