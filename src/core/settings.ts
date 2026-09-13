@@ -144,11 +144,25 @@ export function uid(): string {
   return crypto.randomUUID()
 }
 
+const BUBBLE_KEYS = [
+  'side', 'align', 'gap', 'offsetX', 'offsetY', 'showArrow', 'showOriginal',
+  'colorPreset', 'background', 'textColor', 'borderColor', 'highlightColor',
+  'borderWidth', 'radius', 'shadow', 'padding', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'textAlign',
+] as const
+
+function pickBubbleFields(raw: Record<string, unknown>): Partial<BubbleSettings> {
+  const picked: Record<string, unknown> = {}
+  for (const key of BUBBLE_KEYS) {
+    if (key in raw) picked[key] = raw[key]
+  }
+  return picked as Partial<BubbleSettings>
+}
+
 export function migrateSettings(value: unknown): TranslationSettings {
   const input = isRecord(value) ? value : {}
   const rawBubble = isRecord(input.bubble) ? input.bubble : {}
   const defaults = cloneDefaultSettings()
-  const bubble = { ...defaults.bubble, ...rawBubble } as BubbleSettings
+  const bubble = { ...defaults.bubble, ...pickBubbleFields(rawBubble) } as BubbleSettings
   // 旧版高亮色为 6 位 hex（渲染时固定附加约 22% 透明度）：迁移补上 alpha 位，让选择器显示与实际渲染一致。
   if (typeof bubble.highlightColor === 'string' && /^#[0-9a-f]{6}$/i.test(bubble.highlightColor)) bubble.highlightColor += '38'
   const preset = bubble.colorPreset !== 'custom' && bubble.colorPreset in COLOR_PRESETS

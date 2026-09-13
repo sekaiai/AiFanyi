@@ -92,6 +92,13 @@ describe('settings', () => {
     expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
   })
 
+  it('strips unknown bubble keys instead of carrying them into the migrated settings', () => {
+    const migrated = migrateSettings({ bubble: { gap: 12, fontFamily: 'mono', legacyExtra: 'junk' } })
+    expect(migrated.bubble.gap).toBe(12)
+    expect(migrated.bubble.fontFamily).toBe('mono')
+    expect('legacyExtra' in migrated.bubble).toBe(false)
+  })
+
   it('keeps expanded target languages during migration', () => {
     expect(migrateSettings({ targetLanguage: 'ไทย' }).targetLanguage).toBe('ไทย')
   })
