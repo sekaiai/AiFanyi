@@ -22,10 +22,6 @@ const blacklistText = computed({
   },
 })
 
-const alignHint = computed(() => ['top', 'bottom'].includes(settings.value.bubble.side)
-  ? '上下方向：左 / 中 / 右'
-  : '左右方向：上 / 中 / 下')
-
 /** 滑杆轨道进度填充（纯视觉）：当前值占量程的百分比。 */
 function fillPct(value: number, min: number, max: number): string {
   const pct = ((value - min) / (max - min)) * 100
@@ -64,8 +60,8 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
 
     <section class="settings-section">
       <h2 class="section-title">位置</h2>
-      <div class="control-grid two">
-        <div class="control-col">
+      <div class="control-stack">
+        <div class="control-grid two">
           <label class="field">
             <span class="field-label">方向</span>
             <select v-model="settings.bubble.side" data-testid="bubble-side">
@@ -82,23 +78,20 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
               <option value="center">居中</option>
               <option value="end">末端</option>
             </select>
-            <span class="field-hint">{{ alignHint }}</span>
           </label>
         </div>
-        <div class="control-col">
-          <label class="range-field">
-            <span class="range-label">间距 <output>{{ settings.bubble.gap }} px</output></span>
-            <input v-model.number="settings.bubble.gap" type="range" min="0" max="24" step="1" :style="{ '--fill': fillPct(settings.bubble.gap, 0, 24) }" />
-          </label>
-          <label class="range-field">
-            <span class="range-label">水平微调 <output>{{ settings.bubble.offsetX }} px</output></span>
-            <input v-model.number="settings.bubble.offsetX" type="range" min="-80" max="80" step="1" :style="{ '--fill': fillPct(settings.bubble.offsetX, -80, 80) }" />
-          </label>
-          <label class="range-field">
-            <span class="range-label">垂直微调 <output>{{ settings.bubble.offsetY }} px</output></span>
-            <input v-model.number="settings.bubble.offsetY" type="range" min="-80" max="80" step="1" :style="{ '--fill': fillPct(settings.bubble.offsetY, -80, 80) }" />
-          </label>
-        </div>
+        <label class="range-field">
+          <span class="range-label">间距 <output>{{ settings.bubble.gap }} px</output></span>
+          <input v-model.number="settings.bubble.gap" type="range" min="0" max="24" step="1" :style="{ '--fill': fillPct(settings.bubble.gap, 0, 24) }" />
+        </label>
+        <label class="range-field">
+          <span class="range-label">水平微调 <output>{{ settings.bubble.offsetX }} px</output></span>
+          <input v-model.number="settings.bubble.offsetX" type="range" min="-80" max="80" step="1" :style="{ '--fill': fillPct(settings.bubble.offsetX, -80, 80) }" />
+        </label>
+        <label class="range-field">
+          <span class="range-label">垂直微调 <output>{{ settings.bubble.offsetY }} px</output></span>
+          <input v-model.number="settings.bubble.offsetY" type="range" min="-80" max="80" step="1" :style="{ '--fill': fillPct(settings.bubble.offsetY, -80, 80) }" />
+        </label>
       </div>
     </section>
 
@@ -164,39 +157,43 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
 
     <section class="settings-section text-wide">
       <h2 class="section-title">文字</h2>
-      <div class="control-grid four">
-        <label class="field">
-          <span class="field-label">字体</span>
-          <select v-model="settings.bubble.fontFamily">
-            <option value="system">系统</option>
-            <option value="serif">衬线</option>
-            <option value="mono">等宽</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">字重</span>
-          <select v-model="settings.bubble.fontWeight">
-            <option value="400">常规</option>
-            <option value="500">中等</option>
-            <option value="600">加粗</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">文字对齐</span>
-          <select v-model="settings.bubble.textAlign">
-            <option value="left">左</option>
-            <option value="center">中</option>
-            <option value="right">右</option>
-          </select>
-        </label>
-        <label class="range-field">
-          <span class="range-label">字号 <output>{{ settings.bubble.fontSize }} px</output></span>
-          <input v-model.number="settings.bubble.fontSize" type="range" min="12" max="22" step="1" :style="{ '--fill': fillPct(settings.bubble.fontSize, 12, 22) }" />
-        </label>
-        <label class="range-field col-4">
-          <span class="range-label">行高 <output>{{ settings.bubble.lineHeight }}</output></span>
-          <input v-model.number="settings.bubble.lineHeight" type="range" min="1.2" max="2" step="0.05" :style="{ '--fill': fillPct(settings.bubble.lineHeight, 1.2, 2) }" />
-        </label>
+      <div class="control-stack">
+        <div class="control-grid three">
+          <label class="field">
+            <span class="field-label">字体</span>
+            <select v-model="settings.bubble.fontFamily">
+              <option value="system">系统</option>
+              <option value="serif">衬线</option>
+              <option value="mono">等宽</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">字重</span>
+            <select v-model="settings.bubble.fontWeight">
+              <option value="400">常规</option>
+              <option value="500">中等</option>
+              <option value="600">加粗</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">文字对齐</span>
+            <select v-model="settings.bubble.textAlign">
+              <option value="left">左</option>
+              <option value="center">中</option>
+              <option value="right">右</option>
+            </select>
+          </label>
+        </div>
+        <div class="control-grid two">
+          <label class="range-field">
+            <span class="range-label">字号 <output>{{ settings.bubble.fontSize }} px</output></span>
+            <input v-model.number="settings.bubble.fontSize" type="range" min="12" max="22" step="1" :style="{ '--fill': fillPct(settings.bubble.fontSize, 12, 22) }" />
+          </label>
+          <label class="range-field">
+            <span class="range-label">行高 <output>{{ settings.bubble.lineHeight }}</output></span>
+            <input v-model.number="settings.bubble.lineHeight" type="range" min="1.2" max="2" step="0.05" :style="{ '--fill': fillPct(settings.bubble.lineHeight, 1.2, 2) }" />
+          </label>
+        </div>
       </div>
     </section>
 
@@ -325,12 +322,9 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   grid-column: 1 / -1;
 }
 
-/* 文字通宽：四个一排，行高对齐字号列 */
+/* 文字通宽 */
 .text-wide {
   grid-column: 1 / -1;
-}
-.col-4 {
-  grid-column: 4;
 }
 .hfields {
   display: flex;
@@ -405,8 +399,7 @@ textarea.blacklist:focus {
   line-height: 1.15;
 }
 
-.settings-status,
-.field-hint {
+.settings-status {
   margin: 4px 0 0;
   color: var(--af-muted);
   font-size: 12px;
@@ -437,6 +430,10 @@ textarea.blacklist:focus {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.control-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .control-grid.four {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -444,13 +441,6 @@ textarea.blacklist:focus {
 .control-stack {
   display: grid;
   gap: 12px;
-}
-
-.control-col {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-  align-content: start;
 }
 
 .field,
@@ -509,14 +499,14 @@ input[type="range"] {
 @media (max-width: 760px) {
   .settings-form,
   .control-grid.two,
+  .control-grid.three,
   .control-grid.four {
     grid-template-columns: 1fr;
   }
 
   .preview-section,
   .trigger-wide,
-  .text-wide,
-  .col-4 {
+  .text-wide {
     grid-column: auto;
   }
 }
