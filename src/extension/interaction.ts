@@ -151,7 +151,7 @@ export function createInteraction(host: InteractionHost) {
     window.clearTimeout(closeTimer)
     if (hoveredTarget?.node === caret.node && hoveredTarget.start === word.start && hoveredTarget.end === word.end) return
     hoveredTarget = { node: caret.node, start: word.start, end: word.end }
-    showHighlight(host.highlight, rect)
+    showHighlight(host.highlight, rect, settings.bubble.highlightColor)
     window.clearTimeout(hoverTimer)
     hoverTimer = window.setTimeout(() => {
       if (!wordHovered || hoveredTarget?.node !== caret.node) return

@@ -207,6 +207,7 @@ function markCustomColor(): void {
         <label class="field"><span class="field-label">背景</span><input v-model="settings.bubble.background" type="color" @input="markCustomColor" /></label>
         <label class="field"><span class="field-label">文字</span><input v-model="settings.bubble.textColor" type="color" @input="markCustomColor" /></label>
         <label class="field"><span class="field-label">边框</span><input v-model="settings.bubble.borderColor" type="color" @input="markCustomColor" /></label>
+        <label class="field"><span class="field-label">单词高亮</span><input v-model="settings.bubble.highlightColor" type="color" /></label>
         <label class="field">
           <span class="field-label">阴影</span>
           <select v-model="settings.bubble.shadow">

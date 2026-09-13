@@ -31,7 +31,7 @@ async function setSettings(worker: Awaited<ReturnType<typeof launchExtension>>['
 test.describe('AiFanyi extension', () => {
   test('shows a dictionary bubble after hovering an English word', async () => {
     const { context, page, worker } = await launchExtension()
-    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0 })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0, bubble: { highlightColor: '#ff8800' } })
     await context.route('https://freedictionaryapi.com/**', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
@@ -54,6 +54,8 @@ test.describe('AiFanyi extension', () => {
     const bubble = page.locator('.aifanyi-bubble, .bubble').first()
     await expect(bubble).toBeVisible()
     await expect(bubble).toContainText(/美|beautiful/i)
+    // 悬停高亮跟随设置的「单词高亮」颜色（Chrome CSSOM 将 8 位 hex 序列化为 rgba）
+    expect(await page.locator('#aifanyi-word-highlight').evaluate(el => el.style.background)).toBe('rgba(255, 136, 0, 0.22)')
     // 回归：长释义不许把气泡拉超 290px 固定最大宽度（单词 even 的词典结果即触发）
     const bubbleBox = await bubble.boundingBox()
     expect(bubbleBox).not.toBeNull()

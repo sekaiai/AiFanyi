@@ -95,6 +95,13 @@ describe('settings', () => {
     expect(migrateSettings({ targetLanguage: 'ไทย' }).targetLanguage).toBe('ไทย')
   })
 
+  it('migrates the hover highlight color independently of presets', () => {
+    expect(cloneDefaultSettings().bubble.highlightColor).toBe('#4f84e8')
+    expect(migrateSettings({ bubble: { highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff8800')
+    // 颜色预设只覆盖气泡三色，不吞掉单词高亮色
+    expect(migrateSettings({ bubble: { colorPreset: 'night', highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff8800')
+  })
+
   it('migrates v1 AI settings into an enabled scheme', () => {
     const migrated = migrateSettings({
       ai: { apiUrl: 'https://api.example.com/v1/chat/completions', apiKey: 'sk-x', model: 'm', timeoutMs: 8000 },

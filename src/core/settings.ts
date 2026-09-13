@@ -98,6 +98,7 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     showOriginal: true,
     colorPreset: 'paper',
     ...COLOR_PRESETS.paper,
+    highlightColor: '#4f84e8',
     borderWidth: 1,
     radius: 8,
     shadow: 'soft',

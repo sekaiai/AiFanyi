@@ -17,6 +17,8 @@ export interface BubbleSettings {
   background: string
   textColor: string
   borderColor: string
+  /** 悬停单词时单词下方高亮的背景色（hex，渲染时附加固定透明度，独立于颜色预设）。 */
+  highlightColor: string
   borderWidth: number
   radius: number
   shadow: BubbleShadow
