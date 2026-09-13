@@ -5,9 +5,10 @@ import {
   isWordSourcesMessage,
   toDisplayError,
   type PublicSettingsResponse,
+  type PublicSettingsUpdate,
   type WordSourcesResponse,
 } from '../src/core/messages'
-import { isSiteBlocked } from '../src/core/settings'
+import { isSiteBlocked, type TranslationSettings } from '../src/core/settings'
 import { runTranslation, SCHEME_TEST_PHRASE, translateWithScheme } from '../src/core/translate'
 import { probeWordSources, WORD_PROBE_STORAGE_KEY, type WordProbeState } from '../src/core/word-sources'
 import { createBrowserSettingsStorage, toContentSettings } from '../src/extension/storage'
@@ -17,6 +18,15 @@ import type { TranslateOutcome } from '../src/core/translate'
 
 const storage = createBrowserSettingsStorage()
 const controllers = new Map<RequestId, AbortController>()
+
+interface InflightGroup {
+  textKey: string
+  controller: AbortController
+  participants: Set<RequestId>
+  promise: Promise<ExtensionResponse>
+}
+
+const inflightGroups = new Map<RequestId, InflightGroup>()
 
 let probeState: WordProbeState | null = null
 let probeLoaded = false
@@ -39,7 +49,7 @@ export default defineBackground(() => {
   })
 
   storage.subscribe((settings) => {
-    void browser.runtime.sendMessage({ type: 'settings.public.update', settings: toContentSettings(settings) }).catch(() => undefined)
+    void broadcastSettingsUpdate(settings)
   })
 
   browser.runtime.onMessage.addListener((message: unknown, sender): Promise<ExtensionResponse | PublicSettingsResponse | WordSourcesResponse> | undefined => {
@@ -84,40 +94,96 @@ async function handleWordSourcesMessage(message: { type: 'wordSources.state' | '
   return { type: 'wordSources.probe', requestId: message.requestId, state }
 }
 
-async function handleMessage(message: ExtensionMessage, senderUrl?: string): Promise<ExtensionResponse> {
+export async function broadcastSettingsUpdate(settings: TranslationSettings): Promise<void> {
+  // runtime.sendMessage 只能送达扩展页面，内容脚本必须经 tabs.sendMessage 逐标签页投递
+  const message: PublicSettingsUpdate = { type: 'settings.public.update', settings: toContentSettings(settings) }
+  const tabs = await browser.tabs.query({})
+  await Promise.all(tabs.map((tab) => {
+    if (tab.id === undefined) return undefined
+    return browser.tabs.sendMessage(tab.id, message).catch(() => undefined)
+  }))
+}
+
+export async function handleMessage(message: ExtensionMessage, senderUrl?: string): Promise<ExtensionResponse> {
   if (message.type === 'translation.cancel') {
     controllers.get(message.requestId)?.abort()
     controllers.delete(message.requestId)
+    const group = inflightGroups.get(message.requestId)
+    if (group) {
+      inflightGroups.delete(message.requestId)
+      group.participants.delete(message.requestId)
+      if (group.participants.size === 0) group.controller.abort()
+    }
     return { ok: false, requestId: message.requestId, error: toDisplayError(new DOMException('Cancelled', 'AbortError')) }
   }
 
-  const controller = new AbortController()
-  controllers.set(message.requestId, controller)
-  try {
-    const settings = await storage.load()
-    if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
-      return {
-        ok: false,
-        requestId: message.requestId,
-        error: {
-          code: !settings.enabled ? 'disabled' : 'blacklisted',
-          message: !settings.enabled ? 'AiFanyi 已停用' : 'AiFanyi 已在当前站点停用',
-          retryable: false,
-        },
+  if (message.type === 'settings.testScheme') {
+    const controller = new AbortController()
+    controllers.set(message.requestId, controller)
+    try {
+      const settings = await storage.load()
+      if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
+        return blockedResponse(settings, message.requestId)
       }
-    }
-
-    if (message.type === 'settings.testScheme') {
       const outcome = await translateWithScheme(message.scheme, SCHEME_TEST_PHRASE, settings.targetLanguage, controller.signal)
       return outcomeToResponse(outcome, message.requestId)
+    } catch (error) {
+      return { ok: false, requestId: message.requestId, error: toDisplayError(error) }
+    } finally {
+      controllers.delete(message.requestId)
     }
+  }
 
-    const outcome = await runTranslation(message.text, settings, controller.signal, { probe: await loadProbeState() })
-    return outcomeToResponse(outcome, message.requestId)
-  } catch (error) {
-    return { ok: false, requestId: message.requestId, error: toDisplayError(error) }
+  // ponytail: 并发同文本请求合并为一组共享一次上游调用；启用/黑名单检查仅组长执行，组长 senderUrl 代表整组
+  const textKey = message.text.trim().toLowerCase()
+  let group = findInflightGroup(textKey)
+  if (!group) {
+    const controller = new AbortController()
+    const leader = message
+    group = {
+      textKey,
+      controller,
+      participants: new Set(),
+      promise: (async () => {
+        try {
+          const settings = await storage.load()
+          if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
+            return blockedResponse(settings, leader.requestId)
+          }
+          const outcome = await runTranslation(leader.text, settings, controller.signal, { probe: await loadProbeState() })
+          return outcomeToResponse(outcome, leader.requestId)
+        } catch (error) {
+          return { ok: false, requestId: leader.requestId, error: toDisplayError(error) }
+        }
+      })(),
+    }
+  }
+  group.participants.add(message.requestId)
+  inflightGroups.set(message.requestId, group)
+  try {
+    const response = await group.promise
+    return { ...response, requestId: message.requestId }
   } finally {
-    controllers.delete(message.requestId)
+    inflightGroups.delete(message.requestId)
+  }
+}
+
+function findInflightGroup(textKey: string): InflightGroup | undefined {
+  for (const group of inflightGroups.values()) {
+    if (group.textKey === textKey) return group
+  }
+  return undefined
+}
+
+function blockedResponse(settings: TranslationSettings, requestId: RequestId): ExtensionResponse {
+  return {
+    ok: false,
+    requestId,
+    error: {
+      code: !settings.enabled ? 'disabled' : 'blacklisted',
+      message: !settings.enabled ? 'AiFanyi 已停用' : 'AiFanyi 已在当前站点停用',
+      retryable: false,
+    },
   }
 }
 

@@ -3,12 +3,18 @@ import path from 'node:path'
 
 const extensionPath = path.resolve('.output/chrome-mv3')
 const settingsKey = 'aifanyi.settings.v1'
+const wordSourcePatterns = [
+  'https://dict.youdao.com/**',
+  'https://cn.bing.com/**',
+  'https://translate.googleapis.com/**',
+]
 
 async function launchExtension() {
   const context = await chromium.launchPersistentContext('', {
     headless: false,
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
   })
+  await Promise.all(wordSourcePatterns.map((pattern) => context.route(pattern, (route) => route.abort())))
   let [worker] = context.serviceWorkers()
   if (!worker) worker = await context.waitForEvent('serviceworker')
   await new Promise((resolve) => setTimeout(resolve, 800))
