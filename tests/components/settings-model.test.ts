@@ -1,8 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsModel } from '../../src/composables/useSettingsModel'
-import { cloneDefaultSettings } from '../../src/core/settings'
+import { cloneDefaultSettings, resetToDefaults } from '../../src/core/settings'
 import type { TranslationSettings } from '../../src/core/types'
 
 type FakeStorage = Parameters<typeof useSettingsModel>[0]
@@ -15,10 +15,12 @@ function createStorage(initial: TranslationSettings = cloneDefaultSettings()) {
       current = structuredClone(settings)
     }),
     reset: vi.fn(async () => {
-      current = cloneDefaultSettings()
+      current = resetToDefaults(current)
       return structuredClone(current)
     }),
     subscribe: vi.fn(() => vi.fn()),
+    loadSyncEnabled: vi.fn(async () => true),
+    saveSyncEnabled: vi.fn(async () => undefined),
   }
   return { storage }
 }
@@ -31,13 +33,21 @@ const SettingsHarness = defineComponent({
     },
   },
   setup(props) {
-    return useSettingsModel(props.storage)
+    const model = useSettingsModel(props.storage)
+    const onSyncToggle = (event: Event) => {
+      void model.toggleSync((event.target as HTMLInputElement).checked)
+    }
+    return { ...model, onSyncToggle }
   },
   template: `
     <form>
       <output data-testid="status">{{ stateLabel }}</output>
       <input name="hoverDelay" type="number" v-model.number="settings.hoverDelayMs" />
       <input name="targetLanguage" v-model="settings.targetLanguage" />
+      <span data-testid="schemes-count">{{ settings.schemes.length }}</span>
+      <label>
+        <input data-testid="sync-toggle" type="checkbox" :checked="syncEnabled" @change="onSyncToggle" />
+      </label>
       <button data-testid="reset" type="button" @click="reset">reset</button>
     </form>
   `,
@@ -46,6 +56,10 @@ const SettingsHarness = defineComponent({
 describe('useSettingsModel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('renders loaded settings in a component', async () => {
@@ -63,28 +77,32 @@ describe('useSettingsModel', () => {
   })
 
   it('autosaves after a user changes a setting', async () => {
+    // flushPromises 依赖 setImmediate，fake timers 会劫持它导致挂起，改用时钟推进刷新微任务
+    vi.useFakeTimers()
     const { storage } = createStorage()
     const wrapper = mount(SettingsHarness, { props: { storage } })
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(0)
 
     await wrapper.find('input[name="hoverDelay"]').setValue('500')
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(800)
 
     expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ hoverDelayMs: 500 }))
   })
 
   it('shows the saved status after autosave completes', async () => {
+    vi.useFakeTimers()
     const { storage } = createStorage()
     const wrapper = mount(SettingsHarness, { props: { storage } })
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(0)
 
     await wrapper.find('input[name="targetLanguage"]').setValue('English')
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(800)
 
     expect(wrapper.get('[data-testid="status"]').text()).toBe('已自动保存')
   })
 
   it('serializes rapid saves so an older write cannot overwrite a newer setting', async () => {
+    vi.useFakeTimers()
     let finishFirstSave: (() => void) | undefined
     const { storage } = createStorage()
     vi.mocked(storage.save)
@@ -93,24 +111,97 @@ describe('useSettingsModel', () => {
       }))
       .mockResolvedValue(undefined)
     const wrapper = mount(SettingsHarness, { props: { storage } })
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(0)
 
     await wrapper.find('input[name="hoverDelay"]').setValue('300')
-    await wrapper.find('input[name="hoverDelay"]').setValue('400')
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(800)
 
     expect(storage.save).toHaveBeenCalledTimes(1)
+
+    await wrapper.find('input[name="hoverDelay"]').setValue('400')
     finishFirstSave?.()
-    await flushPromises()
+    await vi.advanceTimersByTimeAsync(800)
 
     expect(storage.save).toHaveBeenCalledTimes(2)
     expect(storage.save).toHaveBeenLastCalledWith(expect.objectContaining({ hoverDelayMs: 400 }))
     expect(wrapper.get('[data-testid="status"]').text()).toBe('已自动保存')
   })
 
-  it('restores default settings when reset is clicked', async () => {
+  it('flushes pending debounced changes when the component unmounts', async () => {
+    vi.useFakeTimers()
+    const { storage } = createStorage()
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await vi.advanceTimersByTimeAsync(0)
+
+    await wrapper.find('input[name="hoverDelay"]').setValue('600')
+    wrapper.unmount()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(storage.save).toHaveBeenCalledTimes(1)
+    expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ hoverDelayMs: 600 }))
+  })
+
+  it('关闭同步开关只保存开关状态，不触发设置写入', async () => {
+    vi.useFakeTimers()
+    const { storage } = createStorage()
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await vi.advanceTimersByTimeAsync(0)
+
+    await wrapper.get('[data-testid="sync-toggle"]').setValue(false)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(storage.saveSyncEnabled).toHaveBeenCalledWith(false)
+    expect(storage.save).not.toHaveBeenCalled()
+    expect(wrapper.get('[data-testid="status"]').text()).toBe('已关闭同步，设置仅保存在本机')
+  })
+
+  it('重新开启同步时立即推送当前设置', async () => {
+    vi.useFakeTimers()
+    const { storage } = createStorage()
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await vi.advanceTimersByTimeAsync(0)
+
+    await wrapper.get('[data-testid="sync-toggle"]').setValue(false)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(storage.save).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-testid="sync-toggle"]').setValue(true)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(storage.saveSyncEnabled).toHaveBeenLastCalledWith(true)
+    expect(storage.save).toHaveBeenCalledOnce()
+    expect(wrapper.get('[data-testid="status"]').text()).toBe('已开启同步')
+  })
+
+  it('同步开关保存失败时回滚勾选状态并提示', async () => {
+    vi.useFakeTimers()
+    const { storage } = createStorage()
+    vi.mocked(storage.saveSyncEnabled).mockRejectedValueOnce(new Error('storage unavailable'))
+    const wrapper = mount(SettingsHarness, { props: { storage } })
+    await vi.advanceTimersByTimeAsync(0)
+
+    await wrapper.get('[data-testid="sync-toggle"]').setValue(false)
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(wrapper.vm.syncEnabled).toBe(true)
+    expect(wrapper.get('[data-testid="status"]').text()).toBe('同步设置保存失败，请稍后重试')
+  })
+
+  it('恢复默认只重置表单项，保留方案列表、翻译成与单词翻译', async () => {
     const initial = cloneDefaultSettings()
     initial.hoverDelayMs = 700
+    initial.targetLanguage = 'English'
+    initial.word.accent = 'uk'
+    initial.schemes.push({
+      id: 'ai-x',
+      type: 'ai',
+      enabled: true,
+      label: '',
+      apiUrl: 'https://api.example.com/v1/chat/completions',
+      apiKey: 'sk-x',
+      model: 'm',
+      timeoutMs: 8000,
+    })
     const { storage } = createStorage(initial)
     const wrapper = mount(SettingsHarness, { props: { storage } })
     await flushPromises()
@@ -122,6 +213,10 @@ describe('useSettingsModel', () => {
     expect(
       (wrapper.find('input[name="hoverDelay"]').element as HTMLInputElement).value,
     ).toBe('200')
+    expect(
+      (wrapper.find('input[name="targetLanguage"]').element as HTMLInputElement).value,
+    ).toBe('English')
+    expect(wrapper.get('[data-testid="schemes-count"]').text()).toBe('2')
   })
 
   it('keeps defaults and reports a load failure', async () => {

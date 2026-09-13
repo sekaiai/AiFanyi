@@ -1,24 +1,70 @@
 import { browser } from 'wxt/browser'
-import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, migrateSettings, type TranslationSettings } from '../core/settings'
+import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, migrateSettings, resetToDefaults, type TranslationSettings } from '../core/settings'
 import { isPublicSettingsUpdate, type PublicSettingsResponse } from '../core/messages'
 
+/** 本机同步开关的存储键：保存在 local（每台设备独立），不进同步的设置数据本身。 */
+const SYNC_ENABLED_STORAGE_KEY = 'aifanyi.settingsSyncEnabled.v1'
+
+/** 本机是否参与设置同步；未设置时默认开启。 */
+async function loadSyncEnabled(): Promise<boolean> {
+  try {
+    const record = await browser.storage.local.get(SYNC_ENABLED_STORAGE_KEY)
+    return record[SYNC_ENABLED_STORAGE_KEY] !== false
+  } catch {
+    return true
+  }
+}
+
+async function saveSyncEnabled(enabled: boolean): Promise<void> {
+  await browser.storage.local.set({ [SYNC_ENABLED_STORAGE_KEY]: enabled })
+}
+
+async function readSettingsFrom(area: 'sync' | 'local'): Promise<TranslationSettings | null> {
+  try {
+    const record = await browser.storage[area].get(SETTINGS_STORAGE_KEY)
+    const raw = record[SETTINGS_STORAGE_KEY]
+    return raw === undefined ? null : migrateSettings(raw)
+  } catch {
+    return null
+  }
+}
+
 async function loadSettings(): Promise<TranslationSettings> {
-  const record = await browser.storage.local.get(SETTINGS_STORAGE_KEY)
-  return migrateSettings(record[SETTINGS_STORAGE_KEY])
+  const syncEnabled = await loadSyncEnabled()
+  if (syncEnabled) {
+    const fromSync = await readSettingsFrom('sync')
+    if (fromSync) return fromSync
+  }
+  const fromLocal = await readSettingsFrom('local')
+  if (fromLocal) {
+    // 一次性迁移：同步区为空而本机有旧数据时推送到 sync（失败静默，下次保存再试）；关闭同步的设备不推送
+    if (syncEnabled) void browser.storage.sync.set({ [SETTINGS_STORAGE_KEY]: fromLocal }).catch(() => undefined)
+    return fromLocal
+  }
+  return migrateSettings(undefined)
 }
 
 async function saveSettings(settings: TranslationSettings): Promise<void> {
-  await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: migrateSettings(settings) })
+  const value = migrateSettings(settings)
+  // 本地镜像兜底（无配额限制）；关闭同步的设备只写本机
+  await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: value })
+  if (await loadSyncEnabled()) {
+    // sync 写失败向上抛，由状态栏提示
+    await browser.storage.sync.set({ [SETTINGS_STORAGE_KEY]: value })
+  }
 }
 
 async function resetSettings(): Promise<TranslationSettings> {
-  await saveSettings(DEFAULT_SETTINGS)
-  return loadSettings()
+  const next = resetToDefaults(await loadSettings())
+  await saveSettings(next)
+  return next
 }
 
 function watchSettings(callback: (settings: TranslationSettings) => void): () => void {
-  const listener = (changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, areaName: string) => {
-    if (areaName !== 'local' || !changes[SETTINGS_STORAGE_KEY]) return
+  const listener = async (changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, areaName: string) => {
+    if ((areaName !== 'sync' && areaName !== 'local') || !changes[SETTINGS_STORAGE_KEY]) return
+    // 关闭同步的设备忽略 sync 区变更（来自其他设备的写入），只响应本机 local 写入
+    if (areaName === 'sync' && !(await loadSyncEnabled())) return
     callback(migrateSettings(changes[SETTINGS_STORAGE_KEY].newValue))
   }
   browser.storage.onChanged.addListener(listener)
@@ -31,6 +77,8 @@ export function createBrowserSettingsStorage() {
     save: saveSettings,
     reset: resetSettings,
     subscribe: watchSettings,
+    loadSyncEnabled,
+    saveSyncEnabled,
   }
 }
 

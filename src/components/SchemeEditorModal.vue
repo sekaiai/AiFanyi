@@ -17,7 +17,7 @@ const emit = defineEmits<{
   save: [scheme: SchemeSettings]
 }>()
 
-const draft = ref<SchemeSettings>(createScheme('deepl'))
+const draft = ref<SchemeSettings>(createScheme('ai'))
 const guideExpanded = ref(true)
 const saving = ref(false)
 const saveError = ref('')
@@ -29,7 +29,7 @@ let saveAttempt = 0
 watch(() => props.visible, (visible) => {
   saveAttempt += 1
   if (visible) {
-    draft.value = props.initialScheme ? structuredClone(toRaw(props.initialScheme)) : createScheme('deepl')
+    draft.value = props.initialScheme ? structuredClone(toRaw(props.initialScheme)) : createScheme('ai')
     guideExpanded.value = true
     saving.value = false
     saveError.value = ''
@@ -50,8 +50,9 @@ function createScheme(type: SchemeType, id = uid(), enabled = true): SchemeSetti
   if (type === 'google') return { id, type, enabled }
   if (type === 'googleCloud') return { id, type, enabled, apiKey: '' }
   if (type === 'baidu') return { id, type, enabled, appId: '', secretKey: '' }
+  if (type === 'baiduAi') return { id, type, enabled, appId: '', secretKey: '', modelType: 'nmt' }
   if (type === 'volcengine') return { id, type, enabled, accessKeyId: '', secretAccessKey: '', region: 'cn-north-1' }
-  return { id, type, enabled, apiUrl: 'https://api.siliconflow.cn/v1/chat/completions', apiKey: '', model: 'tencent/Hunyuan-MT-7B', timeoutMs: 20000 }
+  return { id, type, enabled, label: '', apiUrl: 'https://api.siliconflow.cn/v1/chat/completions', apiKey: '', model: 'tencent/Hunyuan-MT-7B', timeoutMs: 20000 }
 }
 
 function handleTypeChange(type: SchemeType): void {
@@ -73,6 +74,7 @@ async function save(): Promise<void> {
   if (saving.value) return
   const attempt = ++saveAttempt
   const scheme = structuredClone(toRaw(draft.value))
+  if (scheme.type === 'ai') scheme.label = scheme.label.trim().slice(0, 50)
 
   const missing = describeMissingConfig(scheme)
   if (missing) {
@@ -113,14 +115,14 @@ async function save(): Promise<void> {
       <div class="modal-body">
         <label class="field wide">
           <span class="field-label">翻译方案</span>
-          <select :value="draft.type" data-testid="scheme-editor-type" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
+          <select :value="draft.type" data-testid="scheme-editor-type" :disabled="draft.type === 'google'" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
             <option value="baidu">百度翻译</option>
+            <option value="baiduAi">百度大模型翻译</option>
             <option value="volcengine">火山引擎</option>
             <option value="ai">自定义 AI</option>
             <option value="deepl">DeepL</option>
-            <option value="google">Google 翻译（免密钥）</option>
+            <option v-if="draft.type === 'google'" value="google">Google 翻译（免密钥）</option>
             <option value="googleCloud">Google Cloud</option>
-    
           </select>
         </label>
 
@@ -134,7 +136,7 @@ async function save(): Promise<void> {
             </select>
           </label>
         </template>
-        <p v-else-if="draft.type === 'google'" class="field-hint wide">使用免费接口 translate.googleapis.com，无需额外配置。</p>
+        <p v-else-if="draft.type === 'google'" class="field-hint wide">内置默认方案：使用免费接口 translate.googleapis.com，无需配置；可在方案列表中停用，但不可删除。</p>
         <template v-else-if="draft.type === 'googleCloud'">
           <label class="field wide">
             <span class="field-label">API Key</span>
@@ -142,15 +144,30 @@ async function save(): Promise<void> {
           </label>
         </template>
         <template v-else-if="draft.type === 'baidu'">
-          <p class="field-hint wide">使用百度通用文本翻译 API，源语言自动检测。密钥仅保存在本地设置中。</p>
+          <p class="field-hint wide">使用百度通用文本翻译 API，源语言自动检测。密钥随浏览器账号同步保存。</p>
           <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" placeholder="百度翻译 AppID" /></label>
           <label class="field">
             <span class="field-label">密钥</span>
             <input v-model="draft.secretKey" type="password" autocomplete="off" placeholder="百度翻译密钥" />
           </label>
         </template>
+        <template v-else-if="draft.type === 'baiduAi'">
+          <p class="field-hint wide">使用百度大模型文本翻译 API，源语言自动检测。密钥随浏览器账号同步保存。</p>
+          <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" placeholder="百度翻译 AppID" /></label>
+          <label class="field">
+            <span class="field-label">密钥</span>
+            <input v-model="draft.secretKey" type="password" autocomplete="off" placeholder="百度翻译密钥" />
+          </label>
+          <label class="field wide">
+            <span class="field-label">翻译模型</span>
+            <select v-model="draft.modelType">
+              <option value="nmt">机器翻译 · 机器翻译 200万免费字符/月</option>
+              <option value="llm">大模型翻译 · 100万字符测试额度（总）</option>
+            </select>
+          </label>
+        </template>
         <template v-else-if="draft.type === 'volcengine'">
-          <p class="field-hint wide">使用火山引擎机器翻译文本接口，源语言自动检测。密钥仅保存在本地设置中。</p>
+          <p class="field-hint wide">使用火山引擎机器翻译文本接口，源语言自动检测。密钥随浏览器账号同步保存。</p>
           <label class="field"><span class="field-label">访问密钥 ID（Access Key ID）</span><input v-model="draft.accessKeyId" autocomplete="off" placeholder="火山引擎 Access Key ID" /></label>
           <label class="field">
             <span class="field-label">访问密钥（Secret Access Key）</span>
@@ -159,6 +176,7 @@ async function save(): Promise<void> {
           <label class="field wide"><span class="field-label">地域</span><input v-model="draft.region" autocomplete="off" placeholder="cn-north-1" /></label>
         </template>
         <template v-else>
+          <label class="field wide"><span class="field-label">方案标题</span><input v-model="draft.label" type="text" maxlength="50" placeholder="自定义 AI" /></label>
           <label class="field wide"><span class="field-label">AI 地址</span><input v-model="draft.apiUrl" placeholder="https://api.example.com/v1/chat/completions" /></label>
           <label class="field"><span class="field-label">模型</span><input v-model="draft.model" placeholder="gpt-4o-mini" /></label>
           <label class="field">
@@ -183,7 +201,7 @@ async function save(): Promise<void> {
         >
           <span class="guide-toggle-label">新手指南 ·</span>
           <span class="guide-toggle-title">{{ guide.title }}</span>
-          <span class="guide-badge">{{ draft.type === 'google' ? '无需密钥' : '密钥仅本地保存' }}</span>
+          <span class="guide-badge">{{ draft.type === 'google' ? '无需密钥' : '配置随账号同步' }}</span>
           <span class="guide-chevron" aria-hidden="true"></span>
         </button>
         <div v-show="guideExpanded" id="scheme-guide-body" class="guide-body" data-testid="scheme-guide-body">

@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import { browser } from 'wxt/browser'
-import { onMounted, shallowRef } from 'vue'
+import { onMounted, onUnmounted, shallowRef } from 'vue'
 import { useSettingsModel } from '../composables/useSettingsModel'
 import type { ExtensionResponse, WordSourcesResponse } from '../core/messages'
 import type { SchemeSettings } from '../core/types'
+import type { UsageStats } from '../core/usage'
 import type { WordProbeState } from '../core/word-sources'
 import { createBrowserSettingsStorage } from '../extension/storage'
+import { createUsageStorage } from '../extension/usage-storage'
 import DemoApp from '../demo/DemoApp.vue'
 import SchemesSection from './SchemesSection.vue'
 import SettingsForm from './SettingsForm.vue'
 import WordSourcesCard from './WordSourcesCard.vue'
 
-const { settings, stateLabel, reset } = useSettingsModel(createBrowserSettingsStorage())
+const { settings, stateLabel, reset, syncEnabled, toggleSync } = useSettingsModel(createBrowserSettingsStorage())
+
+const usage = shallowRef<UsageStats | null>(null)
+const usageStorage = createUsageStorage()
+let usageUnwatch: (() => void) | null = null
 
 const wordProbe = shallowRef<WordProbeState | null>(null)
 const probingWords = shallowRef(false)
@@ -30,6 +36,21 @@ onMounted(async () => {
   } catch {
     // 后台不可达时保持 null（显示「未检测」）
   }
+})
+
+// 用量展示：挂载时读取一次，之后跟随后台写入实时刷新
+onMounted(() => {
+  void usageStorage.load().then((stats) => {
+    usage.value = stats
+  })
+  usageUnwatch = usageStorage.watch((next) => {
+    usage.value = next
+  })
+})
+
+onUnmounted(() => {
+  usageUnwatch?.()
+  usageUnwatch = null
 })
 
 async function probeWords(): Promise<void> {
@@ -85,7 +106,16 @@ async function requestDemo(
       </section>
 
       <section class="schemes-slot" aria-label="句子翻译">
-        <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" />
+        <SchemesSection
+          v-model="settings.schemes"
+          v-model:target-language="settings.targetLanguage"
+          v-model:scheme-order="settings.schemeOrder"
+          show-sync
+          :sync-enabled="syncEnabled"
+          @toggle-sync="toggleSync"
+          :usage="usage"
+          :test-scheme="testScheme"
+        />
       </section>
 
     </div>

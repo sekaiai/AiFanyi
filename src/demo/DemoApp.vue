@@ -4,7 +4,7 @@ import SchemesSection from '../components/SchemesSection.vue'
 import SettingsForm from '../components/SettingsForm.vue'
 import WordSourcesCard from '../components/WordSourcesCard.vue'
 import { toDisplayError, type ExtensionResponse } from '../core/messages'
-import { cloneDefaultSettings, type TranslationSettings } from '../core/settings'
+import { cloneDefaultSettings, resetToDefaults, type TranslationSettings } from '../core/settings'
 import { runTranslation, SCHEME_TEST_PHRASE, translateWithScheme } from '../core/translate'
 import type { SchemeSettings } from '../core/types'
 import { createHighlight } from '../extension/highlight'
@@ -58,7 +58,7 @@ watch(settings, (value) => {
 }, { deep: true })
 
 function reset() {
-  settings.value = cloneDefaultSettings()
+  settings.value = resetToDefaults(settings.value)
 }
 
 async function testScheme(scheme: SchemeSettings) {
@@ -102,7 +102,7 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
     <aside v-if="showSettings" class="settings-panel" aria-label="演示设置">
       <SettingsForm v-model="settings" :status="status" @reset="reset" />
       <WordSourcesCard v-model="settings" />
-      <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" demo-mode />
+      <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" :test-scheme="testScheme" demo-mode />
     </aside>
   </div>
 </template>
