@@ -235,7 +235,7 @@ export function createInteraction(host: InteractionHost) {
       const kind = currentKind
       host.renderer.showError(response.error.message, response.error.retryable && kind ? () => void submit(kind, text, range) : undefined)
     } else if (response.kind === 'dictionary') {
-      const speakable = settings.word.enabled && settings.word.speakEnabled
+      const speakable = settings.word.speakEnabled
       host.renderer.showDictionary(text, response.result, speakable
         ? { onSpeak: () => speakWord(text, settings.word.accent) }
         : undefined)

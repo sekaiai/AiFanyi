@@ -88,7 +88,6 @@ describe('handleMessage same-text merge', () => {
     vi.stubGlobal('fetch', fetchMock)
     const settings = cloneDefaultSettings()
     settings.schemes = [deeplScheme]
-    settings.word.enabled = false
     await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: settings })
   })
 

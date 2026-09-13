@@ -111,7 +111,6 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
   },
   schemes: [],
   word: {
-    enabled: true,
     speakEnabled: true,
     accent: 'us',
     sources: { youdao: true, bing: true, google: true, freedictionaryapi: true },
@@ -177,7 +176,6 @@ function readWordSettings(value: unknown, fallback: WordQuerySettings): WordQuer
     WORD_SOURCE_KEYS.map((key) => [key, readBoolean(rawSources[key], fallback.sources[key])]),
   ) as WordQuerySettings['sources']
   return {
-    enabled: readBoolean(raw.enabled, fallback.enabled),
     speakEnabled: readBoolean(raw.speakEnabled, fallback.speakEnabled),
     accent: readEnum<WordAccent>(raw.accent, ['us', 'uk'], fallback.accent),
     sources,

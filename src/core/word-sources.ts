@@ -26,10 +26,11 @@ export const WORD_SOURCE_LABELS: Record<WordSourceId, string> = {
 /** 单词卡片结果直接复用 DictionaryResult，可直接喂给气泡的词典渲染。 */
 export type WordResult = DictionaryResult
 
-/** 连通性探测快照。results 中缺失的源视为「未检测」。 */
+/** 连通性探测快照。results 中缺失的源视为「未检测」；latency 仅记录探测成功的源（ms）。 */
 export interface WordProbeState {
   checkedAt: number
   results: Partial<Record<WordSourceId, boolean>>
+  latency?: Partial<Record<WordSourceId, number>>
 }
 
 export const WORD_PROBE_STORAGE_KEY = 'aifanyi.wordProbe.v1'
@@ -355,17 +356,24 @@ export async function lookupWord(word: string, options: WordLookupOptions, signa
 const PROBE_WORD = 'hello'
 const PROBE_TIMEOUT_MS = 4000
 
-/** 四个源并行探测；单个源失败记 false，不影响其他源。永不 reject。 */
+/** 四个源并行探测；单个源失败记 false，不影响其他源。永不 reject。成功源附上探测耗时。 */
 export async function probeWordSources(): Promise<WordProbeState> {
-  const entries = await Promise.all(WORD_SOURCE_IDS.map(async (source): Promise<[WordSourceId, boolean]> => {
+  const entries = await Promise.all(WORD_SOURCE_IDS.map(async (source): Promise<[WordSourceId, boolean, number | undefined]> => {
+    const startedAt = performance.now()
     try {
       await fetchWordResult(source, PROBE_WORD, { sources: [...WORD_SOURCE_IDS], targetLanguage: '简体中文', accent: 'us' }, AbortSignal.timeout(PROBE_TIMEOUT_MS))
-      return [source, true]
+      return [source, true, Math.round(performance.now() - startedAt)]
     } catch {
-      return [source, false]
+      return [source, false, undefined]
     }
   }))
-  return { checkedAt: Date.now(), results: Object.fromEntries(entries) as Partial<Record<WordSourceId, boolean>> }
+  const results: Partial<Record<WordSourceId, boolean>> = {}
+  const latency: Partial<Record<WordSourceId, number>> = {}
+  for (const [source, ok, ms] of entries) {
+    results[source] = ok
+    if (ok) latency[source] = ms ?? 0
+  }
+  return { checkedAt: Date.now(), results, latency }
 }
 
 function shuffle<T>(items: readonly T[]): T[] {

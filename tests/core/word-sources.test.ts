@@ -212,12 +212,20 @@ describe('lookupWord', () => {
 })
 
 describe('probeWordSources', () => {
-  it('逐源探测且永不 reject', async () => {
-    fetchMock.mockResolvedValue(jsonResponse(YOUDAO_LOVED))
+  it('逐源探测且永不 reject，成功源附带探测耗时', async () => {
+    // 四源并行探测：每次调用都要给新的 Response（响应体只能读一次，共享实例会让其余源必然失败）
+    fetchMock.mockImplementation(async () => jsonResponse(YOUDAO_LOVED))
 
     const state = await probeWordSources()
 
     expect(Object.keys(state.results).sort()).toEqual(['bing', 'freedictionaryapi', 'google', 'youdao'])
     expect(state.checkedAt).toBeGreaterThan(0)
+    // mock 返回体只有 youdao 认可：成功源必有耗时，失败的源不带 latency
+    expect(state.results.youdao).toBe(true)
+    expect(state.latency?.youdao).toBeGreaterThanOrEqual(0)
+    for (const [source, ok] of Object.entries(state.results)) {
+      if (ok) expect(state.latency?.[source as WordSourceId]).toBeGreaterThanOrEqual(0)
+      else expect(state.latency?.[source as WordSourceId]).toBeUndefined()
+    }
   })
 })

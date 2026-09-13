@@ -30,12 +30,14 @@ const aiScheme: SchemeSettings = {
   timeoutMs: 20000,
 }
 
-function settingsWithSchemes(schemes: SchemeSettings[], options?: { wordPoolEnabled?: boolean }): TranslationSettings {
+function settingsWithSchemes(schemes: SchemeSettings[], options?: { wordPool?: boolean }): TranslationSettings {
   const settings = cloneDefaultSettings()
   settings.schemes = schemes
-  // 默认关掉单词源池：这里绝大多数用例验证的是「方案链」语义，
-  // 单词源池的行为在下面的专属 describe 里单独覆盖。
-  settings.word.enabled = options?.wordPoolEnabled ?? false
+  // 默认禁用全部单词源（等价旧的「单词池关闭」）：这里绝大多数用例验证的是「方案链」语义，
+  // 全源禁用时池立即让位（不发请求，落到方案链）。单词池的行为在下面的专属 describe 里单独覆盖。
+  if (!options?.wordPool) {
+    settings.word.sources = { youdao: false, bing: false, google: false, freedictionaryapi: false }
+  }
   return settings
 }
 
@@ -311,7 +313,8 @@ describe('runTranslation', () => {
       init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
     }))
     const controller = new AbortController()
-    const pending = runTranslation('hello', settingsWithSchemes([deeplScheme, googleScheme]), controller.signal)
+    // 单词池保持启用：中止发生在池的首个在途请求上（与真实划词路径一致）
+    const pending = runTranslation('hello', settingsWithSchemes([deeplScheme, googleScheme], { wordPool: true }), controller.signal)
 
     controller.abort(new DOMException('Cancelled', 'AbortError'))
 
@@ -319,7 +322,7 @@ describe('runTranslation', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('falls back to the dictionary for single words when the word pool is disabled and no schemes exist', async () => {
+  it('queries single words through the word pool even without any scheme', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse([
       {
         pronunciations: [{ type: 'ipa', text: '/həˈloʊ/' }],
@@ -328,7 +331,10 @@ describe('runTranslation', () => {
       },
     ]))
 
-    const outcome = await runTranslation('hello', settingsWithSchemes([]))
+    const settings = settingsWithSchemes([], { wordPool: true })
+    settings.word.sources = { youdao: false, bing: false, google: false, freedictionaryapi: true }
+
+    const outcome = await runTranslation('hello', settings)
 
     expect(outcome).toEqual({
       kind: 'dictionary',
@@ -353,7 +359,7 @@ describe('runTranslation', () => {
       },
     }))
 
-    const settings = settingsWithSchemes([deeplScheme], { wordPoolEnabled: true })
+    const settings = settingsWithSchemes([deeplScheme], { wordPool: true })
     settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
 
     const outcome = await runTranslation('loved', settings, undefined, {
@@ -379,7 +385,7 @@ describe('runTranslation', () => {
       .mockResolvedValueOnce(new Response('down', { status: 503 }))
       .mockResolvedValueOnce(jsonResponse({ translations: [{ text: '你好' }] }))
 
-    const settings = settingsWithSchemes([deeplScheme], { wordPoolEnabled: true })
+    const settings = settingsWithSchemes([deeplScheme], { wordPool: true })
     settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
 
     const outcome = await runTranslation('loved', settings)
@@ -392,7 +398,7 @@ describe('runTranslation', () => {
   it('reports the pool error when all sources fail and no scheme exists', async () => {
     fetchMock.mockResolvedValue(new Response('down', { status: 503 }))
 
-    const settings = settingsWithSchemes([], { wordPoolEnabled: true })
+    const settings = settingsWithSchemes([], { wordPool: true })
     settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
 
     await expect(runTranslation('loved', settings)).rejects.toThrow('单词查询失败：HTTP 503')
@@ -402,7 +408,7 @@ describe('runTranslation', () => {
   it('falls back to the scheme when no word source is enabled at all', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ translations: [{ text: '你好' }] }))
 
-    const settings = settingsWithSchemes([deeplScheme], { wordPoolEnabled: true })
+    const settings = settingsWithSchemes([deeplScheme], { wordPool: true })
     settings.word.sources = { youdao: false, bing: false, google: false, freedictionaryapi: false }
 
     const outcome = await runTranslation('loved', settings)
@@ -423,13 +429,14 @@ describe('runTranslation', () => {
     await expect(runTranslation('hello world', settingsWithSchemes([deeplScheme]))).rejects.toThrow('HTTP 500')
   })
 
-  it('prefers the scheme error over a dictionary failure for single words', async () => {
+  it('prefers the scheme error over the word pool failure for single words', async () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (String(url).includes('deepl')) return new Response('unauthorized', { status: 401 })
       return new Response('not found', { status: 404 })
     })
 
     await expect(runTranslation('hello', settingsWithSchemes([deeplScheme]))).rejects.toThrow('HTTP 401')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    // 源全部禁用：池让位时不发请求，只有 DeepL 的 1 次调用
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

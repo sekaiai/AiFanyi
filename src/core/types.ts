@@ -80,8 +80,6 @@ export type WordSourceId = 'youdao' | 'bing' | 'google' | 'freedictionaryapi'
 export type WordAccent = 'us' | 'uk'
 
 export interface WordQuerySettings {
-  /** 启用后，划选单个单词走免费源池，不再消耗「翻译方案」额度。 */
-  enabled: boolean
   speakEnabled: boolean
   accent: WordAccent
   sources: Record<WordSourceId, boolean>

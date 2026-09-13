@@ -1,7 +1,6 @@
 import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
 import { requestVolcengineTranslation } from './volcengine'
-import { lookupDictionary } from './dictionary'
 import { readArray, readRecord, readText } from './read'
 import { extractSingleWord, normalizeSourceText } from './text'
 import { lookupWord, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
@@ -133,12 +132,12 @@ export async function runTranslation(
   signal?: AbortSignal,
   wordContext?: WordLookupContext,
 ): Promise<TranslateOutcome> {
-  // 单词源池：单词优先走免费源池（四源平级轮换），不消耗「翻译方案」额度；
-  // 全部源都失败（或未启用任何源）时回落方案链。
+  // 单词源池：划选单个单词时按已启用的免费源轮换（四源平级），不消耗「翻译方案」额度；
+  // 全部源都失败（或一个都没启用）时回落方案链。
   const singleWord = extractSingleWord(text)
   let poolTried = false
   let poolError: unknown = null
-  if (singleWord && settings.word.enabled) {
+  if (singleWord) {
     poolTried = true
     const enabledSources = (wordContext?.sources ?? [...WORD_SOURCE_IDS]).filter((source) => settings.word.sources[source] !== false)
     try {
@@ -165,16 +164,6 @@ export async function runTranslation(
     } catch (error) {
       if (isAbortError(error)) throw error
       schemeError = error
-    }
-  }
-
-  // 单词池关闭时保留老的词典兜底（池开着就不重复打 freedictionaryapi：刚在池里试过）。
-  if (singleWord && !settings.word.enabled) {
-    try {
-      return { kind: 'dictionary', result: await lookupDictionary(singleWord, signal) }
-    } catch (error) {
-      if (isAbortError(error)) throw error
-      if (!schemeTried && !poolTried) throw error
     }
   }
 

@@ -34,6 +34,12 @@ function wordStateCls(source: WordSourceId): string {
   return 'is-unknown'
 }
 
+/** 探测成功的源显示上次探测耗时；失败/未检测的源不显示。 */
+function latencyText(source: WordSourceId): string {
+  const ms = props.wordProbe?.latency?.[source]
+  return typeof ms === 'number' ? `${ms}ms` : ''
+}
+
 const wordProbeTime = computed(() => {
   const checkedAt = props.wordProbe?.checkedAt ?? 0
   if (!checkedAt) return ''
@@ -47,15 +53,6 @@ const wordProbeTime = computed(() => {
   <section class="word-sources-card" aria-label="单词查询">
     <h2 class="section-title">单词查询</h2>
 
-    <div class="switch-rows">
-      <label class="switch-row is-strong">单词使用免费词典源
-        <input v-model="settings.word.enabled" type="checkbox" class="checkbox" />
-      </label>
-      <label class="switch-row is-strong">朗读单词
-        <input v-model="settings.word.speakEnabled" type="checkbox" class="checkbox" />
-      </label>
-    </div>
-
     <div class="src-chips">
       <label
         v-for="row in wordSourceRows"
@@ -66,9 +63,11 @@ const wordProbeTime = computed(() => {
         <input
           v-model="settings.word.sources[row.id]"
           type="checkbox"
+          class="checkbox"
           :aria-label="`启用${WORD_SOURCE_LABELS[row.id]}`"
         />
         <span class="dot" :class="wordStateCls(row.id)"></span>{{ WORD_SOURCE_LABELS[row.id] }}
+        <span v-if="latencyText(row.id)" class="latency">{{ latencyText(row.id) }}</span>
       </label>
     </div>
 
@@ -77,6 +76,12 @@ const wordProbeTime = computed(() => {
         {{ probing ? '检测中…' : '重新检测' }}
       </button>
       <span v-if="wordProbeTime" class="source-time">{{ wordProbeTime }}</span>
+    </div>
+
+    <div class="switch-rows">
+      <label class="switch-row is-strong">朗读单词
+        <input v-model="settings.word.speakEnabled" type="checkbox" class="checkbox" />
+      </label>
     </div>
 
     <div class="seg-row">
@@ -88,10 +93,11 @@ const wordProbeTime = computed(() => {
     </div>
 
     <div class="src-desc">
-      <p>划选<b>单个单词</b>时优先走免费源，不消耗「翻译方案」额度；随机轮换、失败换源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。朗读音色仅有真人音频的源才区分，TTS 兜底按系统默认。</p>
+      <p>划选<b>单个单词</b>时按上面勾选的免费源随机轮换，不消耗「翻译方案」额度；失败自动换下一个源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。绿点=探测可用，红点=不可达，灰点=未检测；ms 为该源上次探测耗时。</p>
       <ul>
         <li v-for="row in wordSourceRows" :key="row.id"><b>{{ WORD_SOURCE_LABELS[row.id] }}</b>{{ row.desc }}</li>
       </ul>
+      <p>「朗读单词」控制词典气泡里的发音按钮；朗读音色仅对有真人音频的源生效，TTS 兜底按系统默认。</p>
     </div>
   </section>
 </template>
@@ -151,6 +157,7 @@ const wordProbeTime = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 28px;
+  margin-top: 10px;
 }
 .switch-row {
   display: flex;
@@ -189,8 +196,10 @@ const wordProbeTime = computed(() => {
 .chip:hover {
   border-color: var(--af-control-border-hover);
 }
-.chip input {
-  display: none;
+.chip .latency {
+  color: var(--af-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 .chip .dot {
   width: 6px;
