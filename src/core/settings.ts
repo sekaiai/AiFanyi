@@ -72,10 +72,10 @@ export const SHADOWS: Record<BubbleSettings['shadow'], string> = {
   strong: '0 16px 44px rgba(27, 34, 46, 0.26)',
 }
 
-/** 单词查询的最低触发延迟：无论悬停延迟设为多少，查单词至少等 300ms，避免扫过单词时连环打接口。 */
+/** 单词翻译的最低触发延迟：无论悬停延迟设为多少，查单词至少等 300ms，避免扫过单词时连环打接口。 */
 export const WORD_LOOKUP_MIN_DELAY_MS = 300
 
-/** 单词查询的实际触发延迟：遵守悬停延迟设置，但不低于 300ms 下限。 */
+/** 单词翻译的实际触发延迟：遵守悬停延迟设置，但不低于 300ms 下限。 */
 export function wordLookupDelay(hoverDelayMs: number): number {
   return Math.max(hoverDelayMs, WORD_LOOKUP_MIN_DELAY_MS)
 }

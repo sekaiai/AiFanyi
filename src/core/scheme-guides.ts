@@ -23,7 +23,7 @@ export const SCHEME_GUIDES: Record<SchemeType, SchemeGuide> = {
     ],
     links: [
       { label: '申请 API 账户', href: 'https://www.deepl.com/pro-api' },
-      { label: '官方开发文档', href: 'https://developers.deepl.com/docs/getting-started/intro' },
+      { label: 'DeepL API Key', href: 'https://www.deepl.com/en/your-account/keys' },
     ],
   },
   google: {
@@ -90,10 +90,11 @@ export const SCHEME_GUIDES: Record<SchemeType, SchemeGuide> = {
       '选一个兼容 OpenAI Chat Completions 的服务商，创建 API Key。',
       '回到这里填完整接口地址、模型名和 API 密钥。',
       '点「测试」；失败先核对地址末尾路径、模型名和余额。',
+      '推荐使用硅基流动提供的免费翻译模型tencent/Hunyuan-MT-7B'
     ],
     links: [
       { label: 'OpenAI API 密钥', href: 'https://platform.openai.com/api-keys' },
-      { label: 'OpenAI 官方文档', href: 'https://platform.openai.com/docs/api-reference/chat/create' },
+      { label: '硅基流动', href: 'https://cloud.siliconflow.cn/i/0gApJ55Y' },
     ],
   },
 }

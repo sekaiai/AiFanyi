@@ -129,7 +129,7 @@ describe('SettingsForm', () => {
 
     const toggle = wrapper.get('[data-testid="scheme-guide-toggle"]')
     expect(toggle.text()).toContain('新手指南')
-    expect(toggle.text()).toContain('DeepL配置步骤与官方入口')
+    expect(toggle.text()).toContain('新手指南 ·DeepL')
     expect(toggle.text()).toContain('密钥仅本地保存')
     expect(toggle.attributes('aria-expanded')).toBe('true')
     expect(isGuideCollapsed()).toBe(false)
@@ -149,7 +149,7 @@ describe('SettingsForm', () => {
 
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('volcengine')
     const editorText = wrapper.get('[data-testid="scheme-editor"]').text()
-    expect(editorText).toContain('火山引擎配置步骤与官方入口')
+    expect(editorText).toContain('新手指南 ·火山引擎')
     expect(editorText).toContain('密钥管理页面（拿 AK/SK）')
     expect(editorText).toContain('国内接入顺畅')
     // 切换方案类型后指南回到默认的展开态

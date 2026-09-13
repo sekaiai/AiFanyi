@@ -168,7 +168,7 @@ export async function runTranslation(
   }
 
   if (schemeTried) throw schemeError ?? new Error('翻译失败')
-  if (poolTried) throw poolError ?? new Error('单词查询失败')
+  if (poolTried) throw poolError ?? new Error('单词翻译失败')
   throw new Error('请先在设置中添加翻译方案')
 }
 

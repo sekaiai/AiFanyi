@@ -75,10 +75,7 @@ async function requestDemo(
       <section aria-label="翻译交互演示">
         <DemoApp :settings="settings" :request="requestDemo" :show-settings="false" />
       </section>
-      <section class="schemes-slot" aria-label="翻译方案">
-        <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" />
-      </section>
-      <section class="word-slot" aria-label="单词查询">
+            <section class="word-slot" aria-label="单词翻译">
         <WordSourcesCard
           v-model="settings"
           :word-probe="wordProbe"
@@ -86,6 +83,11 @@ async function requestDemo(
           @probe-words="probeWords"
         />
       </section>
+
+      <section class="schemes-slot" aria-label="句子翻译">
+        <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" />
+      </section>
+
     </div>
     <aside class="settings-column" aria-label="扩展设置">
       <SettingsForm

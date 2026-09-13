@@ -362,7 +362,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   flex: 1 1 100%;
   cursor: default;
 }
-/* 复选组：与「单词查询」源行同款芯片样式，空间足够时一排放下 5 个 */
+/* 复选组：与「单词翻译」源行同款芯片样式，空间足够时一排放下 5 个 */
 .check-rows {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));

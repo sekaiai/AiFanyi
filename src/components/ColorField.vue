@@ -64,6 +64,6 @@ onBeforeUnmount(() => {
 <style scoped>
 .color-field :deep(.pcr-button) {
   border: 1px solid;
-  font-size: 12px;
+  font-size: 11px;
 }
 </style>

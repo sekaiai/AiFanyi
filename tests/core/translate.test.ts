@@ -401,7 +401,7 @@ describe('runTranslation', () => {
     const settings = settingsWithSchemes([], { wordPool: true })
     settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
 
-    await expect(runTranslation('loved', settings)).rejects.toThrow('单词查询失败：HTTP 503')
+    await expect(runTranslation('loved', settings)).rejects.toThrow('单词翻译失败：HTTP 503')
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 

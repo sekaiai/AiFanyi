@@ -51,7 +51,7 @@ function createScheme(type: SchemeType, id = uid(), enabled = true): SchemeSetti
   if (type === 'googleCloud') return { id, type, enabled, apiKey: '' }
   if (type === 'baidu') return { id, type, enabled, appId: '', secretKey: '' }
   if (type === 'volcengine') return { id, type, enabled, accessKeyId: '', secretAccessKey: '', region: 'cn-north-1' }
-  return { id, type, enabled, apiUrl: '', apiKey: '', model: '', timeoutMs: 20000 }
+  return { id, type, enabled, apiUrl: 'https://api.siliconflow.cn/v1/chat/completions', apiKey: '', model: 'tencent/Hunyuan-MT-7B', timeoutMs: 20000 }
 }
 
 function handleTypeChange(type: SchemeType): void {
@@ -114,9 +114,9 @@ async function save(): Promise<void> {
         <label class="field wide">
           <span class="field-label">翻译方案</span>
           <select :value="draft.type" data-testid="scheme-editor-type" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
-            <option value="ai">自定义 AI</option>
             <option value="baidu">百度翻译</option>
             <option value="volcengine">火山引擎</option>
+            <option value="ai">自定义 AI</option>
             <option value="deepl">DeepL</option>
             <option value="google">Google 翻译（免密钥）</option>
             <option value="googleCloud">Google Cloud</option>
@@ -182,7 +182,7 @@ async function save(): Promise<void> {
           @click="guideExpanded = !guideExpanded"
         >
           <span class="guide-toggle-label">新手指南 ·</span>
-          <span class="guide-toggle-title">{{ guide.title }}配置步骤与官方入口</span>
+          <span class="guide-toggle-title">{{ guide.title }}</span>
           <span class="guide-badge">{{ draft.type === 'google' ? '无需密钥' : '密钥仅本地保存' }}</span>
           <span class="guide-chevron" aria-hidden="true"></span>
         </button>

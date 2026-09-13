@@ -101,7 +101,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 <template>
   <section class="schemes-section">
     <div class="section-head">
-      <h2 class="section-title">翻译方案</h2>
+      <h2 class="section-title">句子翻译</h2>
       <label class="target-field">
         <span class="field-label">翻译成</span>
         <select v-model="targetLanguage" data-testid="target-language">
@@ -232,7 +232,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   border: 1px solid transparent;
   border-radius: 7px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 400;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
   white-space: nowrap;
 }
@@ -249,12 +249,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 }
 
 .button-primary {
-  background: var(--af-accent);
-  color: var(--af-accent-contrast);
-}
-
-.button-primary:hover:not(:disabled) {
-  background: var(--af-accent-hover);
+  color: var(--af-accent);
 }
 
 .button:disabled {

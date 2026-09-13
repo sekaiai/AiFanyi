@@ -334,7 +334,7 @@ export function selectSourceOrder(enabled: readonly WordSourceId[], probe: WordP
 
 export async function lookupWord(word: string, options: WordLookupOptions, signal?: AbortSignal): Promise<WordResult> {
   const order = selectSourceOrder(options.sources, options.probe ?? null)
-  if (!order.length) throw new Error('未启用任何单词查询源')
+  if (!order.length) throw new Error('未启用任何单词翻译源')
   let lastError: unknown = null
   for (const source of order) {
     try {
@@ -346,7 +346,7 @@ export async function lookupWord(word: string, options: WordLookupOptions, signa
     }
   }
   const message = lastError instanceof Error ? lastError.message : '未知错误'
-  throw new Error(`单词查询失败：${message}`)
+  throw new Error(`单词翻译失败：${message}`)
 }
 
 // ---------------------------------------------------------------------------

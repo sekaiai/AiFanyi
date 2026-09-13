@@ -189,11 +189,11 @@ describe('lookupWord', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('全部失败时抛「单词查询失败」并带上最后一个错误', async () => {
+  it('全部失败时抛「单词翻译失败」并带上最后一个错误', async () => {
     fetchMock.mockResolvedValue(new Response('boom', { status: 503 }))
 
     await expect(lookupWord('hello', { sources: ['google', 'freedictionaryapi'], targetLanguage: '简体中文', accent: 'us' }))
-      .rejects.toThrow('单词查询失败：HTTP 503')
+      .rejects.toThrow('单词翻译失败：HTTP 503')
   })
 
   it('探测结果为 false 的源仍会被尝试（只是排后）', async () => {

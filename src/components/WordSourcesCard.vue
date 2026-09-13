@@ -38,8 +38,8 @@ const wordProbeTime = computed(() => {
 </script>
 
 <template>
-  <section class="word-sources-card" aria-label="单词查询">
-    <h2 class="section-title">单词查询</h2>
+  <section class="word-sources-card" aria-label="单词翻译">
+    <h2 class="section-title">单词翻译</h2>
 
     <div class="src-rows">
       <label
@@ -77,10 +77,6 @@ const wordProbeTime = computed(() => {
       </span>
     </div>
 
-    <div class="src-desc">
-      <p>划选<b>单个单词</b>时按上面勾选的免费源随机轮换，不消耗「翻译方案」额度；失败自动换下一个源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。延迟为该源上次探测耗时：绿色为可用，红色「不可用」为检测失败，「—」表示未检测。</p>
-      <p>「朗读单词」控制词典气泡里的发音按钮；朗读音色仅对有真人音频的源生效，TTS 兜底按系统默认。</p>
-    </div>
   </section>
 </template>
 
@@ -261,21 +257,7 @@ const wordProbeTime = computed(() => {
   cursor: pointer;
 }
 
-/* 描述性文字统一沉底 */
-.src-desc {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--af-soft);
-  color: var(--af-muted);
-  font-size: 14px;
-  line-height: 1.6;
-}
-.src-desc p {
-  margin: 0 0 6px;
-}
-.src-desc p:last-child {
-  margin-bottom: 0;
-}
+
 
 /* 窄屏源行退回单列 */
 @media (max-width: 760px) {
