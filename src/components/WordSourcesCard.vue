@@ -258,8 +258,4 @@ const wordProbeTime = computed(() => {
   opacity: 0;
   cursor: pointer;
 }
-
-
-
-
 </style>

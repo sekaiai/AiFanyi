@@ -141,7 +141,7 @@ describe('useSettingsModel', () => {
     expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ hoverDelayMs: 600 }))
   })
 
-  it('关闭同步开关只保存开关状态，不触发设置写入', async () => {
+  it('saving the sync switch off only persists the flag without writing settings', async () => {
     vi.useFakeTimers()
     const { storage } = createStorage()
     const wrapper = mount(SettingsHarness, { props: { storage } })
@@ -155,7 +155,7 @@ describe('useSettingsModel', () => {
     expect(wrapper.get('[data-testid="status"]').text()).toBe('已关闭同步，设置仅保存在本机')
   })
 
-  it('重新开启同步时立即推送当前设置', async () => {
+  it('pushes current settings immediately when sync is re-enabled', async () => {
     vi.useFakeTimers()
     const { storage } = createStorage()
     const wrapper = mount(SettingsHarness, { props: { storage } })
@@ -173,7 +173,7 @@ describe('useSettingsModel', () => {
     expect(wrapper.get('[data-testid="status"]').text()).toBe('已开启同步')
   })
 
-  it('同步开关保存失败时回滚勾选状态并提示', async () => {
+  it('rolls back the switch and surfaces an error when saving the sync flag fails', async () => {
     vi.useFakeTimers()
     const { storage } = createStorage()
     vi.mocked(storage.saveSyncEnabled).mockRejectedValueOnce(new Error('storage unavailable'))
@@ -187,7 +187,7 @@ describe('useSettingsModel', () => {
     expect(wrapper.get('[data-testid="status"]').text()).toBe('同步设置保存失败，请稍后重试')
   })
 
-  it('恢复默认只重置表单项，保留方案列表、翻译成与单词翻译', async () => {
+  it('reset keeps schemes, target language and word settings while resetting form items', async () => {
     const initial = cloneDefaultSettings()
     initial.hoverDelayMs = 700
     initial.targetLanguage = 'English'

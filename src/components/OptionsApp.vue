@@ -6,6 +6,7 @@ import type { ExtensionResponse, WordSourcesResponse } from '../core/messages'
 import type { SchemeSettings } from '../core/types'
 import type { UsageStats } from '../core/usage'
 import type { WordProbeState } from '../core/word-sources'
+import { uid } from '../core/settings'
 import { createBrowserSettingsStorage } from '../extension/storage'
 import { createUsageStorage } from '../extension/usage-storage'
 import DemoApp from '../demo/DemoApp.vue'
@@ -26,7 +27,7 @@ onMounted(async () => {
   try {
     const response = await browser.runtime.sendMessage({
       type: 'wordSources.state',
-      requestId: `word-state-${Date.now()}`,
+      requestId: `word-state-${uid()}`,
     }) as WordSourcesResponse
     wordProbe.value = response.state
     // 旧版本落库的快照只有 results 没有 latency：自动补测一次，让延迟列立即有数据
@@ -58,7 +59,7 @@ async function probeWords(): Promise<void> {
   try {
     const response = await browser.runtime.sendMessage({
       type: 'wordSources.probe',
-      requestId: `word-probe-${Date.now()}`,
+      requestId: `word-probe-${uid()}`,
     }) as WordSourcesResponse
     wordProbe.value = response.state
   } catch {
@@ -71,7 +72,7 @@ async function probeWords(): Promise<void> {
 async function testScheme(scheme: SchemeSettings): Promise<string> {
   const response = await browser.runtime.sendMessage({
     type: 'settings.testScheme',
-    requestId: `settings-${scheme.id}-${Date.now()}`,
+    requestId: `settings-${scheme.id}-${uid()}`,
     scheme,
   }) as ExtensionResponse
   if (!response.ok) throw new Error(response.error.message)
