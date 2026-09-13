@@ -259,7 +259,7 @@ async function save(): Promise<void> {
 .modal-kicker {
   margin: 0 0 3px;
   color: var(--af-accent);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 720;
   letter-spacing: .08em;
 }
@@ -297,7 +297,7 @@ async function save(): Promise<void> {
 .field-label,
 .range-label {
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .range-label {
@@ -358,7 +358,7 @@ async function save(): Promise<void> {
 .guide-toggle-label {
   flex: none;
   color: var(--af-accent);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 720;
   letter-spacing: .08em;
 }
@@ -367,7 +367,7 @@ async function save(): Promise<void> {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -393,7 +393,7 @@ async function save(): Promise<void> {
   border-radius: 999px;
   background: color-mix(in srgb, var(--af-accent) 12%, transparent);
   color: var(--af-accent);
-  font-size: 11px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -406,14 +406,14 @@ async function save(): Promise<void> {
 .guide-tagline {
   margin: 0;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
 .guide-block-label {
   margin: 0 0 7px;
   color: var(--af-muted);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 650;
   letter-spacing: .04em;
 }
@@ -432,7 +432,7 @@ async function save(): Promise<void> {
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 8px;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
 
@@ -440,7 +440,7 @@ async function save(): Promise<void> {
   counter-increment: step;
   content: counter(step);
   color: var(--af-accent);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 720;
   line-height: 1.75;
 }
@@ -456,7 +456,7 @@ async function save(): Promise<void> {
 
 .guide-links a {
   color: var(--af-accent);
-  font-size: 12px;
+  font-size: 14px;
   text-decoration: none;
 }
 
@@ -468,7 +468,7 @@ async function save(): Promise<void> {
 .modal-notice {
   margin: 0;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -489,7 +489,7 @@ async function save(): Promise<void> {
   min-width: 0;
   margin: 0 auto 0 0;
   color: oklch(55% 0.19 25);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -498,7 +498,7 @@ async function save(): Promise<void> {
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
   font-weight: 600;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
@@ -565,7 +565,7 @@ input[type="range"] {
   }
 
   .guide-toggle-title {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .guide-body {

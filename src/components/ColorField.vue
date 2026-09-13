@@ -62,34 +62,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.color-field {
-  min-width: 0;
-}
-
-.color-field :deep(.pickr) {
-  width: 100%;
-}
-
 .color-field :deep(.pcr-button) {
-  width: 100%;
-  height: 38px;
-  padding: 4px;
   border: 1px solid;
-  border-radius: 7px;
-  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
-}
-
-.color-field :deep(.pcr-button)::after {
-  border-radius: 4px;
-}
-
-.color-field :deep(.pcr-button:hover) {
-  border-color: var(--af-control-border-hover);
-}
-
-.color-field :deep(.pcr-button:focus-visible) {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 </style>

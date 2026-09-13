@@ -91,7 +91,7 @@ const wordProbeTime = computed(() => {
   border: 1px solid var(--af-line);
   border-radius: 12px;
   background: var(--af-panel);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .section-title {
@@ -102,7 +102,7 @@ const wordProbeTime = computed(() => {
 
 .field-label {
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 /* 复选框：appearance 自绘，选中 accent 底 + 白色对勾 */
@@ -166,7 +166,7 @@ const wordProbeTime = computed(() => {
   min-height: 26px;
   padding: 2px 6px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   user-select: none;
   background-color: var(--af-page);
@@ -181,7 +181,7 @@ const wordProbeTime = computed(() => {
 }
 .src-row .latency {
   color: var(--af-muted);
-  font-size: 11px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 .src-row .latency.ok {
@@ -203,7 +203,7 @@ const wordProbeTime = computed(() => {
 }
 .source-time {
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -212,7 +212,7 @@ const wordProbeTime = computed(() => {
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
@@ -244,7 +244,7 @@ const wordProbeTime = computed(() => {
   padding: 3px 10px;
   border-radius: 6px;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
 }
 .seg label:has(input:checked) {
@@ -267,7 +267,7 @@ const wordProbeTime = computed(() => {
   padding-top: 10px;
   border-top: 1px solid var(--af-soft);
   color: var(--af-muted);
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.6;
 }
 .src-desc p {

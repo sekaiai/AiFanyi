@@ -149,7 +149,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   border: 1px solid var(--af-line);
   border-radius: 12px;
   background: var(--af-panel);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .section-head {
@@ -170,7 +170,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 .section-hint {
   margin: 0 0 10px;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .target-field {
@@ -181,7 +181,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 
 .target-field .field-label {
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -192,7 +192,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   border-radius: 7px;
   background: var(--af-control-background);
   color: var(--af-text);
-  font-size: 12px;
+  font-size: 14px;
   transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
 }
 
@@ -210,7 +210,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 .settings-status {
   margin: 4px 0 0;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .settings-status.fast {
@@ -231,7 +231,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
   white-space: nowrap;
@@ -331,13 +331,13 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   flex: none;
   width: 16px;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
 .scheme-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 640;
   white-space: nowrap;
 }
@@ -351,7 +351,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   flex: none;
   padding: 3px 7px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -391,7 +391,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   border-radius: 6px;
   background: transparent;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
   transition: background 160ms ease-out, color 160ms ease-out;
 }

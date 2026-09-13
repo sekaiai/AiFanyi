@@ -112,7 +112,7 @@ button {
   scrollbar-gutter: stable;
   border-left: 1px solid var(--af-line);
   background: transparent;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.4;
 }
 
@@ -161,7 +161,7 @@ button {
 
 .status {
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .plain-button {
@@ -186,7 +186,7 @@ button {
 
 .setting-section h3 {
   margin: 0 0 7px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
 }
 
@@ -280,7 +280,7 @@ input[type="range"] {
 .field-hint {
   grid-column: 1 / -1;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .preview-stage {

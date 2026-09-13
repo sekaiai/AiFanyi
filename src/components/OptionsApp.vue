@@ -119,7 +119,7 @@ async function requestDemo(
 }
 
 .word-slot {
-  padding: 0 52px 64px;
+  padding: 0 52px 0;
 }
 
 .settings-column {
@@ -141,7 +141,7 @@ async function requestDemo(
   }
 
   .word-slot {
-    padding: 0 52px 40px;
+    padding: 0 52px 10px;
   }
 }
 

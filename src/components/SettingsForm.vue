@@ -215,7 +215,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
           <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>显示箭头</span></label>
         </div>
         <div class="hfield">
-          <span class="hlbl">鼠标悬停 <output class="delay-val">{{ hoverDelayText }}</output> 后显式翻译</span>
+          <span class="hlbl">鼠标悬停多久后触发翻译</span>
           <input
             v-model.number="settings.hoverDelayMs"
             type="range"
@@ -225,6 +225,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
             class="range-inline"
             :style="{ '--fill': fillPct(settings.hoverDelayMs, 0, 5000) }"
           />
+          <output class="delay-val">{{ hoverDelayText }}</output>
         </div>
         <div class="hfield grow">
           <span class="hlbl">站点黑名单<span class="hlbl-sub">每行一个域名</span></span>
@@ -278,7 +279,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
   white-space: nowrap;
@@ -350,11 +351,11 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
 }
 .hfield .hlbl {
   flex: none;
-  font-size: 13px;
+  font-size: 14px;
 }
 .hfield .hlbl-sub {
   display: block;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--af-muted);
 }
 .hfield.grow {
@@ -376,7 +377,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   min-height: 26px;
   padding: 2px 6px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   user-select: none;
   background-color: var(--af-page);
@@ -401,7 +402,7 @@ textarea.blacklist {
   border-radius: 8px;
   background: var(--af-control-background);
   color: var(--af-text);
-  font-size: 12px;
+  font-size: 14px;
   resize: vertical;
 }
 textarea.blacklist:hover {
@@ -431,7 +432,7 @@ textarea.blacklist:focus {
 .settings-status {
   margin: 4px 0 0;
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .settings-section {
@@ -484,7 +485,7 @@ textarea.blacklist:focus {
 .field-label,
 .range-label {
   color: var(--af-muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .range-label {
