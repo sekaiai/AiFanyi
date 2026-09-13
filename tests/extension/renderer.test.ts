@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cloneDefaultSettings } from '../../src/core/settings'
-import { createBubbleRenderer } from '../../src/extension/renderer'
+import { createBubbleRenderer, selectionContainerWidth } from '../../src/extension/renderer'
 import type { BubbleSettings } from '../../src/core/types'
 
 function bubbleSettings(overrides: Partial<BubbleSettings> = {}): BubbleSettings {
@@ -146,5 +146,28 @@ describe('createBubbleRenderer 原文显示', () => {
     expect(lines).toHaveLength(2)
     expect(lines[0]?.title).toBe('爱，热爱（love 的过去式和过去分词）')
     expect(lines[1]?.title).toBe('受珍爱的，被爱的，心爱的（常作定语，如 loved ones 亲人）')
+  })
+
+  // selectionContainerWidth：句子翻译气泡以选区所在块级容器的 clientWidth 为上限。
+  // jsdom/happy-dom 测不出布局，clientWidth 用 stub 注入；display 用内联样式声明，
+  // 不依赖测试环境对默认 UA 样式表的实现。
+  it('selectionContainerWidth 穿过 inline 层找到块级容器的 clientWidth', () => {
+    const div = document.createElement('div')
+    div.style.display = 'block'
+    const span = document.createElement('span')
+    span.style.display = 'inline'
+    const bold = document.createElement('b')
+    bold.style.display = 'inline'
+    bold.textContent = 'text'
+    span.append(bold)
+    div.append(span)
+    document.body.append(div)
+
+    const range = document.createRange()
+    range.selectNodeContents(bold)
+    Object.defineProperty(div, 'clientWidth', { value: 640, configurable: true })
+    expect(selectionContainerWidth(range)).toBe(640)
+
+    div.remove()
   })
 })

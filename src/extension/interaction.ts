@@ -5,7 +5,7 @@ import { wordLookupDelay } from '../core/settings'
 import type { TranslationSettings } from '../core/types'
 import { classifySelection, getCaretFromPoint, getWordAtOffset, hasActiveSelection, isIgnorableElement, isSelectionIgnorableElement } from '../core/text'
 import { hideHighlight, showHighlight } from './highlight'
-import { boundsFromRange, type BubbleRenderer } from './renderer'
+import { boundsFromRange, selectionContainerWidth, type BubbleRenderer } from './renderer'
 import { speakWord } from './speech'
 
 /**
@@ -52,11 +52,18 @@ export function createInteraction(host: InteractionHost) {
   let pointerDown = false
   let wordHovered = false
   let bubbleHovered = false
+  let pointerDownInBubble = false
+
+  /** document 级监听下 shadow 内事件被重定向为宿主元素，contains/closest 均不跨 shadow 边界。 */
+  function isInsideBubble(target: EventTarget | null): boolean {
+    return target instanceof Element && (host.renderer.container.contains(target) || host.renderer.root.contains(target))
+  }
 
   function start(): void {
     listen(document, 'mousemove', (event) => onMouseMove(event as MouseEvent), { capture: true })
-    listen(document, 'mousedown', () => {
+    listen(document, 'mousedown', (event) => {
       pointerDown = true
+      pointerDownInBubble = isInsideBubble(event.target)
     }, { capture: true })
     listen(document, 'mouseup', () => {
       pointerDown = false
@@ -116,7 +123,7 @@ export function createInteraction(host: InteractionHost) {
       || !settings.hoverEnabled
       || pointerDown
       || hasActiveSelection()
-      || host.renderer.root.contains(target)
+      || isInsideBubble(target)
       || isIgnorableElement(target)
       || !host.acceptHoverTarget(target)
     ) {
@@ -165,6 +172,8 @@ export function createInteraction(host: InteractionHost) {
   function handleSelection(): void {
     const settings = host.getSettings()
     if (!host.isActive(settings) || !settings.selectionEnabled) return
+    // 本次按下发生在气泡内：不关闭气泡，也不对气泡内容发起新翻译
+    if (pointerDownInBubble) return
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
       if (currentInteraction === 'selection') close()
@@ -251,7 +260,9 @@ export function createInteraction(host: InteractionHost) {
     const settings = host.getSettings()
     const bounds = boundsFromRange(range)
     if (!bounds) return
-    const sizing = getBubbleSizing(bounds.right - bounds.left, window.innerWidth, settings.bubble.side)
+    // 句子翻译以选区所在块级容器宽度为上限；单词翻译维持 290px 封顶
+    const sentenceContainerWidth = currentKind === 'ai' ? selectionContainerWidth(range) : 0
+    const sizing = getBubbleSizing(bounds.right - bounds.left, window.innerWidth, settings.bubble.side, { sentenceContainerWidth })
     host.renderer.prepareForMeasure(sizing.minWidth, sizing.maxWidth)
     const rect = host.renderer.root.getBoundingClientRect()
     const placement = getBubblePlacement(bounds, rect.width, rect.height, window.innerWidth, window.innerHeight, settings.bubble)

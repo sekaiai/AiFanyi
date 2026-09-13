@@ -3,9 +3,10 @@ import type { BubbleSettings, RectLike } from './types'
 
 const VIEWPORT_MARGIN = 8
 const MIN_READABLE_WIDTH = 160
-/** 与 renderer.ts 里 .bubble 的 CSS max-width（min(290px, calc(100vw - 16px))）保持一致：
+/** 单词气泡的宽度封顶（与 renderer.ts 里 .bubble 的 CSS max-width 290px 保持一致）。
  *  prepareForMeasure 写的 inline maxWidth 会覆盖样式表，上限必须在这里同样封顶，
- *  否则长释义（如单词 even 的词典结果）会把气泡拉到视口宽。 */
+ *  否则长释义（如单词 even 的词典结果）会把气泡拉到视口宽。
+ *  句子翻译不走此封顶：其宽度上限由选区所在块级容器宽度决定（见 getBubbleSizing）。 */
 const MAX_BUBBLE_WIDTH = 290
 
 const OPPOSITE_SIDE = {
@@ -25,15 +26,25 @@ export interface BubblePlacement {
   arrowY: number
 }
 
-export function getBubbleSizing(rangeWidth: number, containerWidth: number, side: BubbleSettings['side']) {
-  const availableWidth = Math.min(Math.max(0, containerWidth - VIEWPORT_MARGIN * 2), MAX_BUBBLE_WIDTH)
+export function getBubbleSizing(
+  rangeWidth: number,
+  containerWidth: number,
+  side: BubbleSettings['side'],
+  options?: { sentenceContainerWidth?: number },
+) {
   const verticalSide = side === 'top' || side === 'bottom'
   const constrainToRange = verticalSide && rangeWidth >= MIN_READABLE_WIDTH
-  const maxWidth = Math.min(availableWidth, constrainToRange ? rangeWidth : availableWidth)
-  return {
-    minWidth: constrainToRange ? 0 : Math.min(MIN_READABLE_WIDTH, maxWidth),
-    maxWidth,
+  const sentenceContainerWidth = options?.sentenceContainerWidth ?? 0
+  if (constrainToRange && sentenceContainerWidth > 0) {
+    // 句子翻译：宽度上限是选区所在块级容器宽度（仍受视口留白约束），不再套用单词气泡 290px 封顶
+    return {
+      minWidth: 0,
+      maxWidth: Math.min(Math.max(0, containerWidth - VIEWPORT_MARGIN * 2), sentenceContainerWidth),
+    }
   }
+  const availableWidth = Math.min(Math.max(0, containerWidth - VIEWPORT_MARGIN * 2), MAX_BUBBLE_WIDTH)
+  const maxWidth = Math.min(availableWidth, constrainToRange ? rangeWidth : availableWidth)
+  return { minWidth: constrainToRange ? 0 : Math.min(MIN_READABLE_WIDTH, maxWidth), maxWidth }
 }
 
 export function getBubblePlacement(

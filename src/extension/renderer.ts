@@ -11,6 +11,7 @@ export interface DictionaryRenderOptions {
 export interface BubbleRenderer {
   root: HTMLElement
   content: HTMLElement
+  container: HTMLElement
   showLoading(message: string, sourceWord?: string): void
   showDictionary(sourceWord: string, result: DictionaryResult, options?: DictionaryRenderOptions): void
   showText(text: string, sourceWord?: string): void
@@ -48,6 +49,7 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
 
   const renderer: BubbleRenderer = {
     root: bubble,
+    container: host,
     content,
     showLoading(message, sourceWord = '') {
       const nodes: Node[] = []
@@ -166,6 +168,19 @@ export function boundsFromRange(range: Range): RectLike | null {
     top: Math.min(...source.map((rect) => rect.top)),
     bottom: Math.max(...source.map((rect) => rect.bottom)),
   }
+}
+
+/** 选区所在最近块级容器的宽度；句子翻译气泡以它为宽度上限。测不出时返回 0（调用方回退单词封顶）。 */
+export function selectionContainerWidth(range: Range): number {
+  const node = range.commonAncestorContainer
+  let el = node instanceof Element ? node : node.parentElement
+  while (el) {
+    const display = getComputedStyle(el).display
+    if (display !== 'inline' && display !== 'contents') break
+    el = el.parentElement
+  }
+  const width = el?.clientWidth ?? 0
+  return Number.isFinite(width) ? width : 0
 }
 
 function wordNode(word: string, pronunciation = '', speakable = false): HTMLElement {
