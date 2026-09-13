@@ -23,6 +23,10 @@ onMounted(async () => {
       requestId: `word-state-${Date.now()}`,
     }) as WordSourcesResponse
     wordProbe.value = response.state
+    // 旧版本落库的快照只有 results 没有 latency：自动补测一次，让延迟列立即有数据
+    if (response.state.checkedAt && Object.keys(response.state.latency ?? {}).length === 0) {
+      void probeWords()
+    }
   } catch {
     // 后台不可达时保持 null（显示「未检测」）
   }
