@@ -194,7 +194,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
         <div class="control-grid three">
           <label class="range-field">
             <span class="range-label">字号 <output>{{ settings.bubble.fontSize }} px</output></span>
-            <input v-model.number="settings.bubble.fontSize" type="range" min="12" max="22" step="1" :style="{ '--fill': fillPct(settings.bubble.fontSize, 12, 22) }" />
+            <input v-model.number="settings.bubble.fontSize" type="range" min="14" max="22" step="1" :style="{ '--fill': fillPct(settings.bubble.fontSize, 14, 22) }" />
           </label>
           <label class="range-field">
             <span class="range-label">行高 <output>{{ settings.bubble.lineHeight }}</output></span>

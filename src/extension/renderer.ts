@@ -217,7 +217,7 @@ const bubbleStyle = `
   color: var(--af-bubble-text, #30323a);
   box-shadow: var(--af-bubble-shadow, 0 6px 20px rgb(0 0 0 / 0.11));
   font-family: var(--af-bubble-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-  font-size: var(--af-bubble-font-size, 14px);
+  font-size: var(--af-bubble-font-size, 16px);
   font-weight: var(--af-bubble-font-weight, 400);
   line-height: var(--af-bubble-line-height, 1.55);
   text-align: var(--af-bubble-text-align, left);
@@ -278,7 +278,7 @@ const bubbleStyle = `
 }
 .word {
   margin-bottom: 3px;
-  font-size: calc(var(--af-bubble-font-size, 14px) + 1px);
+  font-size: calc(var(--af-bubble-font-size, 16px) + 1px);
   font-weight: 650;
 }
 /* 有朗读按钮时原文行右侧预留 22px，否则长单词会压到按钮上 */
@@ -287,7 +287,7 @@ const bubbleStyle = `
 }
 .pronunciation,
 .pos {
-  font-size: max(11px, calc(var(--af-bubble-font-size, 14px) - 2px));
+  font-size: max(11px, calc(var(--af-bubble-font-size, 16px) - 2px));
   font-weight: 400;
   opacity: 0.65;
 }
@@ -316,7 +316,7 @@ const bubbleStyle = `
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: calc(var(--af-bubble-font-size, 14px) + 1px);
+  font-size: calc(var(--af-bubble-font-size, 16px) + 1px);
   font-weight: 650;
   overflow-wrap: anywhere;
 }

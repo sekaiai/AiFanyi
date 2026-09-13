@@ -55,7 +55,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="trigger" class="color-field"></div>
+  <!-- Pickr 会用 .pickr 容器整体替换挂载点（replaceChild），必须挂在内层占位元素上，否则 scoped 祖先选择器失效 -->
+  <div class="color-field">
+    <div ref="trigger"></div>
+  </div>
 </template>
 
 <style scoped>
