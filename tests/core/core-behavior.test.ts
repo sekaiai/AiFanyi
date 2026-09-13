@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getBubblePlacement, getBubbleSizing } from '../../src/core/bubble'
+import { isTargetLanguageText } from '../../src/core/lang'
 import { buildPrompt } from '../../src/core/prompt'
 import {
   MAX_TRANSLATION_TEXT_LENGTH,
@@ -10,6 +11,35 @@ import {
 } from '../../src/core/settings'
 import { classifySelection, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
 import { toContentSettings } from '../../src/extension/storage'
+
+describe('language detection', () => {
+  it('同语言文本判定为跳过', () => {
+    expect(isTargetLanguageText('有人记得你爱过的人', '简体中文')).toBe(true)
+    expect(isTargetLanguageText('こんにちは世界', '日本語')).toBe(true)
+    expect(isTargetLanguageText('사랑해요', '한국어')).toBe(true)
+    expect(isTargetLanguageText('Hello world', 'English')).toBe(true)
+    expect(isTargetLanguageText('Привет мир', 'Русский')).toBe(true)
+    expect(isTargetLanguageText('सभी लोग', 'हिन्दी')).toBe(true)
+    expect(isTargetLanguageText('สวัสดี', 'ไทย')).toBe(true)
+    expect(isTargetLanguageText('مرحبا', 'العربية')).toBe(true)
+    expect(isTargetLanguageText('Γειά σου', 'Ελληνικά')).toBe(true)
+  })
+
+  it('跨语言文本不跳过', () => {
+    expect(isTargetLanguageText('Someone you loved', '简体中文')).toBe(false)
+    expect(isTargetLanguageText('中文汉字', '日本語')).toBe(false) // 无假名不算日语
+    expect(isTargetLanguageText('API、cache 和 context', 'English')).toBe(false) // 含汉字
+    expect(isTargetLanguageText('café latte', 'English')).toBe(false) // 非纯 ASCII
+  })
+
+  it('保留简繁转换场景与安全默认', () => {
+    expect(isTargetLanguageText('學習另一種語言', '简体中文')).toBe(false) // 繁体特征字 → 不跳过
+    expect(isTargetLanguageText('简体文本', '繁體中文')).toBe(false) // 繁体目标不判定
+    expect(isTargetLanguageText('hello', 'Français')).toBe(false) // 拉丁语系其他语言不判定
+    expect(isTargetLanguageText('hello', 'Nederlands')).toBe(false) // 未收录规则不跳过
+    expect(isTargetLanguageText('', '简体中文')).toBe(false)
+  })
+})
 
 describe('text classification', () => {
   it.each([

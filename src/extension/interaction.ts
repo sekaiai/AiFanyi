@@ -1,4 +1,5 @@
 import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
+import { isTargetLanguageText } from '../core/lang'
 import { LruCache } from '../core/lru'
 import type { ExtensionResponse } from '../core/messages'
 import { wordLookupDelay } from '../core/settings'
@@ -133,6 +134,11 @@ export function createInteraction(host: InteractionHost) {
       leaveHoverWord()
       return
     }
+    // 同语言单词不触发查词与高亮（如英文目标悬停英文词）
+    if (isTargetLanguageText(word.word, settings.targetLanguage)) {
+      leaveHoverWord()
+      return
+    }
     const range = document.createRange()
     range.setStart(caret.node, word.start)
     range.setEnd(caret.node, word.end)
@@ -171,6 +177,8 @@ export function createInteraction(host: InteractionHost) {
     if (isSelectionIgnorableElement(target) || !host.acceptSelectTarget(target)) return
     const action = classifySelection(selection.toString())
     if (action.type === 'empty') return
+    // 已是目标语言的文本不触发翻译（如中文目标选中中文句）
+    if (isTargetLanguageText(action.text, settings.targetLanguage)) return
     window.clearTimeout(hoverTimer)
     window.clearTimeout(submitTimer)
     hideHighlight(host.highlight)

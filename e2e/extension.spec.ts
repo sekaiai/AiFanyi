@@ -110,6 +110,36 @@ test.describe('AiFanyi extension', () => {
     await context.close()
   })
 
+  test('skips translation when the selected text is already in the target language', async () => {
+    const { context, page, worker } = await launchExtension()
+    await page.route('https://fixture.test/**', async (route) => {
+      await route.fulfill({
+        path: path.resolve('e2e/fixtures/translation-page.html'),
+        contentType: 'text/html',
+      })
+    })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: false, selectionEnabled: true })
+
+    await page.goto('https://fixture.test/')
+    await page.locator('#zh-target').evaluate((node) => {
+      const text = node.firstChild
+      if (!text) throw new Error('中文文本不可用')
+      const range = document.createRange()
+      range.setStart(text, 0)
+      range.setEnd(text, 10)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    // 未 mock 任何翻译 API：若门控失效会发出真实请求并弹出错误气泡
+    await page.waitForTimeout(400)
+    await expect(page.locator('.aifanyi-bubble, .bubble').first()).toBeHidden()
+
+    await context.close()
+  })
+
   test('does not translate when the current host is blacklisted', async () => {
     const { context, page, worker } = await launchExtension()
     await page.route('https://fixture.test/**', async (route) => {
@@ -193,6 +223,21 @@ test.describe('AiFanyi extension', () => {
       if (side === 'left') expect(bubbleBox!.x + bubbleBox!.width).toBeLessThanOrEqual(sourceBox!.x)
       if (side === 'right') expect(bubbleBox!.x).toBeGreaterThanOrEqual(sourceBox!.x + sourceBox!.width)
     }
+
+    // 中文段落 + 默认目标简体中文：同语言不触发翻译，气泡不出现
+    await page.locator('.reading-copy p').last().evaluate((element) => {
+      const text = element.firstChild
+      if (!text) throw new Error('演示文本不可用')
+      const range = document.createRange()
+      range.setStart(text, 0)
+      range.setEnd(text, 5)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+    await page.waitForTimeout(300)
+    await expect(page.locator('#aifanyi-shadow-host .bubble')).toBeHidden()
 
     await page.locator('.reading-copy p').first().evaluate((element) => {
       const text = element.firstChild
