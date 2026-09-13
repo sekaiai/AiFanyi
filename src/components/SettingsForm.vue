@@ -211,9 +211,12 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
           <label class="check-row"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>全局启用</span></label>
           <label class="check-row"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>悬停翻译</span></label>
           <label class="check-row"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>选中翻译</span></label>
-          <label class="check-row"><input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" /><span>显示原文</span></label>
           <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>显示箭头</span></label>
         </div>
+        <label class="hfield" title="句子翻译气泡中是否显示原文；取消勾选后气泡只显示译文。">
+          <input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" data-testid="show-original" />
+          <span class="hlbl">句子显示原文</span>
+        </label>
         <div class="hfield">
           <span class="hlbl">鼠标悬停多久后触发翻译</span>
           <input
