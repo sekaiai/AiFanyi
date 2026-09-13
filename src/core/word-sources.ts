@@ -1,4 +1,5 @@
 import { lookupDictionary, type DictionaryMeaning, type DictionaryResult } from './dictionary'
+import { readArray, readRecord, readText } from './read'
 import type { WordSourceId } from './types'
 
 /**
@@ -400,16 +401,4 @@ function shuffle<T>(items: readonly T[]): T[] {
     result[j] = a
   }
   return result
-}
-
-function readRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
-}
-
-function readArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function readText(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
 }

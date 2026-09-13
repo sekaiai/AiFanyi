@@ -1,3 +1,4 @@
+import { readRecord, readText } from './read'
 import type { VolcengineSchemeSettings } from './types'
 
 export const VOLCENGINE_TRANSLATE_ENDPOINT = 'https://translate.volcengineapi.com'
@@ -122,15 +123,15 @@ export async function requestVolcengineTranslation(
     const metadata = readRecord(record.ResponseMetadata ?? record.ResponseMetaData)
     const upstreamError = readRecord(metadata.Error ?? record.Error)
     if (Object.keys(upstreamError).length) {
-      const code = readString(upstreamError.Code) || readString(upstreamError.code) || '请求失败'
-      const message = readString(upstreamError.Message) || readString(upstreamError.message) || '请求失败'
+      const code = readText(upstreamError.Code) || readText(upstreamError.code) || '请求失败'
+      const message = readText(upstreamError.Message) || readText(upstreamError.message) || '请求失败'
       throw new Error(describeVolcengineError(code, message))
     }
     const resultRecord = readRecord(record.Result)
     const rawTranslations = record.TranslationList ?? resultRecord.TranslationList
     const translations = Array.isArray(rawTranslations) ? rawTranslations : []
     const result = translations
-      .map((item) => readString(readRecord(item).Translation))
+      .map((item) => readText(readRecord(item).Translation))
       .filter(Boolean)
       .join('\n')
       .trim()
@@ -153,14 +154,6 @@ export function formatVolcengineDate(value: Date): string {
 
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
-function readRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
-}
-
-function readString(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
 }
 
 /** 火山引擎错误码 → 可执行的排查指引。 */

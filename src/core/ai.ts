@@ -2,6 +2,7 @@ import { validateAiUrl } from './settings'
 import type { AiSchemeSettings } from './types'
 import { normalizeSourceText } from './text'
 import { buildPrompt } from './prompt'
+import { readRecord } from './read'
 
 export async function requestAiTranslation(text: string, settings: AiSchemeSettings, targetLanguage: string, signal?: AbortSignal): Promise<string> {
   const source = normalizeSourceText(text)
@@ -56,8 +57,4 @@ export function readAssistantContent(payload: unknown): string {
     }
   }
   return ''
-}
-
-function readRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
 }

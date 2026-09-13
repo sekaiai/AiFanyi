@@ -1,4 +1,5 @@
 import { md5Hex } from './md5'
+import { readRecord } from './read'
 import type { BaiduSchemeSettings } from './types'
 
 export const BAIDU_TRANSLATE_ENDPOINT = 'https://fanyi-api.baidu.com/api/trans/vip/translate'
@@ -85,8 +86,4 @@ export async function requestBaiduTranslation(
   } finally {
     clearTimeout(timeoutId)
   }
-}
-
-function readRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
 }

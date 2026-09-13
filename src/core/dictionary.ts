@@ -1,3 +1,5 @@
+import { readArray, readRecord, readText } from './read'
+
 const DICTIONARY_API_BASE = 'https://freedictionaryapi.com/api/v1'
 
 export interface DictionaryMeaning {
@@ -80,16 +82,4 @@ function readPronunciation(entry: Record<string, unknown>): string {
     .map(readRecord)
     .map((item) => readText(item.text))
     .find(Boolean) ?? ''
-}
-
-function readArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function readRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
-}
-
-function readText(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
 }

@@ -2,6 +2,7 @@ import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
 import { requestVolcengineTranslation } from './volcengine'
 import { lookupDictionary } from './dictionary'
+import { readArray, readRecord, readText } from './read'
 import { extractSingleWord, normalizeSourceText } from './text'
 import { lookupWord, toFreeDictionaryResult, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
@@ -258,16 +259,4 @@ async function requestJsonWithTimeout(url: string, init: RequestInit, signal?: A
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'
-}
-
-function readRecord(value: unknown): Record<string, unknown> {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : {}
-}
-
-function readArray(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function readText(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
 }
