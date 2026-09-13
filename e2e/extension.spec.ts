@@ -24,14 +24,14 @@ async function launchExtension() {
 
 async function setSettings(worker: Awaited<ReturnType<typeof launchExtension>>['worker'], value: object) {
   await worker.evaluate(async ({ key, settings }) => {
-    await (globalThis as typeof globalThis & { chrome: typeof chrome }).chrome.storage.local.set({ [key]: settings })
+    await (globalThis as typeof globalThis & { chrome: typeof chrome }).chrome.storage.sync.set({ [key]: settings })
   }, { key: settingsKey, settings: value })
 }
 
 test.describe('AiFanyi extension', () => {
   test('shows a dictionary bubble after hovering an English word', async () => {
     const { context, page, worker } = await launchExtension()
-    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0, bubble: { highlightColor: '#ff8800' } })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0, word: { sources: { youdao: true, bing: true, google: true, freedictionaryapi: true } }, bubble: { highlightColor: '#ff8800' } })
     await context.route('https://freedictionaryapi.com/**', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
@@ -109,6 +109,83 @@ test.describe('AiFanyi extension', () => {
     await expect(bubble).toContainText('学习另一种语言')
     await expect(bubble).toContainText('Learning another language can help you understand different cultures.')
 
+    // 回归：句子翻译气泡宽度受所在容器限制，不再被单词气泡 290px 封顶
+    const bubbleBox = await bubble.boundingBox()
+    const paragraphWidth = await page.locator('#ai-target').evaluate((el) => el.clientWidth)
+    expect(bubbleBox).not.toBeNull()
+    expect(bubbleBox!.width).toBeGreaterThan(290)
+    expect(bubbleBox!.width).toBeLessThanOrEqual(paragraphWidth)
+
+    await context.close()
+  })
+
+  test('keeps the bubble open when selecting text inside it', async () => {
+    const { context, page, worker } = await launchExtension()
+    await page.route('https://fixture.test/**', async (route) => {
+      await route.fulfill({ path: path.resolve('e2e/fixtures/translation-page.html'), contentType: 'text/html' })
+    })
+    let apiCalls = 0
+    await context.route('https://api.example.com/v1/chat/completions', async (route) => {
+      apiCalls += 1
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ choices: [{ message: { content: '学习另一种语言可以帮助你理解不同文化。' } }] }),
+      })
+    })
+
+    await setSettings(worker, {
+      version: 1,
+      enabled: true,
+      hoverEnabled: true,
+      selectionEnabled: true,
+      hoverDelayMs: 0,
+      ai: {
+        apiUrl: 'https://api.example.com/v1/chat/completions',
+        apiKey: 'sk-e2e',
+        model: 'gpt-4o-mini',
+        prompt: 'Translate into Simplified Chinese: {text}',
+        timeoutMs: 5000,
+      },
+    })
+
+    await page.goto('https://fixture.test/')
+    await page.locator('#ai-target').evaluate((node) => {
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    const bubble = page.locator('#aifanyi-shadow-host .bubble')
+    await expect(bubble).toContainText('学习另一种语言')
+
+    // 在气泡内拖动选择译文：修复前会被当作页面划词，关闭气泡并对气泡内容重新翻译
+    const sentence = bubble.locator('.sentence').first()
+    await expect(sentence).toBeVisible()
+    const box = await sentence.boundingBox()
+    if (!box) throw new Error('气泡译文不可选中')
+    await page.mouse.move(box.x + box.width - 12, box.y + box.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 12, box.y + box.height / 2, { steps: 6 })
+    await page.mouse.up()
+    await expect(bubble).toBeVisible()
+
+    // 单击气泡内文字同样不关闭、不重译
+    await sentence.click()
+    await expect(bubble).toBeVisible()
+
+    // 全程只有初始那一次翻译请求：气泡内交互没有发起新翻译
+    expect(apiCalls).toBe(1)
+
+    // 点击气泡外空白处才关闭
+    const viewport = page.viewportSize()
+    expect(viewport).not.toBeNull()
+    await page.mouse.click(24, viewport!.height - 24)
+    await expect(bubble).toBeHidden()
+
     await context.close()
   })
 
@@ -177,7 +254,7 @@ test.describe('AiFanyi extension', () => {
     await page.route('https://fixture.test/**', async (route) => {
       await route.fulfill({ path: path.resolve('e2e/fixtures/translation-page.html'), contentType: 'text/html' })
     })
-    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0 })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0, word: { sources: { youdao: true, bing: true, google: true, freedictionaryapi: true } } })
     await page.goto('https://fixture.test/')
 
     await page.locator('#edge-word').hover()
@@ -204,6 +281,7 @@ test.describe('AiFanyi extension', () => {
         body: JSON.stringify({ entries: [{ partOfSpeech: 'pronoun', senses: [{ translations: [{ language: 'zh', word: '某人' }] }] }] }),
       })
     })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, word: { sources: { youdao: true, bing: true, google: true, freedictionaryapi: true } } })
     const optionsUrl = await worker.evaluate(() => chrome.runtime.getURL('/options.html'))
     await page.goto(optionsUrl)
 
