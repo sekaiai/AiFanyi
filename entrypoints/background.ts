@@ -12,11 +12,13 @@ import { isSiteBlocked, type TranslationSettings } from '../src/core/settings'
 import { runTranslation, SCHEME_TEST_PHRASE, translateWithScheme } from '../src/core/translate'
 import { probeWordSources, WORD_PROBE_STORAGE_KEY, type WordProbeState } from '../src/core/word-sources'
 import { createBrowserSettingsStorage, toContentSettings } from '../src/extension/storage'
+import { createUsageStorage } from '../src/extension/usage-storage'
 import type { ExtensionMessage, ExtensionResponse } from '../src/core/messages'
 import type { RequestId } from '../src/core/messages'
 import type { TranslateOutcome } from '../src/core/translate'
 
 const storage = createBrowserSettingsStorage()
+const usage = createUsageStorage()
 const controllers = new Map<RequestId, AbortController>()
 
 interface InflightGroup {
@@ -150,7 +152,10 @@ export async function handleMessage(message: ExtensionMessage, senderUrl?: strin
           if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
             return blockedResponse(settings, leader.requestId)
           }
-          const outcome = await runTranslation(leader.text, settings, controller.signal, { probe: await loadProbeState() })
+          const outcome = await runTranslation(leader.text, settings, controller.signal, { probe: await loadProbeState() }, {
+            onSentence: (schemeId, chars) => void usage.recordSentence(schemeId, chars),
+            onWord: (chars) => void usage.recordWord(chars),
+          })
           return outcomeToResponse(outcome, leader.requestId)
         } catch (error) {
           return { ok: false, requestId: leader.requestId, error: toDisplayError(error) }
