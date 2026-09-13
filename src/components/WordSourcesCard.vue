@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TranslationSettings, WordSourceId } from '../core/types'
-import { WORD_SOURCE_LABELS, type WordProbeState } from '../core/word-sources'
+import { WORD_SOURCE_IDS, WORD_SOURCE_LABELS, type WordProbeState } from '../core/word-sources'
 
 const settings = defineModel<TranslationSettings>({ required: true })
 
@@ -15,37 +15,18 @@ const emit = defineEmits<{
   probeWords: []
 }>()
 
-interface WordSourceRow {
-  id: WordSourceId
-  desc: string
-}
-
-const wordSourceRows: WordSourceRow[] = [
-  { id: 'youdao', desc: '释义（含词性）· 英美音标 · 真人发音音频，最完整' },
-  { id: 'bing', desc: '译文 · 英美音标（按原形词给，loved 会得到 lʌv）' },
-  { id: 'google', desc: '仅译文，无音标；国内常不可达，检测不到会自动跳过' },
-  { id: 'freedictionaryapi', desc: '中文释义 + IPA 音标，不区分口音；与其他源平级轮换' },
-]
-
-function wordStateCls(source: WordSourceId): string {
-  const ok = props.wordProbe?.results[source]
-  if (ok === true) return ''
-  if (ok === false) return 'is-bad'
-  return 'is-unknown'
-}
-
-/** 探测成功的源显示上次探测耗时；失败/未检测的源不显示。 */
+/** 每个源都显示延迟：探测成功显示耗时，失败/未检测显示「—」占位。 */
 function latencyText(source: WordSourceId): string {
   const ms = props.wordProbe?.latency?.[source]
-  return typeof ms === 'number' ? `${ms}ms` : ''
+  return typeof ms === 'number' ? `${ms}ms` : '—'
 }
 
 const wordProbeTime = computed(() => {
   const checkedAt = props.wordProbe?.checkedAt ?? 0
   if (!checkedAt) return ''
   const available = props.wordProbe?.results ?? {}
-  const count = wordSourceRows.filter((row) => available[row.id] === true).length
-  return `上次检测：${new Date(checkedAt).toLocaleTimeString()} · ${count}/${wordSourceRows.length} 可用`
+  const count = WORD_SOURCE_IDS.filter((id) => available[id] === true).length
+  return `上次检测：${new Date(checkedAt).toLocaleTimeString()} · ${count}/${WORD_SOURCE_IDS.length} 可用`
 })
 </script>
 
@@ -53,21 +34,21 @@ const wordProbeTime = computed(() => {
   <section class="word-sources-card" aria-label="单词查询">
     <h2 class="section-title">单词查询</h2>
 
-    <div class="src-chips">
+    <div class="src-rows">
       <label
-        v-for="row in wordSourceRows"
-        :key="row.id"
-        class="chip"
-        :class="{ off: !settings.word.sources[row.id] }"
+        v-for="id in WORD_SOURCE_IDS"
+        :key="id"
+        class="src-row"
+        :class="{ off: !settings.word.sources[id] }"
       >
         <input
-          v-model="settings.word.sources[row.id]"
+          v-model="settings.word.sources[id]"
           type="checkbox"
           class="checkbox"
-          :aria-label="`启用${WORD_SOURCE_LABELS[row.id]}`"
+          :aria-label="`启用${WORD_SOURCE_LABELS[id]}`"
         />
-        <span class="dot" :class="wordStateCls(row.id)"></span>{{ WORD_SOURCE_LABELS[row.id] }}
-        <span v-if="latencyText(row.id)" class="latency">{{ latencyText(row.id) }}</span>
+        <span class="src-name">{{ WORD_SOURCE_LABELS[id] }}</span>
+        <span class="latency">{{ latencyText(id) }}</span>
       </label>
     </div>
 
@@ -78,13 +59,10 @@ const wordProbeTime = computed(() => {
       <span v-if="wordProbeTime" class="source-time">{{ wordProbeTime }}</span>
     </div>
 
-    <div class="switch-rows">
-      <label class="switch-row is-strong">朗读单词
+    <div class="speak-row">
+      <label class="field-label speak-toggle">朗读单词
         <input v-model="settings.word.speakEnabled" type="checkbox" class="checkbox" />
       </label>
-    </div>
-
-    <div class="seg-row">
       <span class="field-label">朗读音色</span>
       <span class="seg">
         <label><input v-model="settings.word.accent" type="radio" value="us" />美音</label>
@@ -93,10 +71,7 @@ const wordProbeTime = computed(() => {
     </div>
 
     <div class="src-desc">
-      <p>划选<b>单个单词</b>时按上面勾选的免费源随机轮换，不消耗「翻译方案」额度；失败自动换下一个源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。绿点=探测可用，红点=不可达，灰点=未检测；ms 为该源上次探测耗时。</p>
-      <ul>
-        <li v-for="row in wordSourceRows" :key="row.id"><b>{{ WORD_SOURCE_LABELS[row.id] }}</b>{{ row.desc }}</li>
-      </ul>
+      <p>划选<b>单个单词</b>时按上面勾选的免费源随机轮换，不消耗「翻译方案」额度；失败自动换下一个源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。延迟为该源上次探测耗时，「—」表示未检测或不可达。</p>
       <p>「朗读单词」控制词典气泡里的发音按钮；朗读音色仅对有真人音频的源生效，TTS 兜底按系统默认。</p>
     </div>
   </section>
@@ -153,67 +128,50 @@ const wordProbeTime = computed(() => {
   box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
-.switch-rows {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 28px;
-  margin-top: 10px;
-}
-.switch-row {
+/* 朗读两项同排：朗读单词（复选）+ 朗读音色（分段胶囊），标签样式一致 */
+.speak-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 220px;
-  min-height: 30px;
-  padding: 2px 0;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+}
+.speak-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
   user-select: none;
 }
-.switch-row.is-strong {
-  font-weight: 650;
-}
 
-/* 源芯片行：只留名称 + 勾选 + 探测状态点 */
-.src-chips {
+/* 源行：【checkbox | 名称 | 延迟】，延迟恒显 */
+.src-rows {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
   margin-top: 10px;
 }
-.chip {
-  display: inline-flex;
+.src-row {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 9px 3px 7px;
-  border: 1px solid var(--af-line);
-  border-radius: 999px;
-  background: var(--af-control-background);
+  gap: 8px;
+  min-height: 26px;
+  padding: 2px 6px;
+  border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
   user-select: none;
 }
-.chip:hover {
-  border-color: var(--af-control-border-hover);
+.src-row:hover {
+  background: var(--af-control-hover);
 }
-.chip .latency {
+.src-row .latency {
+  margin-left: auto;
   color: var(--af-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
-.chip .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: oklch(55% 0.14 150);
-}
-.chip .dot.is-bad {
-  background: oklch(55% 0.19 25);
-}
-.chip .dot.is-unknown {
-  background: var(--af-control-border);
-}
-.chip.off {
+.src-row.off {
   opacity: 0.45;
 }
 
@@ -255,13 +213,6 @@ const wordProbeTime = computed(() => {
 }
 
 /* 分段胶囊（radio 语义不变） */
-.seg-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 10px;
-}
 .seg {
   display: inline-flex;
   gap: 2px;
@@ -303,23 +254,7 @@ const wordProbeTime = computed(() => {
 .src-desc p {
   margin: 0 0 6px;
 }
-.src-desc ul {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 2px 18px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.src-desc li b {
-  margin-right: 6px;
-  color: var(--af-text);
-  font-weight: 600;
-}
-
-@media (max-width: 760px) {
-  .src-desc ul {
-    grid-template-columns: 1fr;
-  }
+.src-desc p:last-child {
+  margin-bottom: 0;
 }
 </style>
