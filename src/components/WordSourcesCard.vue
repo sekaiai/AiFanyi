@@ -15,10 +15,17 @@ const emit = defineEmits<{
   probeWords: []
 }>()
 
-/** 每个源都显示延迟：探测成功显示耗时，失败/未检测显示「—」占位。 */
+/** 每个源都显示延迟：探测成功显示耗时，检测失败显示「不可用」，未检测显示「—」占位。 */
 function latencyText(source: WordSourceId): string {
+  if (props.wordProbe?.results[source] === false) return '不可用'
   const ms = props.wordProbe?.latency?.[source]
   return typeof ms === 'number' ? `${ms}ms` : '—'
+}
+
+/** 按显示的值着色：可用绿、不可用红、未检测保持灰。 */
+function latencyCls(source: WordSourceId): string {
+  if (props.wordProbe?.results[source] === false) return 'bad'
+  return typeof props.wordProbe?.latency?.[source] === 'number' ? 'ok' : ''
 }
 
 const wordProbeTime = computed(() => {
@@ -48,7 +55,7 @@ const wordProbeTime = computed(() => {
           :aria-label="`启用${WORD_SOURCE_LABELS[id]}`"
         />
         <span class="src-name">{{ WORD_SOURCE_LABELS[id] }}</span>
-        <span class="latency">{{ latencyText(id) }}</span>
+        <span class="latency" :class="latencyCls(id)">{{ latencyText(id) }}</span>
       </label>
     </div>
 
@@ -71,7 +78,7 @@ const wordProbeTime = computed(() => {
     </div>
 
     <div class="src-desc">
-      <p>划选<b>单个单词</b>时按上面勾选的免费源随机轮换，不消耗「翻译方案」额度；失败自动换下一个源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。延迟为该源上次探测耗时，「—」表示未检测或不可达。</p>
+      <p>划选<b>单个单词</b>时按上面勾选的免费源随机轮换，不消耗「翻译方案」额度；失败自动换下一个源，<b>全部失败</b>（或一个都没启用）才回落「翻译方案」。延迟为该源上次探测耗时：绿色为可用，红色「不可用」为检测失败，「—」表示未检测。</p>
       <p>「朗读单词」控制词典气泡里的发音按钮；朗读音色仅对有真人音频的源生效，TTS 兜底按系统默认。</p>
     </div>
   </section>
@@ -144,17 +151,18 @@ const wordProbeTime = computed(() => {
   user-select: none;
 }
 
-/* 源行：【checkbox | 名称 | 延迟】，延迟恒显 */
+/* 源行：【checkbox | 名称 | 延迟】，延迟恒显，一行排两个源 */
 .src-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 16px;
   margin-top: 10px;
 }
 .src-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   min-height: 26px;
   padding: 2px 6px;
   border-radius: 6px;
@@ -165,11 +173,22 @@ const wordProbeTime = computed(() => {
 .src-row:hover {
   background: var(--af-control-hover);
 }
+.src-row .src-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .src-row .latency {
   margin-left: auto;
   color: var(--af-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+}
+.src-row .latency.ok {
+  color: oklch(55% 0.14 150);
+}
+.src-row .latency.bad {
+  color: oklch(55% 0.19 25);
 }
 .src-row.off {
   opacity: 0.45;
@@ -256,5 +275,12 @@ const wordProbeTime = computed(() => {
 }
 .src-desc p:last-child {
   margin-bottom: 0;
+}
+
+/* 窄屏源行退回单列 */
+@media (max-width: 760px) {
+  .src-rows {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
