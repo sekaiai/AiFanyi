@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 38px;
   padding: 4px;
-  border: 1px solid var(--af-control-border);
+  border: 1px solid;
   border-radius: 7px;
   transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
 }

@@ -55,7 +55,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   <form class="settings-form" @submit.prevent>
     <header class="settings-header">
       <div>
-        <h1 class="settings-title">AiFanyi</h1>
+        <h1 class="settings-title">设置</h1>
         <p class="settings-status">{{ status }}</p>
       </div>
       <button class="button button-secondary" type="button" @click="emit('reset')">恢复默认</button>
@@ -127,7 +127,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
             </select>
           </label>
         </div>
-        <div class="control-grid four">
+        <div class="control-grid flex-between">
           <label class="field">
             <span class="field-label">背景</span>
             <ColorField :model-value="settings.bubble.background" @update:model-value="setBubbleColor('background', $event)" />
@@ -463,8 +463,9 @@ textarea.blacklist:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.control-grid.four {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.control-grid.flex-between {
+  display: flex;
+  justify-content: space-between;
 }
 
 .control-stack {
@@ -528,8 +529,12 @@ input[type="range"] {
 @media (max-width: 760px) {
   .settings-form,
   .control-grid.two,
-  .control-grid.three,
-  .control-grid.four {
+  .control-grid.three {
+    grid-template-columns: 1fr;
+  }
+
+  .control-grid.flex-between {
+    display: grid;
     grid-template-columns: 1fr;
   }
 

@@ -96,7 +96,6 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
         <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
         <p>Learning another language can help you understand different cultures and communicate with people around the world.</p>
         <p>Technology is changing the way people work, communicate and learn new things every day.</p>
-        <p>同一页面里的英文单词也能查询，例如 API、cache 和 context。</p>
         <pre><code>const message = "代码区不触发悬停，但划词可显式翻译";</code></pre>
       </div>
     </main>

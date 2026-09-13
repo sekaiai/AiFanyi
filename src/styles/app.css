@@ -67,7 +67,7 @@ button {
 
 .demo-pane {
   min-width: 0;
-  padding: 48px 52px 20px;
+  padding: 48px 52px 0;
   font-size: 18px;
   line-height: 1.8;
 }

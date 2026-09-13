@@ -124,8 +124,11 @@ async function requestDemo(
 
 .settings-column {
   min-width: 0;
-  border-left: 1px solid var(--af-line);
+  border: 1px solid var(--af-line);
   background: var(--af-panel);
+  margin-top: 40px;
+  border-radius: 12px;
+  align-self: flex-start;
 }
 
 @media (max-width: 980px) {
@@ -139,11 +142,6 @@ async function requestDemo(
 
   .word-slot {
     padding: 0 52px 40px;
-  }
-
-  .settings-column {
-    border-top: 1px solid var(--af-line);
-    border-left: 0;
   }
 }
 
