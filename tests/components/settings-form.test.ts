@@ -76,7 +76,6 @@ describe('SettingsForm', () => {
 
     expect(wrapper.vm.settings.schemes.map((scheme) => scheme.type)).toEqual(['ai', 'google'])
     expect(wrapper.vm.settings.schemes[0]).toMatchObject({ type: 'ai', timeoutMs: 20000 })
-    expect(wrapper.find('[data-testid="dictionary-fallback"]').exists()).toBe(true)
   })
 
   it('adds and edits a Baidu scheme', async () => {

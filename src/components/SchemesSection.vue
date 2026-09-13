@@ -100,47 +100,36 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 
 <template>
   <section class="schemes-section">
-    <h2 class="section-title">翻译方案</h2>
-    <p class="section-hint">按顺序依次尝试，排在最前面的优先使用；单词查询始终内置 freedictionaryapi 兜底。</p>
+    <div class="section-head">
+      <h2 class="section-title">翻译方案</h2>
+      <label class="target-field">
+        <span class="field-label">目标语言</span>
+        <select v-model="targetLanguage" data-testid="target-language">
+          <option v-for="lang in TARGET_LANGUAGES" :key="lang" :value="lang">{{ lang }}</option>
+        </select>
+      </label>
+    </div>
+    <p class="section-hint">按顺序依次尝试，排在最前面的优先使用。</p>
     <p v-if="demoMode" class="notice">在线演示中的 API 密钥只保存在当前页面内存，刷新后会消失。</p>
     <p v-else class="notice security-notice">扩展密钥仅保存在本机受信任存储，由后台请求使用；网页内容脚本不会接收密钥。</p>
 
-    <label class="field target-field">
-      <span class="field-label">翻译目标语言</span>
-      <select v-model="targetLanguage" data-testid="target-language">
-        <option v-for="lang in TARGET_LANGUAGES" :key="lang" :value="lang">{{ lang }}</option>
-      </select>
-    </label>
-
     <div class="scheme-list">
-      <div v-for="(scheme, index) in schemes" :key="scheme.id" class="scheme-card" :data-testid="`scheme-card-${scheme.type}`">
-        <div class="scheme-header">
-          <div class="scheme-title-row">
-            <label class="switch-field scheme-switch">
-              <input v-model="scheme.enabled" type="checkbox" :data-testid="`scheme-toggle-${scheme.id}`" />
-              <span class="scheme-name">{{ SCHEME_TYPE_LABELS[scheme.type] }}</span>
-            </label>
-            <span class="scheme-state" :class="schemeConfigured[scheme.id] ? 'configured' : 'incomplete'">
-              {{ schemeConfigured[scheme.id] ? '配置完成' : '待完善配置' }}
-            </span>
-          </div>
-          <div class="scheme-actions">
-            <button class="icon-button" type="button" title="上移" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
-            <button class="icon-button" type="button" title="下移" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
-            <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" title="编辑" @click="openEditScheme(scheme)">✎</button>
-            <button class="icon-button" type="button" title="删除" @click="removeScheme(scheme.id)">✕</button>
-          </div>
-        </div>
-        <div class="scheme-test">
-          <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">测试</button>
-          <span class="settings-status" :class="schemeTestStatus[scheme.id]?.tone">{{ schemeTestStatus[scheme.id]?.text ?? '' }}</span>
-        </div>
-      </div>
-
-      <div class="scheme-card scheme-fallback" data-testid="dictionary-fallback">
-        <div class="scheme-header">
-          <span class="scheme-name">freedictionaryapi</span>
-          <span class="field-hint">内置兜底 · 仅单词</span>
+      <div v-for="(scheme, index) in schemes" :key="scheme.id" class="scheme-card" :class="{ 'is-off': !scheme.enabled }" :data-testid="`scheme-card-${scheme.type}`">
+        <span class="scheme-order">{{ index + 1 }}</span>
+        <label class="switch-field scheme-switch">
+          <input v-model="scheme.enabled" type="checkbox" class="checkbox" :data-testid="`scheme-toggle-${scheme.id}`" />
+          <span class="scheme-name">{{ SCHEME_TYPE_LABELS[scheme.type] }}</span>
+        </label>
+        <span class="scheme-state" :class="schemeConfigured[scheme.id] ? 'configured' : 'incomplete'">
+          {{ schemeConfigured[scheme.id] ? '配置完成' : '待完善配置' }}
+        </span>
+        <span class="settings-status scheme-status" :class="schemeTestStatus[scheme.id]?.tone" :title="schemeTestStatus[scheme.id]?.text ?? ''">{{ schemeTestStatus[scheme.id]?.text ?? '' }}</span>
+        <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">测试</button>
+        <div class="scheme-actions">
+          <button class="icon-button" type="button" title="上移" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
+          <button class="icon-button" type="button" title="下移" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
+          <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" title="编辑" @click="openEditScheme(scheme)">✎</button>
+          <button class="icon-button" type="button" title="删除" @click="removeScheme(scheme.id)">✕</button>
         </div>
       </div>
     </div>
@@ -163,24 +152,61 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   font-size: 13px;
 }
 
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 6px;
+}
+
 .section-title {
-  margin: 0 0 6px;
+  margin: 0;
   font-size: 14px;
   font-weight: 720;
 }
 
 .section-hint {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: var(--af-muted);
   font-size: 12px;
 }
 
 .target-field {
-  margin: 0 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.target-field .field-label {
+  color: var(--af-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.target-field select {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--af-control-border);
+  border-radius: 7px;
+  background: var(--af-control-background);
+  color: var(--af-text);
+  font-size: 12px;
+  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
+}
+
+.target-field select:hover {
+  border-color: var(--af-control-border-hover);
+}
+
+.target-field select:focus {
+  border-color: var(--af-accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
 .notice,
-.field-hint,
 .settings-status {
   margin: 4px 0 0;
   color: var(--af-muted);
@@ -200,75 +226,12 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   color: oklch(55% 0.19 25);
 }
 
-.field,
-.range-field {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  align-content: start;
-}
-
-.field.wide {
-  grid-column: 1 / -1;
-}
-
-.field-label,
-.range-label {
-  color: var(--af-muted);
-  font-size: 12px;
-}
-
-.range-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.field :is(input:not([type="color"]), select, textarea) {
-  width: 100%;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
-  transition: border-color 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out;
-}
-
-.field :is(input:not([type="color"]), select) {
-  min-height: 38px;
-}
-
-.field :is(input:not([type="color"]), select, textarea):hover {
-  border-color: var(--af-control-border-hover);
-}
-
-.field :is(input:not([type="color"]), select, textarea):focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
-}
-
-.field textarea {
-  min-height: 78px;
-  resize: vertical;
-}
-
-input[type="range"] {
-  width: 100%;
-}
-
-.range-field input[type="range"] {
-  height: 22px;
-  margin: 0;
-  accent-color: var(--af-accent);
-}
-
 .button {
-  min-height: 36px;
-  padding: 0 13px;
+  min-height: 30px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 7px;
+  font-size: 12px;
   font-weight: 600;
   transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
   white-space: nowrap;
@@ -305,62 +268,92 @@ input[type="range"] {
   min-height: 28px;
   gap: 8px;
   user-select: none;
+  cursor: pointer;
 }
 
-.switch-field input[type="checkbox"] {
+/* 复选框：appearance 自绘，选中 accent 底 + 白色对勾 */
+.checkbox {
+  appearance: none;
+  flex: none;
   width: 16px;
   height: 16px;
-  accent-color: var(--af-accent);
+  margin: 0;
+  border: 1px solid var(--af-control-border);
+  border-radius: 4px;
+  background-color: var(--af-control-background);
+  cursor: pointer;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out;
 }
-
-.key-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+.checkbox:hover {
+  border-color: var(--af-control-border-hover);
+}
+.checkbox:checked {
+  border-color: var(--af-accent);
+  background-color: var(--af-accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 12px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.checkbox:focus-visible {
+  border-color: var(--af-accent);
+  outline: 0;
+  box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
 .scheme-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .scheme-card {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--af-line);
   border-radius: 10px;
   background: var(--af-control-background);
+  transition: border-color 160ms ease-out;
 }
 
-.scheme-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.scheme-card:hover {
+  border-color: var(--af-control-border-hover);
 }
 
-.scheme-title-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
+.scheme-card.is-off .scheme-name,
+.scheme-card.is-off .scheme-state,
+.scheme-card.is-off .scheme-order {
+  opacity: 0.5;
+}
+
+.scheme-order {
+  flex: none;
+  width: 16px;
+  color: var(--af-muted);
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .scheme-name {
   font-size: 13px;
   font-weight: 640;
+  white-space: nowrap;
 }
 
 .scheme-switch {
   gap: 8px;
+  min-width: 0;
 }
 
 .scheme-state {
+  flex: none;
   padding: 3px 7px;
   border-radius: 999px;
   font-size: 11px;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .scheme-state.configured {
@@ -373,59 +366,78 @@ input[type="range"] {
   color: var(--af-muted);
 }
 
+.scheme-status {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .scheme-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex: none;
+  gap: 2px;
 }
 
 .icon-button {
-  min-width: 30px;
-  min-height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
-  font-size: 13px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 5px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--af-muted);
+  font-size: 12px;
   line-height: 1;
-  transition: background 160ms ease-out, border-color 160ms ease-out;
+  transition: background 160ms ease-out, color 160ms ease-out;
 }
 
 .icon-button:hover:not(:disabled) {
-  border-color: var(--af-control-border-hover);
-  background: var(--af-control-hover);
+  background: var(--af-soft);
+  color: var(--af-text);
 }
 
 .icon-button:disabled {
   cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.scheme-test {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.scheme-fallback {
-  padding: 10px 14px;
+  opacity: 0.4;
 }
 
 .scheme-add {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
 .add-button {
   width: 100%;
+  min-height: 34px;
+  border-style: dashed;
+  border-color: var(--af-control-border);
+  background: transparent;
+  color: var(--af-muted);
+  font-weight: 400;
+}
+
+.add-button:hover {
+  border-color: var(--af-accent);
+  background: transparent;
+  color: var(--af-accent);
 }
 
 @media (max-width: 760px) {
-  .scheme-header {
-    align-items: flex-start;
+  .scheme-card {
+    flex-wrap: wrap;
+  }
+
+  .scheme-status {
+    flex-basis: 100%;
+    order: 5;
+    text-align: left;
   }
 }
 </style>

@@ -494,12 +494,14 @@ async function save(): Promise<void> {
 }
 
 .button {
-  min-height: 36px;
-  padding: 0 13px;
+  min-height: 30px;
+  padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 7px;
+  font-size: 12px;
   white-space: nowrap;
   font-weight: 600;
+  transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
 }
 
 .button:disabled {
@@ -513,9 +515,18 @@ async function save(): Promise<void> {
   color: var(--af-text);
 }
 
+.button-secondary:hover {
+  border-color: var(--af-control-border-hover);
+  background: var(--af-control-hover);
+}
+
 .button-primary {
   background: var(--af-accent);
   color: var(--af-accent-contrast);
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--af-accent-hover);
 }
 
 .icon-button {

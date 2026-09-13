@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import SchemesSection from '../components/SchemesSection.vue'
 import SettingsForm from '../components/SettingsForm.vue'
+import WordSourcesCard from '../components/WordSourcesCard.vue'
 import { toDisplayError, type ExtensionResponse } from '../core/messages'
 import { cloneDefaultSettings, type TranslationSettings } from '../core/settings'
 import { runTranslation, SCHEME_TEST_PHRASE, translateWithScheme } from '../core/translate'
@@ -89,7 +90,7 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
 <template>
   <div :class="showSettings ? 'app-shell' : 'demo-surface'">
     <main id="reading-area" class="demo-pane">
-      <h1>翻译交互演示</h1>
+      <h1>Translation demo</h1>
       <p class="tip">悬停或选中单词查词典；选中多个词、句子或段落时按翻译方案顺序翻译。划词对代码区同样生效，悬停不会在代码区弹泡。与目标语言相同的文本不会触发翻译。</p>
       <div class="reading-copy">
         <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
@@ -101,6 +102,7 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
     </main>
     <aside v-if="showSettings" class="settings-panel" aria-label="演示设置">
       <SettingsForm v-model="settings" :status="status" @reset="reset" />
+      <WordSourcesCard v-model="settings" />
       <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" demo-mode />
     </aside>
   </div>

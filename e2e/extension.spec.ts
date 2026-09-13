@@ -207,7 +207,7 @@ test.describe('AiFanyi extension', () => {
     const optionsUrl = await worker.evaluate(() => chrome.runtime.getURL('/options.html'))
     await page.goto(optionsUrl)
 
-    await expect(page.getByRole('heading', { name: '翻译交互演示' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Translation demo' })).toBeVisible()
     await page.getByTestId('color-preset').selectOption('night')
     await expect(page.getByTestId('bubble-preview')).toHaveCSS('background-color', 'rgb(32, 36, 45)')
 

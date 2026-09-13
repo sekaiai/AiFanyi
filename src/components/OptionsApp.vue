@@ -9,6 +9,7 @@ import { createBrowserSettingsStorage } from '../extension/storage'
 import DemoApp from '../demo/DemoApp.vue'
 import SchemesSection from './SchemesSection.vue'
 import SettingsForm from './SettingsForm.vue'
+import WordSourcesCard from './WordSourcesCard.vue'
 
 const { settings, stateLabel, reset } = useSettingsModel(createBrowserSettingsStorage())
 
@@ -73,15 +74,20 @@ async function requestDemo(
       <section class="schemes-slot" aria-label="翻译方案">
         <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" :test-scheme="testScheme" />
       </section>
+      <section class="word-slot" aria-label="单词查询">
+        <WordSourcesCard
+          v-model="settings"
+          :word-probe="wordProbe"
+          :probing="probingWords"
+          @probe-words="probeWords"
+        />
+      </section>
     </div>
     <aside class="settings-column" aria-label="扩展设置">
       <SettingsForm
         v-model="settings"
         :status="stateLabel"
-        :word-probe="wordProbe"
-        :probing="probingWords"
         @reset="reset"
-        @probe-words="probeWords"
       />
     </aside>
   </main>
@@ -105,6 +111,10 @@ async function requestDemo(
 }
 
 .schemes-slot {
+  padding: 0 52px 8px;
+}
+
+.word-slot {
   padding: 0 52px 64px;
 }
 
@@ -120,6 +130,10 @@ async function requestDemo(
   }
 
   .schemes-slot {
+    padding: 0 52px 8px;
+  }
+
+  .word-slot {
     padding: 0 52px 40px;
   }
 
@@ -131,6 +145,10 @@ async function requestDemo(
 
 @media (max-width: 900px) {
   .schemes-slot {
+    padding: 0 4px 8px;
+  }
+
+  .word-slot {
     padding: 0 4px 40px;
   }
 }
