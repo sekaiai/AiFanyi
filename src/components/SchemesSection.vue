@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, toRaw } from 'vue'
+import { computed, onUnmounted, ref, shallowRef, toRaw } from 'vue'
 import { TARGET_LANGUAGES } from '../core/settings'
 import type { SchemeOrder, SchemeSettings, SchemeType } from '../core/types'
 import { hasRequiredConfig } from '../core/translate'
@@ -85,8 +85,34 @@ function saveScheme(scheme: SchemeSettings): void {
 
 function removeScheme(id: string): void {
   const index = schemes.value.findIndex((scheme) => scheme.id === id)
-  if (index !== -1) schemes.value.splice(index, 1)
+  if (index === -1) return
+  schemes.value.splice(index, 1)
+  delete schemeTestStatus.value[id]
 }
+
+const pendingDeleteId = ref('')
+let deleteConfirmTimer: ReturnType<typeof setTimeout> | undefined
+
+function disarmDelete(): void {
+  if (deleteConfirmTimer !== undefined) {
+    clearTimeout(deleteConfirmTimer)
+    deleteConfirmTimer = undefined
+  }
+  pendingDeleteId.value = ''
+}
+
+function requestRemoveScheme(id: string): void {
+  if (pendingDeleteId.value === id) {
+    disarmDelete()
+    removeScheme(id)
+    return
+  }
+  disarmDelete()
+  pendingDeleteId.value = id
+  deleteConfirmTimer = setTimeout(disarmDelete, 3000)
+}
+
+onUnmounted(disarmDelete)
 
 function moveScheme(id: string, offset: -1 | 1): void {
   const list = schemes.value
@@ -168,7 +194,14 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
           <button class="icon-button" type="button" title="上移" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
           <button class="icon-button" type="button" title="下移" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
           <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" title="编辑" @click="openEditScheme(scheme)">✎</button>
-          <button class="icon-button" type="button" :title="scheme.type === 'google' ? '默认方案，不可删除' : '删除'" :disabled="scheme.type === 'google'" @click="removeScheme(scheme.id)">✕</button>
+          <button
+            class="icon-button"
+            type="button"
+            :class="{ 'icon-button-danger': pendingDeleteId === scheme.id }"
+            :title="scheme.type === 'google' ? '默认方案，不可删除' : pendingDeleteId === scheme.id ? '再次点击确认删除' : '删除'"
+            :disabled="scheme.type === 'google'"
+            @click="requestRemoveScheme(scheme.id)"
+          >{{ pendingDeleteId === scheme.id ? '确认' : '✕' }}</button>
         </div>
       </div>
     </div>
@@ -450,6 +483,16 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 .icon-button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+.icon-button.icon-button-danger {
+  color: oklch(55% 0.19 25);
+  background: color-mix(in srgb, oklch(55% 0.19 25) 12%, transparent);
+}
+
+.icon-button.icon-button-danger:hover:not(:disabled) {
+  color: oklch(55% 0.19 25);
+  background: color-mix(in srgb, oklch(55% 0.19 25) 18%, transparent);
 }
 
 .scheme-add {

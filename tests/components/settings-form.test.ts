@@ -266,6 +266,11 @@ describe('SettingsForm', () => {
     expect(wrapper.vm.settings.schemes[0]?.enabled).toBe(false)
 
     await deeplCard().get('button[title="删除"]').trigger('click')
+    expect(wrapper.vm.settings.schemes.map((scheme) => scheme.type)).toEqual(['deepl', 'google'])
+    const armedDelete = deeplCard().get('button[title="再次点击确认删除"]')
+    expect(armedDelete.text()).toBe('确认')
+
+    await armedDelete.trigger('click')
     expect(wrapper.vm.settings.schemes).toHaveLength(1)
     expect(wrapper.find('[data-testid="scheme-card-deepl"]').exists()).toBe(false)
     expect(wrapper.get('button[title="默认方案，不可删除"]').attributes('disabled')).toBeDefined()
