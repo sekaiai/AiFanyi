@@ -103,7 +103,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
     <div class="section-head">
       <h2 class="section-title">翻译方案</h2>
       <label class="target-field">
-        <span class="field-label">目标语言</span>
+        <span class="field-label">翻译成</span>
         <select v-model="targetLanguage" data-testid="target-language">
           <option v-for="lang in TARGET_LANGUAGES" :key="lang" :value="lang">{{ lang }}</option>
         </select>

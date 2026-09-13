@@ -109,7 +109,7 @@ async function requestDemo(
 .demo-column {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
   min-width: 0;
   background: var(--af-page);
 }
