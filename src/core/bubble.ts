@@ -3,6 +3,10 @@ import type { BubbleSettings, RectLike } from './types'
 
 const VIEWPORT_MARGIN = 8
 const MIN_READABLE_WIDTH = 160
+/** 与 renderer.ts 里 .bubble 的 CSS max-width（min(290px, calc(100vw - 16px))）保持一致：
+ *  prepareForMeasure 写的 inline maxWidth 会覆盖样式表，上限必须在这里同样封顶，
+ *  否则长释义（如单词 even 的词典结果）会把气泡拉到视口宽。 */
+const MAX_BUBBLE_WIDTH = 290
 
 const OPPOSITE_SIDE = {
   top: 'bottom',
@@ -22,7 +26,7 @@ export interface BubblePlacement {
 }
 
 export function getBubbleSizing(rangeWidth: number, containerWidth: number, side: BubbleSettings['side']) {
-  const availableWidth = Math.max(0, containerWidth - VIEWPORT_MARGIN * 2)
+  const availableWidth = Math.min(Math.max(0, containerWidth - VIEWPORT_MARGIN * 2), MAX_BUBBLE_WIDTH)
   const verticalSide = side === 'top' || side === 'bottom'
   const constrainToRange = verticalSide && rangeWidth >= MIN_READABLE_WIDTH
   const maxWidth = Math.min(availableWidth, constrainToRange ? rangeWidth : availableWidth)

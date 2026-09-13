@@ -35,7 +35,7 @@ test.describe('AiFanyi extension', () => {
     await context.route('https://freedictionaryapi.com/**', async (route) => {
       await route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ entries: [{ partOfSpeech: 'adj.', senses: [{ translations: [{ language: 'zh', word: '美丽的' }] }] }] }),
+        body: JSON.stringify({ entries: [{ partOfSpeech: 'adj.', senses: [{ translations: [{ language: 'zh', word: '美丽的；漂亮的；出色的；令人愉悦的；绝妙的；非常好的；用来加强语气表示甚至' }] }] }] }),
       })
     })
     await page.route('https://fixture.test/**', async (route) => {
@@ -54,6 +54,10 @@ test.describe('AiFanyi extension', () => {
     const bubble = page.locator('.aifanyi-bubble, .bubble').first()
     await expect(bubble).toBeVisible()
     await expect(bubble).toContainText(/美|beautiful/i)
+    // 回归：长释义不许把气泡拉超 290px 固定最大宽度（单词 even 的词典结果即触发）
+    const bubbleBox = await bubble.boundingBox()
+    expect(bubbleBox).not.toBeNull()
+    expect(bubbleBox!.width).toBeLessThanOrEqual(290)
 
     await context.close()
   })

@@ -177,4 +177,12 @@ describe('bubble placement', () => {
     expect(getBubbleSizing(40, 180, 'top')).toEqual({ minWidth: 160, maxWidth: 164 })
     expect(cloneDefaultSettings()).not.toBe(cloneDefaultSettings())
   })
+
+  // 回归：悬停单词（rangeWidth < 160）时 maxWidth 曾是视口宽 - 16，
+  // inline maxWidth 覆盖 CSS 后长释义把气泡拉到几百 px 宽（单词 even 即触发）。
+  it('caps the bubble width at 290px regardless of viewport width', () => {
+    expect(getBubbleSizing(40, 1920, 'top')).toEqual({ minWidth: 160, maxWidth: 290 })
+    // 划词长句也不超过上限
+    expect(getBubbleSizing(600, 1920, 'top')).toEqual({ minWidth: 0, maxWidth: 290 })
+  })
 })

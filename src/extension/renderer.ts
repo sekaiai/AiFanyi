@@ -203,6 +203,7 @@ const bubbleStyle = `
   all: initial;
 }
 .bubble {
+  box-sizing: border-box;
   position: fixed;
   z-index: 2147483647;
   display: none;
