@@ -356,11 +356,10 @@ const PROBE_WORD = 'hello'
 const PROBE_TIMEOUT_MS = 4000
 
 /** 四个源并行探测；单个源失败记 false，不影响其他源。永不 reject。 */
-export async function probeWordSources(signal?: AbortSignal): Promise<WordProbeState> {
+export async function probeWordSources(): Promise<WordProbeState> {
   const entries = await Promise.all(WORD_SOURCE_IDS.map(async (source): Promise<[WordSourceId, boolean]> => {
     try {
-      const probeSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(PROBE_TIMEOUT_MS)]) : AbortSignal.timeout(PROBE_TIMEOUT_MS)
-      await fetchWordResult(source, PROBE_WORD, { sources: [...WORD_SOURCE_IDS], targetLanguage: '简体中文', accent: 'us' }, probeSignal)
+      await fetchWordResult(source, PROBE_WORD, { sources: [...WORD_SOURCE_IDS], targetLanguage: '简体中文', accent: 'us' }, AbortSignal.timeout(PROBE_TIMEOUT_MS))
       return [source, true]
     } catch {
       return [source, false]

@@ -122,15 +122,7 @@ export function cloneDefaultSettings(): TranslationSettings {
 }
 
 export function uid(): string {
-  const crypto = globalThis.crypto
-  if (crypto && typeof crypto.randomUUID === 'function') {
-    try {
-      return crypto.randomUUID()
-    } catch {
-      return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-    }
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return crypto.randomUUID()
 }
 
 export function migrateSettings(value: unknown): TranslationSettings {

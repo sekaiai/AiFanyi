@@ -16,7 +16,7 @@ export function extractSingleWord(text: string): string | null {
   return normalizeSourceText(text).match(SINGLE_WORD_RE)?.[1] ?? null
 }
 
-export function normalizeText(text: string): string {
+function normalizeText(text: string): string {
   return text.replace(/\s+/g, ' ').trim()
 }
 

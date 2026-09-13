@@ -20,8 +20,4 @@ export class LruCache<K, V> {
       this.values.delete(oldest)
     }
   }
-
-  clear(): void {
-    this.values.clear()
-  }
 }
