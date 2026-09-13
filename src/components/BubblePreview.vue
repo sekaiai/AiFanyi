@@ -97,7 +97,8 @@ watch(() => props.settings, async () => {
           loved<span class="preview-pronunciation">/lʌvd/</span>
         </div>
         <div class="preview-result"><span class="preview-pos">v.</span>爱；喜欢</div>
-        <span class="preview-speak" aria-hidden="true">▶</span>
+        <!-- 与真实气泡的朗读按钮一致：仅「显示原文」开启时渲染 -->
+        <span v-if="settings.showOriginal" class="preview-speak" aria-hidden="true">▶</span>
       </div>
       <span class="preview-arrow" aria-hidden="true"></span>
     </div>

@@ -124,6 +124,19 @@ describe('createBubbleRenderer 原文显示', () => {
     expect(renderer.content.querySelector('.word')?.className).toBe('word')
   })
 
+  it('showOriginal 为假时不渲染朗读按钮（即使传了 onSpeak）', () => {
+    renderer = createBubbleRenderer(bubbleSettings({ showOriginal: false }))
+    renderer.showDictionary('loved', {
+      source: 'youdao',
+      sourceLabel: '有道词典',
+      pronunciation: '/lʌvd/',
+      meanings: [{ partOfSpeech: 'v.', translations: ['爱，热爱'] }],
+    }, { onSpeak: () => {} })
+
+    expect(renderer.content.querySelector('.speak')).toBeNull()
+    expect(renderer.content.querySelector('.word')).toBeNull()
+  })
+
   // 释义行 CSS 限单行省略（.result white-space:nowrap），完整文本挂在 title 上悬停可见。
   // happy-dom 不解析截断样式，这里断言 title 属性；CSS 效果由 Playwright 渲染自检兜底。
   it('释义行挂 title，内容为完整释义文本', () => {

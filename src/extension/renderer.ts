@@ -4,7 +4,7 @@ import type { DictionaryResult } from '../core/dictionary'
 import type { BubbleSettings, RectLike } from '../core/types'
 
 export interface DictionaryRenderOptions {
-  /** 提供时在单词卡片右上角渲染朗读按钮（▶）。 */
+  /** 提供时在单词卡片右上角渲染朗读按钮（▶）；仅当「显示原文」开启时生效。 */
   onSpeak?: () => void
 }
 
@@ -60,8 +60,10 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
       replaceContent(nodes)
     },
     showDictionary(sourceWord, result, options) {
+      // 朗读按钮跟随「显示原文」：原文行隐藏时按钮没有落点，直接不渲染。
+      const speakable = Boolean(options?.onSpeak) && settings.showOriginal
       const nodes: Node[] = []
-      if (settings.showOriginal) nodes.push(wordNode(sourceWord, result.pronunciation, Boolean(options?.onSpeak)))
+      if (settings.showOriginal) nodes.push(wordNode(sourceWord, result.pronunciation, speakable))
       if (result.meanings.length) {
         for (const meaning of result.meanings) {
           const line = document.createElement('div')
@@ -82,14 +84,14 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
       }
       bubble.setAttribute('aria-busy', 'false')
       replaceContent(nodes)
-      if (options?.onSpeak) {
+      if (speakable) {
         // 按钮固定在卡片右上角（absolute 于 .content），不随音标长短 / 原文换行跳动
         const speak = document.createElement('button')
         speak.type = 'button'
         speak.className = 'speak'
         speak.title = '朗读'
         speak.textContent = '▶'
-        speak.addEventListener('click', options.onSpeak)
+        speak.addEventListener('click', () => options?.onSpeak?.())
         content.append(speak)
       }
     },
