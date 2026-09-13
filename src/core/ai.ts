@@ -1,7 +1,6 @@
 import { validateAiUrl } from './settings'
 import type { AiSchemeSettings } from './types'
 import { normalizeSourceText } from './text'
-import { buildPrompt } from './prompt'
 import { readRecord } from './read'
 
 export async function requestAiTranslation(text: string, settings: AiSchemeSettings, targetLanguage: string, signal?: AbortSignal): Promise<string> {
@@ -22,7 +21,7 @@ export async function requestAiTranslation(text: string, settings: AiSchemeSetti
       },
       body: JSON.stringify({
         model: settings.model,
-        messages: [{ role: 'user', content: buildPrompt(`请把下面内容翻译成${targetLanguage}，只返回译文，不要解释：\n\n{text}`, source) }],
+        messages: [{ role: 'user', content: `请把下面内容翻译成${targetLanguage}，只返回译文，不要解释：\n\n${source}` }],
         temperature: 0.1,
         stream: false,
       }),

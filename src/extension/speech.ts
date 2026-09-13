@@ -9,7 +9,7 @@ export function speakWord(word: string, accent: 'us' | 'uk'): void {
   playAudio(youdaoAudioUrl(word, accent)).catch(() => speakWithTts(word, accent))
 }
 
-export function speakWithTts(word: string, accent: 'us' | 'uk'): void {
+function speakWithTts(word: string, accent: 'us' | 'uk'): void {
   const synth = window.speechSynthesis
   if (!synth) return
   synth.cancel()

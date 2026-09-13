@@ -1,6 +1,5 @@
 import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import { isTargetLanguageText } from '../core/lang'
-import { LruCache } from '../core/lru'
 import type { ExtensionResponse } from '../core/messages'
 import { wordLookupDelay } from '../core/settings'
 import type { TranslationSettings } from '../core/types'
@@ -35,7 +34,7 @@ const SELECTION_DELAY = 90
 const CACHE_LIMIT = 80
 
 export function createInteraction(host: InteractionHost) {
-  const cache = new LruCache<string, ExtensionResponse>(CACHE_LIMIT)
+  const cache = new Map<string, ExtensionResponse>()
   const bindings: Array<{ target: EventTarget; type: string; listener: EventListener; options?: AddEventListenerOptions | undefined }> = []
   let currentRange: Range | null = null
   let currentText = ''
@@ -219,7 +218,10 @@ export function createInteraction(host: InteractionHost) {
       const response = await host.send(text, requestId, controller.signal)
       if (requestId !== activeRequest || text !== currentText) return
       // 只缓存成功响应：失败响应进缓存后重试会直接命中旧错误
-      if (response.ok) cache.set(cacheKey, response)
+      if (response.ok) {
+        cache.set(cacheKey, response)
+        while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!)
+      }
       renderResponse(response, text, range)
     } finally {
       if (pending?.requestId === requestId) {

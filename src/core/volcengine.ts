@@ -1,11 +1,11 @@
 import { readRecord, readText } from './read'
 import type { VolcengineSchemeSettings } from './types'
 
-export const VOLCENGINE_TRANSLATE_ENDPOINT = 'https://translate.volcengineapi.com'
-export const VOLCENGINE_TRANSLATE_ACTION = 'TranslateText'
-export const VOLCENGINE_TRANSLATE_VERSION = '2020-06-01'
-export const VOLCENGINE_TRANSLATE_SERVICE = 'translate'
-export const VOLCENGINE_DEFAULT_REGION = 'cn-north-1'
+const VOLCENGINE_TRANSLATE_ENDPOINT = 'https://translate.volcengineapi.com'
+const VOLCENGINE_TRANSLATE_ACTION = 'TranslateText'
+const VOLCENGINE_TRANSLATE_VERSION = '2020-06-01'
+const VOLCENGINE_TRANSLATE_SERVICE = 'translate'
+const VOLCENGINE_DEFAULT_REGION = 'cn-north-1'
 
 const VOLCENGINE_TIMEOUT_MS = 15000
 
@@ -45,7 +45,7 @@ export async function sha256Hex(value: string | Uint8Array): Promise<string> {
   return bytesToHex(new Uint8Array(digest))
 }
 
-export async function hmacSha256(value: string | Uint8Array, key: string | Uint8Array): Promise<Uint8Array> {
+async function hmacSha256(value: string | Uint8Array, key: string | Uint8Array): Promise<Uint8Array> {
   const keyBytes = typeof key === 'string' ? new TextEncoder().encode(key) : key
   const dataBytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
   const cryptoKey = await crypto.subtle.importKey('raw', keyBytes as unknown as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
@@ -142,7 +142,7 @@ export async function requestVolcengineTranslation(
   }
 }
 
-export function formatVolcengineDate(value: Date): string {
+function formatVolcengineDate(value: Date): string {
   const year = value.getUTCFullYear()
   const month = String(value.getUTCMonth() + 1).padStart(2, '0')
   const day = String(value.getUTCDate()).padStart(2, '0')
@@ -176,7 +176,7 @@ const VOLCENGINE_NUMERIC_CODES: Record<string, string> = {
   '100004': 'MissingRequestInfo',
 }
 
-export function describeVolcengineError(code: string, message: string): string {
+function describeVolcengineError(code: string, message: string): string {
   const named = VOLCENGINE_ERROR_GUIDES[code] ? code : VOLCENGINE_NUMERIC_CODES[code]
   const guide = named ? VOLCENGINE_ERROR_GUIDES[named] : ''
   return guide ? `火山引擎 ${code}：${guide}` : `火山引擎 ${code}：${message}`

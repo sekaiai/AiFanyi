@@ -3,7 +3,6 @@ import { handleMessage, broadcastSettingsUpdate } from '../../entrypoints/backgr
 import { browser } from 'wxt/browser'
 import { parseDictionaryResult, lookupDictionary } from '../../src/core/dictionary'
 import { isExtensionMessage } from '../../src/core/messages'
-import { buildPrompt } from '../../src/core/prompt'
 import { cloneDefaultSettings, SETTINGS_STORAGE_KEY } from '../../src/core/settings'
 import type { SchemeSettings } from '../../src/core/types'
 
@@ -64,12 +63,6 @@ describe('isExtensionMessage', () => {
 
   it('rejects messages without a request id', () => {
     expect(isExtensionMessage({ type: 'translation.cancel' })).toBe(false)
-  })
-})
-
-describe('buildPrompt', () => {
-  it('replaces every text placeholder in the prompt template', () => {
-    expect(buildPrompt('{text} => {text}', 'Hello')).toBe('Hello => Hello')
   })
 })
 

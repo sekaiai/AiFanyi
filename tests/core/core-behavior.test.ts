@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getBubblePlacement, getBubbleSizing } from '../../src/core/bubble'
 import { isTargetLanguageText } from '../../src/core/lang'
-import { buildPrompt } from '../../src/core/prompt'
 import {
   MAX_TRANSLATION_TEXT_LENGTH,
   cloneDefaultSettings,
@@ -173,11 +172,6 @@ describe('settings', () => {
     expect(isSiteBlocked('https://docs.example.com/page', ['*.example.com'])).toBe(true)
     expect(isSiteBlocked('https://example.com/page', ['example.com'])).toBe(true)
     expect(isSiteBlocked('not a url', ['example.com'])).toBe(false)
-  })
-
-  it('builds prompts even when the template has no placeholder', () => {
-    expect(buildPrompt('Translate: {text} / {text}', 'Hello')).toBe('Translate: Hello / Hello')
-    expect(buildPrompt('Translate this', 'Hello')).toContain('Hello')
   })
 })
 

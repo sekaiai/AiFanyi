@@ -53,13 +53,13 @@ const TARGET_CODES: Record<string, { deepl?: string; google: string }> = {
   'हिन्दी': { google: 'hi' },
 }
 
-export function deeplTargetCode(targetLanguage: string): string {
+function deeplTargetCode(targetLanguage: string): string {
   const codes = TARGET_CODES[targetLanguage]
   if (!codes?.deepl) throw new Error(`DeepL 不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
   return codes.deepl
 }
 
-export function googleTargetCode(targetLanguage: string): string {
+function googleTargetCode(targetLanguage: string): string {
   const codes = TARGET_CODES[targetLanguage]
   if (!codes) throw new Error(`Google 翻译不支持目标语言「${targetLanguage}」`)
   return codes.google

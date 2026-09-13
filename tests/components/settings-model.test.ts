@@ -3,12 +3,13 @@ import { defineComponent } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSettingsModel } from '../../src/composables/useSettingsModel'
 import { cloneDefaultSettings } from '../../src/core/settings'
-import type { SettingsStorageAdapter } from '../../src/core/storage'
 import type { TranslationSettings } from '../../src/core/types'
+
+type FakeStorage = Parameters<typeof useSettingsModel>[0]
 
 function createStorage(initial: TranslationSettings = cloneDefaultSettings()) {
   let current = structuredClone(initial)
-  const storage: SettingsStorageAdapter = {
+  const storage: FakeStorage = {
     load: vi.fn(async () => structuredClone(current)),
     save: vi.fn(async (settings) => {
       current = structuredClone(settings)
@@ -25,7 +26,7 @@ function createStorage(initial: TranslationSettings = cloneDefaultSettings()) {
 const SettingsHarness = defineComponent({
   props: {
     storage: {
-      type: Object as () => SettingsStorageAdapter,
+      type: Object as () => FakeStorage,
       required: true,
     },
   },

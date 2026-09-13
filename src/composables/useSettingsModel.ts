@@ -1,9 +1,13 @@
 import { computed, nextTick, onUnmounted, reactive, shallowRef, watch } from 'vue'
 import { cloneDefaultSettings, migrateSettings } from '../core/settings'
-import type { SettingsStorageAdapter } from '../core/storage'
 import type { TranslationSettings } from '../core/settings'
 
-export function useSettingsModel(storage: SettingsStorageAdapter) {
+export function useSettingsModel(storage: {
+  load(): Promise<TranslationSettings>
+  save(settings: TranslationSettings): Promise<void>
+  reset(): Promise<TranslationSettings>
+  subscribe(callback: (settings: TranslationSettings) => void): () => void
+}) {
   const settings = reactive<TranslationSettings>(cloneDefaultSettings())
   const loading = shallowRef(true)
   const saving = shallowRef(false)
