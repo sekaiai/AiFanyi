@@ -19,7 +19,9 @@ const DEEPL_PRO_ENDPOINT = 'https://api.deepl.com/v2/translate'
 const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t'
 const GOOGLE_CLOUD_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2'
 
-const TARGET_CODES: Record<string, { deepl: string; google: string }> = {
+// DeepL 保守收录确定支持的语言；不确定的（tr/th/vi/id/ms/hi）不收录，
+// 选中后显式报错由方案链顺延到下一方案，避免发出必然失败的请求。
+const TARGET_CODES: Record<string, { deepl?: string; google: string }> = {
   '简体中文': { deepl: 'ZH', google: 'zh-CN' },
   '繁體中文': { deepl: 'ZH', google: 'zh-TW' },
   'English': { deepl: 'EN', google: 'en' },
@@ -28,11 +30,39 @@ const TARGET_CODES: Record<string, { deepl: string; google: string }> = {
   'Français': { deepl: 'FR', google: 'fr' },
   'Deutsch': { deepl: 'DE', google: 'de' },
   'Español': { deepl: 'ES', google: 'es' },
+  'Português': { deepl: 'PT', google: 'pt' },
+  'Italiano': { deepl: 'IT', google: 'it' },
   'Русский': { deepl: 'RU', google: 'ru' },
+  'Nederlands': { deepl: 'NL', google: 'nl' },
+  'Polski': { deepl: 'PL', google: 'pl' },
+  'Türkçe': { google: 'tr' },
+  'العربية': { deepl: 'AR', google: 'ar' },
+  'ไทย': { google: 'th' },
+  'Tiếng Việt': { google: 'vi' },
+  'Bahasa Indonesia': { google: 'id' },
+  'Bahasa Melayu': { google: 'ms' },
+  'Ελληνικά': { deepl: 'EL', google: 'el' },
+  'Svenska': { deepl: 'SV', google: 'sv' },
+  'Dansk': { deepl: 'DA', google: 'da' },
+  'Suomi': { deepl: 'FI', google: 'fi' },
+  'Norsk': { deepl: 'NB', google: 'no' },
+  'Čeština': { deepl: 'CS', google: 'cs' },
+  'Magyar': { deepl: 'HU', google: 'hu' },
+  'Română': { deepl: 'RO', google: 'ro' },
+  'Українська': { deepl: 'UK', google: 'uk' },
+  'हिन्दी': { google: 'hi' },
 }
 
-function targetCodes(targetLanguage: string): { deepl: string; google: string } {
-  return TARGET_CODES[targetLanguage] ?? { deepl: 'ZH', google: 'zh-CN' }
+export function deeplTargetCode(targetLanguage: string): string {
+  const codes = TARGET_CODES[targetLanguage]
+  if (!codes?.deepl) throw new Error(`DeepL 不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
+  return codes.deepl
+}
+
+export function googleTargetCode(targetLanguage: string): string {
+  const codes = TARGET_CODES[targetLanguage]
+  if (!codes) throw new Error(`Google 翻译不支持目标语言「${targetLanguage}」`)
+  return codes.google
 }
 
 export type TranslateOutcome =
@@ -166,7 +196,7 @@ async function translateWithDeepl(
         'Content-Type': 'application/json',
         Authorization: `DeepL-Auth-Key ${scheme.authKey}`,
       },
-      body: JSON.stringify({ text: [source], target_lang: targetCodes(targetLanguage).deepl }),
+      body: JSON.stringify({ text: [source], target_lang: deeplTargetCode(targetLanguage) }),
     },
     signal,
   )
@@ -177,7 +207,7 @@ async function translateWithDeepl(
 }
 
 async function translateWithGoogle(source: string, targetLanguage: string, signal?: AbortSignal): Promise<string> {
-  const payload = await requestJsonWithTimeout(`${GOOGLE_FREE_ENDPOINT}&tl=${encodeURIComponent(targetCodes(targetLanguage).google)}`, {
+  const payload = await requestJsonWithTimeout(`${GOOGLE_FREE_ENDPOINT}&tl=${encodeURIComponent(googleTargetCode(targetLanguage))}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: new URLSearchParams({ q: source }).toString(),
@@ -199,7 +229,7 @@ async function translateWithGoogleCloud(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ q: source, target: targetCodes(targetLanguage).google, format: 'text' }),
+      body: JSON.stringify({ q: source, target: googleTargetCode(targetLanguage), format: 'text' }),
     },
     signal,
   )

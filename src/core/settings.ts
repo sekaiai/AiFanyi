@@ -18,7 +18,38 @@ export type { TranslationSettings } from './types'
 
 export const SETTINGS_STORAGE_KEY = 'aifanyi.settings.v1'
 export const MAX_TRANSLATION_TEXT_LENGTH = 5000
-export const TARGET_LANGUAGES = ['简体中文', '繁體中文', 'English', '日本語', '한국어', 'Français', 'Deutsch', 'Español', 'Русский'] as const
+/** 可选目标语言（各方案按自己的支持范围映射，不支持的方案会显式报错顺延）。 */
+export const TARGET_LANGUAGES = [
+  '简体中文',
+  '繁體中文',
+  'English',
+  '日本語',
+  '한국어',
+  'Français',
+  'Deutsch',
+  'Español',
+  'Português',
+  'Italiano',
+  'Русский',
+  'Nederlands',
+  'Polski',
+  'Türkçe',
+  'العربية',
+  'ไทย',
+  'Tiếng Việt',
+  'Bahasa Indonesia',
+  'Bahasa Melayu',
+  'Ελληνικά',
+  'Svenska',
+  'Dansk',
+  'Suomi',
+  'Norsk',
+  'Čeština',
+  'Magyar',
+  'Română',
+  'Українська',
+  'हिन्दी',
+] as const
 
 export const COLOR_PRESETS: Record<Exclude<BubbleColorPreset, 'custom'>, Pick<BubbleSettings, 'background' | 'textColor' | 'borderColor'>> = {
   paper: { background: '#fbfbfc', textColor: '#30323a', borderColor: '#d6dae1' },

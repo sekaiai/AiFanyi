@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cloneDefaultSettings } from '../../src/core/settings'
 import { hasRequiredConfig, runTranslation, translateWithScheme } from '../../src/core/translate'
-import { createBaiduSignature } from '../../src/core/baidu'
+import { baiduTargetCode, createBaiduSignature } from '../../src/core/baidu'
 import { md5Hex } from '../../src/core/md5'
 import { createVolcengineAuthorization, sha256Hex, volcengineTargetCode } from '../../src/core/volcengine'
 import type { SchemeSettings, TranslationSettings } from '../../src/core/types'
@@ -108,6 +108,52 @@ describe('Volcengine signing', () => {
   it('maps the traditional Chinese target to zh-Hant', () => {
     expect(volcengineTargetCode('繁體中文')).toBe('zh-Hant')
     expect(volcengineTargetCode('简体中文')).toBe('zh')
+  })
+})
+
+describe('target language mapping', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  it('maps the expanded target languages per provider', () => {
+    expect(baiduTargetCode('Tiếng Việt')).toBe('vie')
+    expect(baiduTargetCode('ไทย')).toBe('th')
+    expect(volcengineTargetCode('ไทย')).toBe('th')
+    expect(volcengineTargetCode('Tiếng Việt')).toBe('vi')
+    expect(volcengineTargetCode('Bahasa Indonesia')).toBe('id')
+  })
+
+  it('rejects unsupported targets with an explicit provider error', () => {
+    expect(() => baiduTargetCode('Bahasa Melayu')).toThrow('百度翻译不支持目标语言「Bahasa Melayu」')
+    expect(() => volcengineTargetCode('Polski')).toThrow('火山引擎不支持目标语言「Polski」')
+  })
+
+  it('fails a scheme locally when it cannot handle the target language', async () => {
+    await expect(translateWithScheme(deeplScheme, 'hello', 'ไทย')).rejects.toThrow('DeepL 不支持目标语言「ไทย」')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('translates with a Google target code for every listed language', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([[['สวัสดี']]]))
+
+    await expect(translateWithScheme(googleScheme, 'hello', 'ไทย')).resolves.toEqual({ kind: 'text', text: 'สวัสดี' })
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('tl=th')
+  })
+
+  it('falls through a provider-unsupported target to the next scheme', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([[['hai']]]))
+
+    const settings = settingsWithSchemes([baiduScheme, googleScheme])
+    // 百度不支持马来语：本地抛错顺延到 Google，不发出必然失败的百度请求
+    settings.targetLanguage = 'Bahasa Melayu'
+
+    await expect(runTranslation('hello', settings)).resolves.toEqual({ kind: 'text', text: 'hai' })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('tl=ms')
   })
 })
 

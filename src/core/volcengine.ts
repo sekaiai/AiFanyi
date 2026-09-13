@@ -17,17 +17,25 @@ const SIGNED_HEADERS = 'content-type;host;x-content-sha256;x-date'
 const TARGET_CODES: Record<string, string> = {
   '简体中文': 'zh',
   '繁體中文': 'zh-Hant',
-  English: 'en',
-  日本語: 'ja',
-  한국어: 'ko',
-  Français: 'fr',
-  Deutsch: 'de',
-  Español: 'es',
-  Русский: 'ru',
+  'English': 'en',
+  '日本語': 'ja',
+  '한국어': 'ko',
+  'Français': 'fr',
+  'Deutsch': 'de',
+  'Español': 'es',
+  'Português': 'pt',
+  'Italiano': 'it',
+  'Русский': 'ru',
+  'العربية': 'ar',
+  'ไทย': 'th',
+  'Tiếng Việt': 'vi',
+  'Bahasa Indonesia': 'id',
 }
 
 export function volcengineTargetCode(targetLanguage: string): string {
-  return TARGET_CODES[targetLanguage] ?? 'zh'
+  const code = TARGET_CODES[targetLanguage]
+  if (!code) throw new Error(`火山引擎不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
+  return code
 }
 
 export async function sha256Hex(value: string | Uint8Array): Promise<string> {

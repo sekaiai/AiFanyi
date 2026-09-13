@@ -7,17 +7,33 @@ const BAIDU_TIMEOUT_MS = 15000
 const BAIDU_TARGET_CODES: Record<string, string> = {
   '简体中文': 'zh',
   '繁體中文': 'cht',
-  English: 'en',
-  日本語: 'jp',
-  한국어: 'kor',
-  Français: 'fra',
-  Deutsch: 'de',
-  Español: 'spa',
-  Русский: 'ru',
+  'English': 'en',
+  '日本語': 'jp',
+  '한국어': 'kor',
+  'Français': 'fra',
+  'Deutsch': 'de',
+  'Español': 'spa',
+  'Português': 'pt',
+  'Italiano': 'it',
+  'Русский': 'ru',
+  'Nederlands': 'nl',
+  'Polski': 'pl',
+  'العربية': 'ara',
+  'ไทย': 'th',
+  'Tiếng Việt': 'vie',
+  'Ελληνικά': 'el',
+  'Svenska': 'swe',
+  'Dansk': 'dan',
+  'Suomi': 'fin',
+  'Čeština': 'csn',
+  'Magyar': 'hu',
+  'Română': 'rom',
 }
 
 export function baiduTargetCode(targetLanguage: string): string {
-  return BAIDU_TARGET_CODES[targetLanguage] ?? 'zh'
+  const code = BAIDU_TARGET_CODES[targetLanguage]
+  if (!code) throw new Error(`百度翻译不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
+  return code
 }
 
 export function createBaiduSignature(appId: string, text: string, salt: string, secretKey: string): string {

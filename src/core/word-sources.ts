@@ -56,7 +56,27 @@ const GOOGLE_TARGET_CODES: Record<string, string> = {
   'Français': 'fr',
   'Deutsch': 'de',
   'Español': 'es',
+  'Português': 'pt',
+  'Italiano': 'it',
   'Русский': 'ru',
+  'Nederlands': 'nl',
+  'Polski': 'pl',
+  'Türkçe': 'tr',
+  'العربية': 'ar',
+  'ไทย': 'th',
+  'Tiếng Việt': 'vi',
+  'Bahasa Indonesia': 'id',
+  'Bahasa Melayu': 'ms',
+  'Ελληνικά': 'el',
+  'Svenska': 'sv',
+  'Dansk': 'da',
+  'Suomi': 'fi',
+  'Norsk': 'no',
+  'Čeština': 'cs',
+  'Magyar': 'hu',
+  'Română': 'ro',
+  'Українська': 'uk',
+  'हिन्दी': 'hi',
 }
 
 const BING_TARGET_CODES: Record<string, string> = {
@@ -68,15 +88,39 @@ const BING_TARGET_CODES: Record<string, string> = {
   'Français': 'fr',
   'Deutsch': 'de',
   'Español': 'es',
+  'Português': 'pt',
+  'Italiano': 'it',
   'Русский': 'ru',
+  'Nederlands': 'nl',
+  'Polski': 'pl',
+  'Türkçe': 'tr',
+  'العربية': 'ar',
+  'ไทย': 'th',
+  'Tiếng Việt': 'vi',
+  'Bahasa Indonesia': 'id',
+  'Bahasa Melayu': 'ms',
+  'Ελληνικά': 'el',
+  'Svenska': 'sv',
+  'Dansk': 'da',
+  'Suomi': 'fi',
+  'Norsk': 'nb',
+  'Čeština': 'cs',
+  'Magyar': 'hu',
+  'Română': 'ro',
+  'Українська': 'uk',
+  'हिन्दी': 'hi',
 }
 
 function googleTargetCode(targetLanguage: string): string {
-  return GOOGLE_TARGET_CODES[targetLanguage] ?? 'zh-CN'
+  const code = GOOGLE_TARGET_CODES[targetLanguage]
+  if (!code) throw new Error(`Google Free 不支持目标语言「${targetLanguage}」`)
+  return code
 }
 
 function bingTargetCode(targetLanguage: string): string {
-  return BING_TARGET_CODES[targetLanguage] ?? 'zh-Hans'
+  const code = BING_TARGET_CODES[targetLanguage]
+  if (!code) throw new Error(`Bing 词典不支持目标语言「${targetLanguage}」`)
+  return code
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit, signal?: AbortSignal, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
