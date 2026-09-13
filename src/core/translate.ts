@@ -8,6 +8,7 @@ import type {
   AiSchemeSettings,
   DeeplSchemeSettings,
   GoogleCloudSchemeSettings,
+  SchemeOrder,
   SchemeSettings,
   TranslationSettings,
   WordSourceId,
@@ -74,6 +75,28 @@ export interface WordLookupContext {
   probe?: WordProbeState | null
 }
 
+export interface UsageSink {
+  onSentence?: (schemeId: string, chars: number) => void
+  onWord?: (chars: number) => void
+}
+
+/**
+ * 按用户选择的顺序重排方案链。
+ * random：Fisher-Yates 洗牌后仍依次尝试（等价「随机抽取一个，失败后从剩余中随机再抽」）。
+ * sequential：保持列表原序。不足 2 个方案时无需重排。
+ */
+export function orderSchemes(schemes: SchemeSettings[], order: SchemeOrder, random: () => number = Math.random): SchemeSettings[] {
+  if (order !== 'random' || schemes.length < 2) return schemes
+  const result = [...schemes]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    const tmp = result[i]!
+    result[i] = result[j]!
+    result[j] = tmp
+  }
+  return result
+}
+
 export function hasRequiredConfig(scheme: SchemeSettings): boolean {
   return describeMissingConfig(scheme) === null
 }
@@ -88,6 +111,8 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
     case 'googleCloud':
       return scheme.apiKey.trim() ? null : '请填写 API Key'
     case 'baidu':
+      return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
+    case 'baiduAi':
       return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
     case 'volcengine':
       return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
@@ -119,6 +144,8 @@ export async function translateWithScheme(
       return { kind: 'text', text: await translateWithGoogleCloud(scheme, source, targetLanguage, signal) }
     case 'baidu':
       return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
+    case 'baiduAi':
+      return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
     case 'volcengine':
       return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':
@@ -131,6 +158,7 @@ export async function runTranslation(
   settings: TranslationSettings,
   signal?: AbortSignal,
   wordContext?: WordLookupContext,
+  usage?: UsageSink,
 ): Promise<TranslateOutcome> {
   // 单词源池：划选单个单词时按已启用的免费源轮换（四源平级），不消耗「翻译方案」额度；
   // 全部源都失败（或一个都没启用）时回落方案链。
@@ -147,6 +175,7 @@ export async function runTranslation(
         accent: settings.word.accent,
         probe: wordContext?.probe ?? null,
       }, signal)
+      usage?.onWord?.(singleWord.length)
       return { kind: 'dictionary', result }
     } catch (error) {
       if (isAbortError(error)) throw error
@@ -154,13 +183,16 @@ export async function runTranslation(
     }
   }
 
-  const schemes = settings.schemes.filter((scheme) => scheme.enabled && hasRequiredConfig(scheme))
+  const schemes = orderSchemes(settings.schemes.filter((scheme) => scheme.enabled && hasRequiredConfig(scheme)), settings.schemeOrder)
+  const sourceChars = normalizeSourceText(text).length
   let schemeError: unknown = null
   let schemeTried = false
   for (const scheme of schemes) {
     schemeTried = true
     try {
-      return await translateWithScheme(scheme, text, settings.targetLanguage, signal)
+      const outcome = await translateWithScheme(scheme, text, settings.targetLanguage, signal)
+      usage?.onSentence?.(scheme.id, sourceChars)
+      return outcome
     } catch (error) {
       if (isAbortError(error)) throw error
       schemeError = error

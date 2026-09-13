@@ -56,15 +56,29 @@ export const SCHEME_GUIDES: Record<SchemeType, SchemeGuide> = {
   },
   baidu: {
     title: '百度翻译',
-    tagline: '中文场景稳，国内网络访问顺畅 · 标准版不限字符量',
+    tagline: '未认证每月 5 万字符、1QPS · 个人认证后每月 100 万字符、10QPS',
     steps: [
       '登录百度翻译开放平台，创建应用并开通「通用文本翻译」。',
       '复制页面生成的 AppID 和密钥。',
       '回到这里分别填入 AppID 与密钥（不同产品线的密钥不能混用）。',
-      '点「测试」，通过后可翻译句子与段落。',
+      '建议同时添加另一个百度翻译',
     ],
     links: [
       { label: '申请百度翻译服务', href: 'https://api.fanyi.baidu.com/product/11' },
+      { label: '管理控制台（拿 APPID / 密钥）', href: 'https://fanyi-api.baidu.com/manage/developer' },
+    ],
+  },
+  baiduAi: {
+    title: '百度大模型翻译',
+    tagline: '需认证 · 大模型文本翻译 100万字符测试额度（总） · 机器翻译 200万免费字符/月',
+    steps: [
+      '登录百度翻译开放平台，完成开发者认证并开通「大模型文本翻译」。',
+      '复制开发者信息页的 AppID 和密钥。',
+      '回到这里分别填入 AppID 与密钥；翻译模型默认机器翻译，可切换为大模型翻译。',
+      '保存后点「测试」，通过即可使用。',
+    ],
+    links: [
+      { label: '大模型文本翻译产品页', href: 'https://api.fanyi.baidu.com/product/133' },
       { label: '管理控制台（拿 APPID / 密钥）', href: 'https://fanyi-api.baidu.com/manage/developer' },
     ],
   },

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cloneDefaultSettings } from '../../src/core/settings'
-import { hasRequiredConfig, runTranslation, translateWithScheme } from '../../src/core/translate'
+import { orderSchemes, hasRequiredConfig, runTranslation, translateWithScheme } from '../../src/core/translate'
 import { baiduTargetCode, createBaiduSignature } from '../../src/core/baidu'
 import { md5Hex } from '../../src/core/md5'
 import { createVolcengineAuthorization, sha256Hex, volcengineTargetCode } from '../../src/core/volcengine'
@@ -24,6 +24,7 @@ const aiScheme: SchemeSettings = {
   id: 'ai-1',
   type: 'ai',
   enabled: true,
+  label: '',
   apiUrl: 'https://api.example.com/v1/chat/completions',
   apiKey: 'sk',
   model: 'test-model',
@@ -33,6 +34,9 @@ const aiScheme: SchemeSettings = {
 function settingsWithSchemes(schemes: SchemeSettings[], options?: { wordPool?: boolean }): TranslationSettings {
   const settings = cloneDefaultSettings()
   settings.schemes = schemes
+  // 固定为顺序模式：下面的用例验证「按列表顺序」的链式语义；
+  // 随机洗牌在 orderSchemes 的专属 describe 里用注入的随机数验证。
+  settings.schemeOrder = 'sequential'
   // 默认禁用全部单词源（等价旧的「单词池关闭」）：这里绝大多数用例验证的是「方案链」语义，
   // 全源禁用时池立即让位（不发请求，落到方案链）。单词池的行为在下面的专属 describe 里单独覆盖。
   if (!options?.wordPool) {
@@ -65,6 +69,28 @@ describe('hasRequiredConfig', () => {
     expect(hasRequiredConfig({ ...volcengineScheme, region: ' ' })).toBe(false)
     expect(hasRequiredConfig(aiScheme)).toBe(true)
     expect(hasRequiredConfig({ ...aiScheme, model: '' })).toBe(false)
+  })
+})
+
+describe('orderSchemes', () => {
+  const a: SchemeSettings = { ...deeplScheme, id: 'a' }
+  const b: SchemeSettings = { ...googleScheme, id: 'b' }
+  const c: SchemeSettings = { ...cloudScheme, id: 'c' }
+
+  it('keeps the list order for sequential mode', () => {
+    expect(orderSchemes([a, b, c], 'sequential')).toEqual([a, b, c])
+  })
+
+  it('shuffles deterministically with an injected random source', () => {
+    // random() 恒返 0：Fisher-Yates 每轮 j=0，两轮交换后得到 [b, c, a]
+    expect(orderSchemes([a, b, c], 'random', () => 0)).toEqual([b, c, a])
+    // random() 恒取最大：j 恒等于 i，等价于原序
+    expect(orderSchemes([a, b, c], 'random', () => 0.99)).toEqual([a, b, c])
+  })
+
+  it('leaves lists shorter than two untouched even in random mode', () => {
+    expect(orderSchemes([a], 'random', () => 0)).toEqual([a])
+    expect(orderSchemes([], 'random')).toEqual([])
   })
 })
 
@@ -219,6 +245,20 @@ describe('translateWithScheme', () => {
     expect(body.get('sign')).toMatch(/^[a-f0-9]{32}$/)
   })
 
+  it('signs Baidu AI requests with model_type against the aiTextTranslate endpoint', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ trans_result: [{ src: 'hello', dst: '你好' }] }))
+    const scheme: SchemeSettings = { id: 'baidu-ai-1', type: 'baiduAi', enabled: true, appId: 'app-id', secretKey: 'secret-key', modelType: 'llm' }
+
+    await expect(translateWithScheme(scheme, 'hello', '简体中文')).resolves.toEqual({ kind: 'text', text: '你好' })
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://fanyi-api.baidu.com/ait/api/aiTextTranslate')
+    const body = new URLSearchParams(String(requestInit(0).body))
+    expect(body.get('model_type')).toBe('llm')
+    expect(body.get('to')).toBe('zh')
+    const salt = body.get('salt') ?? ''
+    expect(body.get('sign')).toBe(createBaiduSignature('app-id', 'hello', salt, 'secret-key'))
+  })
+
   it('signs Volcengine requests and parses translated segments', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ TranslationList: [{ Translation: '你好' }, { Translation: '世界' }] }))
 
@@ -247,7 +287,7 @@ describe('translateWithScheme', () => {
 
     await expect(translateWithScheme(aiScheme, 'hello', '简体中文')).resolves.toEqual({ kind: 'text', text: '你好' })
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(aiScheme.apiUrl)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.example.com/v1/chat/completions')
   })
 
   it('rejects empty upstream payloads', async () => {
@@ -438,5 +478,70 @@ describe('runTranslation', () => {
     await expect(runTranslation('hello', settingsWithSchemes([deeplScheme]))).rejects.toThrow('HTTP 401')
     // 源全部禁用：池让位时不发请求，只有 DeepL 的 1 次调用
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('records word-pool hits through the usage sink', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([
+      {
+        pronunciations: [{ type: 'ipa', text: '/həˈloʊ/' }],
+        partOfSpeech: 'int.',
+        senses: [{ translations: [{ language: { code: 'zh' }, word: '你好' }] }],
+      },
+    ]))
+
+    const settings = settingsWithSchemes([], { wordPool: true })
+    settings.word.sources = { youdao: false, bing: false, google: false, freedictionaryapi: true }
+
+    const onSentence = vi.fn()
+    const onWord = vi.fn()
+    await runTranslation('hello', settings, undefined, undefined, { onSentence, onWord })
+
+    // 单词命中：只记单词用量（'hello' 共 5 字符），方案用量不动
+    expect(onWord).toHaveBeenCalledTimes(1)
+    expect(onWord).toHaveBeenCalledWith(5)
+    expect(onSentence).not.toHaveBeenCalled()
+  })
+
+  it('records only the winning scheme through the usage sink', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('error', { status: 500 }))
+      .mockResolvedValueOnce(jsonResponse([[['你好']]]))
+
+    const onSentence = vi.fn()
+    const outcome = await runTranslation('hello world', settingsWithSchemes([deeplScheme, googleScheme]), undefined, undefined, { onSentence })
+
+    expect(outcome).toEqual({ kind: 'text', text: '你好' })
+    // 记在成功的 Google 方案头上；失败的 DeepL 与重试次数都不额外计数
+    expect(onSentence).toHaveBeenCalledTimes(1)
+    expect(onSentence).toHaveBeenCalledWith('google-1', 11)
+  })
+
+  it('records only the scheme after every word pool source fails', async () => {
+    fetchMock
+      .mockResolvedValueOnce(new Response('down', { status: 503 }))
+      .mockResolvedValueOnce(new Response('down', { status: 503 }))
+      .mockResolvedValueOnce(jsonResponse({ translations: [{ text: '你好' }] }))
+
+    const settings = settingsWithSchemes([deeplScheme], { wordPool: true })
+    settings.word.sources = { youdao: true, bing: false, google: false, freedictionaryapi: true }
+
+    const onSentence = vi.fn()
+    const onWord = vi.fn()
+    await runTranslation('loved', settings, undefined, undefined, { onSentence, onWord })
+
+    // 池全败不算用量，最终由方案兜底成功时计一次
+    expect(onWord).not.toHaveBeenCalled()
+    expect(onSentence).toHaveBeenCalledTimes(1)
+    expect(onSentence).toHaveBeenCalledWith('deepl-1', 5)
+  })
+
+  it('does not record usage when the whole chain fails', async () => {
+    fetchMock.mockResolvedValue(new Response('error', { status: 500 }))
+
+    const onSentence = vi.fn()
+    await expect(runTranslation('hello world', settingsWithSchemes([deeplScheme]), undefined, undefined, { onSentence }))
+      .rejects.toThrow('HTTP 500')
+
+    expect(onSentence).not.toHaveBeenCalled()
   })
 })

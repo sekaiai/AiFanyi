@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { getBubblePlacement, getBubbleSizing } from '../../src/core/bubble'
 import { isTargetLanguageText } from '../../src/core/lang'
 import {
+  DEFAULT_GOOGLE_SCHEME,
   MAX_TRANSLATION_TEXT_LENGTH,
   cloneDefaultSettings,
   isSiteBlocked,
   migrateSettings,
+  resetToDefaults,
   validateAiUrl,
 } from '../../src/core/settings'
 import { classifySelection, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
@@ -87,7 +89,7 @@ describe('settings', () => {
     expect(migrated.hoverDelayMs).toBe(5000)
     expect(migrated.bubble.side).toBe('top')
     expect(migrated.bubble.gap).toBe(0)
-    expect(migrated.schemes).toEqual([])
+    expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
   })
 
   it('keeps expanded target languages during migration', () => {
@@ -121,7 +123,44 @@ describe('settings', () => {
 
   it('does not create a scheme when v1 AI settings are empty', () => {
     const migrated = migrateSettings({ ai: { apiUrl: '', apiKey: '', model: '', timeoutMs: 20000 } })
-    expect(migrated.schemes).toEqual([])
+    expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
+  })
+
+  it('seeds a default Google scheme for fresh installs', () => {
+    expect(cloneDefaultSettings().schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
+  })
+
+  it('resetToDefaults 只重置表单项，保留句子翻译与单词翻译卡片', () => {
+    const current = cloneDefaultSettings()
+    current.enabled = false
+    current.siteBlacklist = ['example.com']
+    current.hoverDelayMs = 700
+    current.bubble.fontSize = 20
+    current.targetLanguage = 'English'
+    current.schemeOrder = 'sequential'
+    current.schemes = [{
+      id: 'ai-x',
+      type: 'ai',
+      enabled: true,
+      label: '',
+      apiUrl: 'https://api.example.com/v1/chat/completions',
+      apiKey: 'sk-x',
+      model: 'm',
+      timeoutMs: 8000,
+    }]
+    current.word = { speakEnabled: false, accent: 'uk', sources: { youdao: false, bing: true, google: true, freedictionaryapi: true } }
+
+    const next = resetToDefaults(current)
+
+    expect(next.enabled).toBe(true)
+    expect(next.siteBlacklist).toEqual([])
+    expect(next.hoverDelayMs).toBe(200)
+    expect(next.bubble.fontSize).toBe(16)
+    expect(next.targetLanguage).toBe('English')
+    expect(next.schemeOrder).toBe('sequential')
+    expect(next.schemes).toEqual(current.schemes)
+    expect(next.word).toEqual(current.word)
+    expect(current.enabled).toBe(false)
   })
 
   it('drops unknown scheme types and backfills missing ids', () => {
@@ -144,6 +183,18 @@ describe('settings', () => {
     expect(migrated.schemes).toEqual([{ id: 'b1', type: 'baidu', enabled: true, appId: 'app', secretKey: 'key' }])
   })
 
+  it('keeps Baidu AI scheme credentials and clamps the model type during migration', () => {
+    const migrated = migrateSettings({
+      schemes: [{ id: 'ba1', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'llm' }],
+    })
+    expect(migrated.schemes).toEqual([{ id: 'ba1', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'llm' }])
+
+    const fallback = migrateSettings({
+      schemes: [{ id: 'ba2', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'nope' }],
+    })
+    expect(fallback.schemes[0]).toMatchObject({ type: 'baiduAi', modelType: 'nmt' })
+  })
+
   it('keeps Volcengine scheme credentials during migration', () => {
     const migrated = migrateSettings({
       schemes: [{ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' }],
@@ -151,10 +202,25 @@ describe('settings', () => {
     expect(migrated.schemes).toEqual([{ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' }])
   })
 
+  it('sanitizes custom AI scheme labels with trimming and a 50-char cap', () => {
+    const migrated = migrateSettings({
+      schemes: [
+        { id: 'ai1', type: 'ai', enabled: true, label: '  我的智谱  ', apiUrl: 'https://api.example.com', apiKey: 'k', model: 'm', timeoutMs: 20000 },
+        { id: 'ai2', type: 'ai', enabled: true, label: 'x'.repeat(80), apiUrl: 'https://api.example.com', apiKey: 'k', model: 'm', timeoutMs: 20000 },
+        { id: 'ai3', type: 'ai', enabled: true, apiUrl: 'https://api.example.com', apiKey: 'k', model: 'm', timeoutMs: 20000 },
+        { id: 'ai4', type: 'ai', enabled: true, label: 42, apiUrl: 'https://api.example.com', apiKey: 'k', model: 'm', timeoutMs: 20000 },
+      ],
+    })
+    expect(migrated.schemes[0]).toMatchObject({ type: 'ai', label: '我的智谱' })
+    expect((migrated.schemes[1] as { label: string }).label).toHaveLength(50)
+    expect((migrated.schemes[2] as { label: string }).label).toBe('')
+    expect((migrated.schemes[3] as { label: string }).label).toBe('')
+  })
+
   it('strips all provider credentials from content settings snapshots', () => {
     const settings = cloneDefaultSettings()
     settings.schemes = [
-      { id: 'a', type: 'ai', enabled: true, apiUrl: 'https://example.com', apiKey: 'secret', model: 'm', timeoutMs: 20000 },
+      { id: 'a', type: 'ai', enabled: true, label: '', apiUrl: 'https://example.com', apiKey: 'secret', model: 'm', timeoutMs: 20000 },
       { id: 'b', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-north-1' },
     ]
     const publicSettings = toContentSettings(settings)
@@ -218,5 +284,19 @@ describe('bubble placement', () => {
     expect(getBubbleSizing(40, 1920, 'top')).toEqual({ minWidth: 160, maxWidth: 290 })
     // 划词长句也不超过上限
     expect(getBubbleSizing(600, 1920, 'top')).toEqual({ minWidth: 0, maxWidth: 290 })
+  })
+
+  // 回归：句子翻译不受单词气泡 290px 封顶，宽度上限是选区所在块级容器宽度。
+  it('caps sentence bubbles at their container width instead of the 290px word cap', () => {
+    expect(getBubbleSizing(600, 1920, 'top', { sentenceContainerWidth: 800 })).toEqual({ minWidth: 0, maxWidth: 800 })
+    // 仍受视口留白（containerWidth - 16）约束
+    expect(getBubbleSizing(600, 800, 'top', { sentenceContainerWidth: 4000 })).toEqual({ minWidth: 0, maxWidth: 784 })
+    expect(getBubbleSizing(600, 1920, 'top', { sentenceContainerWidth: 120 })).toEqual({ minWidth: 0, maxWidth: 120 })
+    // 左右弹出维持单词气泡 290px 封顶
+    expect(getBubbleSizing(600, 1920, 'right', { sentenceContainerWidth: 800 })).toEqual({ minWidth: 160, maxWidth: 290 })
+    // 容器宽度测不出（0）时回退原行为
+    expect(getBubbleSizing(600, 1920, 'top', { sentenceContainerWidth: 0 })).toEqual({ minWidth: 0, maxWidth: 290 })
+    // 短选区（rangeWidth < 160）维持现状：160px 最小可读宽
+    expect(getBubbleSizing(80, 1920, 'top', { sentenceContainerWidth: 800 })).toEqual({ minWidth: 160, maxWidth: 290 })
   })
 })

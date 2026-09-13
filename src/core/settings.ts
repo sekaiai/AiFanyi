@@ -1,10 +1,13 @@
 import type {
   AiSchemeSettings,
+  BaiduAiSchemeSettings,
   BaiduSchemeSettings,
   BubbleColorPreset,
   BubbleSettings,
   DeeplSchemeSettings,
   GoogleCloudSchemeSettings,
+  GoogleSchemeSettings,
+  SchemeOrder,
   SchemeSettings,
   SchemeType,
   TranslationSettings,
@@ -80,6 +83,8 @@ export function wordLookupDelay(hoverDelayMs: number): number {
   return Math.max(hoverDelayMs, WORD_LOOKUP_MIN_DELAY_MS)
 }
 
+export const DEFAULT_GOOGLE_SCHEME: GoogleSchemeSettings = { id: 'default-google', type: 'google', enabled: true }
+
 export const DEFAULT_SETTINGS: TranslationSettings = {
   version: 2,
   enabled: true,
@@ -88,6 +93,7 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
   selectionEnabled: true,
   hoverDelayMs: 200,
   targetLanguage: '简体中文',
+  schemeOrder: 'random',
   bubble: {
     side: 'top',
     align: 'start',
@@ -109,16 +115,29 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     lineHeight: 1.55,
     textAlign: 'left',
   },
-  schemes: [],
+  schemes: [DEFAULT_GOOGLE_SCHEME],
   word: {
     speakEnabled: true,
     accent: 'us',
-    sources: { youdao: true, bing: true, google: true, freedictionaryapi: true },
+    sources: { youdao: true, bing: true, google: false, freedictionaryapi: false },
   },
 }
 
 export function cloneDefaultSettings(): TranslationSettings {
   return structuredClone(DEFAULT_SETTINGS)
+}
+
+/** 恢复默认：仅重置右侧表单项（启用/黑名单/触发/气泡/文字），保留句子翻译与单词翻译两张卡片的全部配置。 */
+export function resetToDefaults(current: TranslationSettings): TranslationSettings {
+  // 经 migrateSettings 深拷贝为纯数据，剥离 Vue 响应式代理
+  const preserved = migrateSettings(current)
+  return {
+    ...cloneDefaultSettings(),
+    schemes: preserved.schemes,
+    targetLanguage: preserved.targetLanguage,
+    schemeOrder: preserved.schemeOrder,
+    word: preserved.word,
+  }
 }
 
 export function uid(): string {
@@ -143,6 +162,7 @@ export function migrateSettings(value: unknown): TranslationSettings {
     selectionEnabled: readBoolean(input.selectionEnabled, defaults.selectionEnabled),
     hoverDelayMs: clampNumber(input.hoverDelayMs, 0, 5000, defaults.hoverDelayMs),
     targetLanguage: readEnum(input.targetLanguage, TARGET_LANGUAGES, defaults.targetLanguage),
+    schemeOrder: readEnum<SchemeOrder>(input.schemeOrder, ['random', 'sequential'], defaults.schemeOrder),
     siteBlacklist: Array.isArray(input.siteBlacklist)
       ? input.siteBlacklist.map((item) => String(item).trim()).filter(Boolean)
       : defaults.siteBlacklist,
@@ -197,6 +217,7 @@ function readSchemes(input: Record<string, unknown>, fallback: SchemeSettings[])
     id: uid(),
     type: 'ai',
     enabled: true,
+    label: readString(rawAi.label, '').trim().slice(0, 50),
     apiUrl,
     apiKey,
     model: readString(rawAi.model, ''),
@@ -240,6 +261,17 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
     }
     return scheme
   }
+  if (type === 'baiduAi') {
+    const scheme: BaiduAiSchemeSettings = {
+      id,
+      type,
+      enabled,
+      appId: readString(value.appId, ''),
+      secretKey: readString(value.secretKey, ''),
+      modelType: value.modelType === 'llm' ? 'llm' : 'nmt',
+    }
+    return scheme
+  }
   if (type === 'volcengine') {
     const scheme: VolcengineSchemeSettings = {
       id,
@@ -257,6 +289,7 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
       id,
       type,
       enabled,
+      label: readString(value.label, '').trim().slice(0, 50),
       apiUrl: readString(value.apiUrl, ''),
       apiKey: readString(value.apiKey, ''),
       model: readString(value.model, ''),
@@ -268,7 +301,7 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
 }
 
 function readSchemeType(value: unknown): SchemeType | null {
-  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'baidu' || value === 'volcengine' || value === 'ai' ? value : null
+  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'baidu' || value === 'baiduAi' || value === 'volcengine' || value === 'ai' ? value : null
 }
 
 export function validateAiUrl(url: string): string {

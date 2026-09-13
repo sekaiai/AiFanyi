@@ -30,7 +30,7 @@ export interface BubbleSettings {
   textAlign: BubbleTextAlign
 }
 
-export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'volcengine' | 'ai'
+export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'baiduAi' | 'volcengine' | 'ai'
 
 interface SchemeBase {
   id: string
@@ -59,6 +59,13 @@ export interface BaiduSchemeSettings extends SchemeBase {
   secretKey: string
 }
 
+export interface BaiduAiSchemeSettings extends SchemeBase {
+  type: 'baiduAi'
+  appId: string
+  secretKey: string
+  modelType: 'llm' | 'nmt'
+}
+
 export interface VolcengineSchemeSettings extends SchemeBase {
   type: 'volcengine'
   accessKeyId: string
@@ -68,16 +75,20 @@ export interface VolcengineSchemeSettings extends SchemeBase {
 
 export interface AiSchemeSettings extends SchemeBase {
   type: 'ai'
+  /** 自定义标题：用于方案列表与气泡中的显示名，留空回退为「自定义 AI」。 */
+  label: string
   apiUrl: string
   apiKey: string
   model: string
   timeoutMs: number
 }
 
-export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
+export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | BaiduAiSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
 
 export type WordSourceId = 'youdao' | 'bing' | 'google' | 'freedictionaryapi'
 export type WordAccent = 'us' | 'uk'
+
+export type SchemeOrder = 'random' | 'sequential'
 
 export interface WordQuerySettings {
   speakEnabled: boolean
@@ -93,6 +104,7 @@ export interface TranslationSettings {
   selectionEnabled: boolean
   hoverDelayMs: number
   targetLanguage: string
+  schemeOrder: SchemeOrder
   bubble: BubbleSettings
   schemes: SchemeSettings[]
   word: WordQuerySettings

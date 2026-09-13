@@ -6,6 +6,7 @@ const settings: AiSchemeSettings = {
   id: 'ai-1',
   type: 'ai',
   enabled: true,
+  label: '',
   apiUrl: 'https://api.example.com/v1/chat/completions',
   apiKey: 'sk-private',
   model: 'test-model',

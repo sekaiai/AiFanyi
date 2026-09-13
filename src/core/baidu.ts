@@ -1,8 +1,9 @@
 import { md5Hex } from './md5'
 import { readRecord } from './read'
-import type { BaiduSchemeSettings } from './types'
+import type { BaiduAiSchemeSettings, BaiduSchemeSettings } from './types'
 
 export const BAIDU_TRANSLATE_ENDPOINT = 'https://fanyi-api.baidu.com/api/trans/vip/translate'
+export const BAIDU_AI_ENDPOINT = 'https://fanyi-api.baidu.com/ait/api/aiTextTranslate'
 const BAIDU_TIMEOUT_MS = 15000
 
 const BAIDU_TARGET_CODES: Record<string, string> = {
@@ -43,10 +44,11 @@ export function createBaiduSignature(appId: string, text: string, salt: string, 
 
 export async function requestBaiduTranslation(
   text: string,
-  scheme: BaiduSchemeSettings,
+  scheme: BaiduSchemeSettings | BaiduAiSchemeSettings,
   targetLanguage: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  const isAi = scheme.type === 'baiduAi'
   const salt = `${Date.now()}${Math.floor(Math.random() * 1000)}`
   const body = new URLSearchParams({
     q: text,
@@ -55,11 +57,12 @@ export async function requestBaiduTranslation(
     appid: scheme.appId.trim(),
     salt,
     sign: createBaiduSignature(scheme.appId.trim(), text, salt, scheme.secretKey.trim()),
+    ...(isAi ? { model_type: scheme.modelType } : {}),
   })
   const timeout = new AbortController()
   const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), BAIDU_TIMEOUT_MS)
   try {
-    const response = await fetch(BAIDU_TRANSLATE_ENDPOINT, {
+    const response = await fetch(isAi ? BAIDU_AI_ENDPOINT : BAIDU_TRANSLATE_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
