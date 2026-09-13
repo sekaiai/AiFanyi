@@ -55,8 +55,6 @@ describe('parseYoudaoResult', () => {
   it('解析真实返回体：英美音标与词性释义（音频改为点击朗读时懒加载，结果不再携带）', () => {
     const result = parseYoudaoResult(YOUDAO_LOVED, 'loved', 'us')
 
-    expect(result.source).toBe('youdao')
-    expect(result.sourceLabel).toBe('有道词典')
     expect(result.pronunciation).toBe('/lʌvd/')
     expect(result.meanings).toEqual([
       { partOfSpeech: 'v.', translations: ['爱，热爱（love 的过去式和过去分词）'] },
@@ -117,7 +115,7 @@ describe('Bing 免密钥链路', () => {
 
     const result = await lookupWord('loved', { sources: ['bing'], targetLanguage: '简体中文', accent: 'us' })
 
-    expect(result).toMatchObject({ source: 'bing', pronunciation: '[lʌv]', meanings: [{ partOfSpeech: '', translations: ['被爱'] }] })
+    expect(result).toMatchObject({ pronunciation: '[lʌv]', meanings: [{ partOfSpeech: '', translations: ['被爱'] }] })
     const translateUrl = String(fetchMock.mock.calls[1]?.[0])
     expect(translateUrl).toContain('ttranslatev3')
     expect(translateUrl).toContain('IG=D1A2B3C4D5E6487F')
@@ -187,8 +185,6 @@ describe('lookupWord', () => {
       probe: { checkedAt: 1, results: { youdao: true, freedictionaryapi: false } },
     })
 
-    expect(result.source).toBe('freedictionaryapi')
-    expect(result.sourceLabel).toBe('freedictionaryapi')
     expect(result.pronunciation).toBe('/həˈloʊ/')
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
@@ -210,7 +206,8 @@ describe('lookupWord', () => {
       probe: { checkedAt: 1, results: { youdao: false } },
     })
 
-    expect(result.source).toBe('youdao')
+    // 唯一源探测为 false 仍发起了请求并成功返回（pronunciation 来自有道解析）
+    expect(result.pronunciation).toBe('/lʌvd/')
   })
 })
 

@@ -70,7 +70,6 @@ describe('createBubbleRenderer 原文显示', () => {
   it('原文行与词典原词的标题样式逐项一致', () => {
     renderer = createBubbleRenderer(bubbleSettings({ showOriginal: true }))
     renderer.showDictionary('loved', {
-      source: 'loved',
       pronunciation: '/lʌvd/',
       meanings: [{ partOfSpeech: 'v.', translations: ['爱；喜欢'] }],
     })
@@ -95,8 +94,6 @@ describe('createBubbleRenderer 原文显示', () => {
     renderer = createBubbleRenderer(bubbleSettings({ showOriginal: true }))
     let spoken = 0
     renderer.showDictionary('loved', {
-      source: 'youdao',
-      sourceLabel: '有道词典',
       pronunciation: '/lʌvd/',
       meanings: [{ partOfSpeech: 'v.', translations: ['爱，热爱'] }],
     }, { onSpeak: () => { spoken += 1 } })
@@ -114,8 +111,6 @@ describe('createBubbleRenderer 原文显示', () => {
   it('未传 onSpeak 时不渲染朗读按钮，原文行也不加 padding', () => {
     renderer = createBubbleRenderer(bubbleSettings({ showOriginal: true }))
     renderer.showDictionary('loved', {
-      source: 'freedictionaryapi',
-      sourceLabel: 'freedictionaryapi',
       pronunciation: '/lʌvd/',
       meanings: [{ partOfSpeech: 'v.', translations: ['爱；喜欢'] }],
     })
@@ -127,8 +122,6 @@ describe('createBubbleRenderer 原文显示', () => {
   it('showOriginal 为假时不渲染朗读按钮（即使传了 onSpeak）', () => {
     renderer = createBubbleRenderer(bubbleSettings({ showOriginal: false }))
     renderer.showDictionary('loved', {
-      source: 'youdao',
-      sourceLabel: '有道词典',
       pronunciation: '/lʌvd/',
       meanings: [{ partOfSpeech: 'v.', translations: ['爱，热爱'] }],
     }, { onSpeak: () => {} })
@@ -142,8 +135,6 @@ describe('createBubbleRenderer 原文显示', () => {
   it('释义行挂 title，内容为完整释义文本', () => {
     renderer = createBubbleRenderer(bubbleSettings({ showOriginal: true }))
     renderer.showDictionary('loved', {
-      source: 'youdao',
-      sourceLabel: '有道词典',
       pronunciation: '/lʌvd/',
       meanings: [
         { partOfSpeech: 'v.', translations: ['爱，热爱（love 的过去式和过去分词）'] },

@@ -8,25 +8,18 @@ export interface DictionaryMeaning {
 }
 
 export interface DictionaryResult {
-  source: string
   pronunciation: string
   meanings: DictionaryMeaning[]
-  /** 展示用源名（单词源池填充；词典兜底为 'freedictionaryapi'）。 */
-  sourceLabel?: string
 }
 
 export async function lookupDictionary(word: string, signal?: AbortSignal): Promise<DictionaryResult> {
   const init: RequestInit = signal ? { signal } : {}
   const response = await fetch(`${DICTIONARY_API_BASE}/entries/en/${encodeURIComponent(word.toLowerCase())}?translations=true`, init)
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  return parseDictionaryResult(word, await response.json())
+  return parseDictionaryResult(await response.json())
 }
 
-export function parseDictionaryResult(source: string, payload: unknown): DictionaryResult
-export function parseDictionaryResult(payload: unknown): DictionaryResult
-export function parseDictionaryResult(sourceOrPayload: string | unknown, maybePayload?: unknown): DictionaryResult {
-  const source = typeof sourceOrPayload === 'string' ? sourceOrPayload : ''
-  const payload = typeof sourceOrPayload === 'string' ? maybePayload : sourceOrPayload
+export function parseDictionaryResult(payload: unknown): DictionaryResult {
   const entries = Array.isArray(payload) ? payload : readArray(readRecord(payload).entries)
   let pronunciation = ''
   const meanings: DictionaryMeaning[] = []
@@ -38,7 +31,7 @@ export function parseDictionaryResult(sourceOrPayload: string | unknown, maybePa
     if (meanings.length >= 3) break
   }
 
-  return { source, pronunciation, meanings: meanings.slice(0, 3) }
+  return { pronunciation, meanings: meanings.slice(0, 3) }
 }
 
 function collectTranslatedSenses(entry: Record<string, unknown>, meanings: DictionaryMeaning[]): void {

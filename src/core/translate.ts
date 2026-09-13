@@ -4,7 +4,7 @@ import { requestVolcengineTranslation } from './volcengine'
 import { lookupDictionary } from './dictionary'
 import { readArray, readRecord, readText } from './read'
 import { extractSingleWord, normalizeSourceText } from './text'
-import { lookupWord, toFreeDictionaryResult, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
+import { lookupWord, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
   DeeplSchemeSettings,
@@ -171,7 +171,7 @@ export async function runTranslation(
   // 单词池关闭时保留老的词典兜底（池开着就不重复打 freedictionaryapi：刚在池里试过）。
   if (singleWord && !settings.word.enabled) {
     try {
-      return { kind: 'dictionary', result: toFreeDictionaryResult(await lookupDictionary(singleWord, signal)) }
+      return { kind: 'dictionary', result: await lookupDictionary(singleWord, signal) }
     } catch (error) {
       if (isAbortError(error)) throw error
       if (!schemeTried && !poolTried) throw error

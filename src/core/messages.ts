@@ -1,6 +1,6 @@
 import type { DictionaryResult } from './dictionary'
 import type { SchemeSettings, TranslationSettings } from './types'
-import type { WordProbeState, WordResult } from './word-sources'
+import type { WordProbeState } from './word-sources'
 
 export type RequestId = string | number
 
@@ -22,20 +22,10 @@ export type WordSourcesResponse =
   | { type: 'wordSources.probe'; requestId: RequestId; state: WordProbeState }
 
 export type ExtensionResponse =
-  | { ok: true; requestId: RequestId; kind: 'dictionary'; result: WordResult }
+  | { ok: true; requestId: RequestId; kind: 'dictionary'; result: DictionaryResult }
   | { ok: true; requestId: RequestId; kind: 'text'; result: string }
   | { ok: true; requestId: RequestId; kind: 'cancelled' | 'tested' }
   | { ok: false; requestId: RequestId; error: DisplayError }
-
-/** 词典兜底结果的兼容包装：老调用点手写响应体时补齐 WordResult 必需字段。 */
-export function dictionaryResponse(requestId: RequestId, result: DictionaryResult): ExtensionResponse {
-  return {
-    ok: true,
-    requestId,
-    kind: 'dictionary',
-    result: { ...result, source: 'freedictionaryapi', sourceLabel: 'freedictionaryapi' },
-  }
-}
 
 export interface DisplayError {
   code: 'cancelled' | 'bad_config' | 'disabled' | 'blacklisted' | 'http' | 'timeout' | 'empty' | 'parse' | 'network' | 'unknown'

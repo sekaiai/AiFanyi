@@ -36,7 +36,7 @@ describe('lookupDictionary', () => {
 
 describe('parseDictionaryResult', () => {
   it('extracts Chinese translations from sense translations', () => {
-    const result = parseDictionaryResult('context', {
+    const result = parseDictionaryResult({
       entries: [
         {
           pronunciations: [{ type: 'ipa', text: '/ˈkɑːntekst/' }],

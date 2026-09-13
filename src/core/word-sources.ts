@@ -23,11 +23,8 @@ export const WORD_SOURCE_LABELS: Record<WordSourceId, string> = {
   freedictionaryapi: 'freedictionaryapi',
 }
 
-/** 单词卡片结果：与 DictionaryResult 结构兼容，可直接喂给气泡的词典渲染。 */
-export interface WordResult extends DictionaryResult {
-  source: WordSourceId
-  sourceLabel: string
-}
+/** 单词卡片结果直接复用 DictionaryResult，可直接喂给气泡的词典渲染。 */
+export type WordResult = DictionaryResult
 
 /** 连通性探测快照。results 中缺失的源视为「未检测」。 */
 export interface WordProbeState {
@@ -160,8 +157,6 @@ export function parseYoudaoResult(payload: unknown, word: string, accent: 'us' |
     if (meanings.length >= 3) break
   }
   return {
-    source: 'youdao',
-    sourceLabel: WORD_SOURCE_LABELS.youdao,
     pronunciation,
     meanings,
   }
@@ -267,8 +262,6 @@ export async function lookupBing(word: string, targetLanguage: string, accent: '
   }
 
   return {
-    source: 'bing',
-    sourceLabel: WORD_SOURCE_LABELS.bing,
     pronunciation,
     meanings: [{ partOfSpeech: '', translations: [text] }],
   }
@@ -298,24 +291,9 @@ export async function lookupGoogleFree(word: string, targetLanguage: string, sig
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const text = parseGoogleTranslation(await response.json())
   return {
-    source: 'google',
-    sourceLabel: WORD_SOURCE_LABELS.google,
     pronunciation: '',
     meanings: [{ partOfSpeech: '', translations: [text] }],
   }
-}
-
-// ---------------------------------------------------------------------------
-// freedictionaryapi（中文释义 + IPA，与其他三源平级参与轮换）
-// ---------------------------------------------------------------------------
-
-export async function lookupFreeDictionary(word: string, signal?: AbortSignal): Promise<WordResult> {
-  const result = await lookupDictionary(word, signal)
-  return { ...result, source: 'freedictionaryapi', sourceLabel: WORD_SOURCE_LABELS.freedictionaryapi }
-}
-
-export function toFreeDictionaryResult(result: DictionaryResult): WordResult {
-  return { ...result, source: 'freedictionaryapi', sourceLabel: WORD_SOURCE_LABELS.freedictionaryapi }
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +317,7 @@ export async function fetchWordResult(source: WordSourceId, word: string, option
     case 'google':
       return lookupGoogleFree(word, options.targetLanguage, signal)
     case 'freedictionaryapi':
-      return lookupFreeDictionary(word, signal)
+      return lookupDictionary(word, signal)
   }
 }
 

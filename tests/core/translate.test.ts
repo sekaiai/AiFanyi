@@ -333,8 +333,6 @@ describe('runTranslation', () => {
     expect(outcome).toEqual({
       kind: 'dictionary',
       result: {
-        source: 'freedictionaryapi',
-        sourceLabel: 'freedictionaryapi',
         pronunciation: '/həˈloʊ/',
         meanings: [{ partOfSpeech: 'int.', translations: ['你好'] }],
       },
@@ -366,8 +364,6 @@ describe('runTranslation', () => {
     expect(outcome).toEqual({
       kind: 'dictionary',
       result: {
-        source: 'youdao',
-        sourceLabel: '有道词典',
         pronunciation: '/lʌvd/',
         meanings: [{ partOfSpeech: 'v.', translations: ['爱，热爱（love 的过去式和过去分词）'] }],
       },
