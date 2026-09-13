@@ -40,26 +40,21 @@ export function createBrowserSettingsStorage(): SettingsStorageAdapter {
  * out of this snapshot prevents provider credentials from entering webpage
  * execution contexts, even though the content script itself is isolated.
  */
-export function createContentSettingsStorage(): SettingsStorageAdapter {
-  return {
-    load: async () => {
-      try {
-        const response = await browser.runtime.sendMessage({ type: 'settings.public.request' }) as PublicSettingsResponse
-        return toContentSettings(migrateSettings(response?.settings))
-      } catch {
-        return toContentSettings(DEFAULT_SETTINGS)
-      }
-    },
-    save: async () => undefined,
-    reset: async () => toContentSettings(DEFAULT_SETTINGS),
-    subscribe: (callback) => {
-      const listener = (message: unknown) => {
-        if (isPublicSettingsUpdate(message)) callback(toContentSettings(migrateSettings(message.settings)))
-      }
-      browser.runtime.onMessage.addListener(listener)
-      return () => browser.runtime.onMessage.removeListener(listener)
-    },
+export async function loadContentSettings(): Promise<TranslationSettings> {
+  try {
+    const response = await browser.runtime.sendMessage({ type: 'settings.public.request' }) as PublicSettingsResponse
+    return toContentSettings(migrateSettings(response?.settings))
+  } catch {
+    return toContentSettings(DEFAULT_SETTINGS)
   }
+}
+
+export function watchContentSettings(callback: (settings: TranslationSettings) => void): () => void {
+  const listener = (message: unknown) => {
+    if (isPublicSettingsUpdate(message)) callback(toContentSettings(migrateSettings(message.settings)))
+  }
+  browser.runtime.onMessage.addListener(listener)
+  return () => browser.runtime.onMessage.removeListener(listener)
 }
 
 export function toContentSettings(settings: TranslationSettings): TranslationSettings {

@@ -1,19 +1,11 @@
 import { browser } from 'wxt/browser'
 import type { ContentScriptContext } from 'wxt/utils/content-script-context'
-import { getBubblePlacement, getBubbleSizing } from '../src/core/bubble'
-import { LruCache } from '../src/core/lru'
-import { isSiteBlocked, wordLookupDelay } from '../src/core/settings'
-import { createContentSettingsStorage } from '../src/extension/storage'
-import { classifySelection, getCaretFromPoint, getWordAtOffset, hasActiveSelection, isIgnorableElement, isSelectionIgnorableElement } from '../src/core/text'
-import { boundsFromRange, createBubbleRenderer } from '../src/extension/renderer'
-import { createHighlight, hideHighlight, showHighlight } from '../src/extension/highlight'
-import { speakWord } from '../src/extension/speech'
 import type { ExtensionResponse } from '../src/core/messages'
-import type { TranslationSettings } from '../src/core/types'
-
-const CLOSE_DELAY = 180
-const SELECTION_DELAY = 90
-const CACHE_LIMIT = 80
+import { isSiteBlocked } from '../src/core/settings'
+import { createHighlight } from '../src/extension/highlight'
+import { createInteraction } from '../src/extension/interaction'
+import { createBubbleRenderer } from '../src/extension/renderer'
+import { loadContentSettings, watchContentSettings } from '../src/extension/storage'
 
 export default defineContentScript({
   matches: ['http://*/*', 'https://*/*'],
@@ -26,260 +18,36 @@ export default defineContentScript({
 })
 
 async function run(ctx: ContentScriptContext): Promise<void> {
-  const storage = createContentSettingsStorage()
-  let settings = await storage.load()
+  let settings = await loadContentSettings()
   const renderer = createBubbleRenderer(settings.bubble)
   const highlight = createHighlight()
-  const cache = new LruCache<string, ExtensionResponse>(CACHE_LIMIT)
-  let currentRange: Range | null = null
-  let currentText = ''
-  let currentKind: 'dictionary' | 'ai' | null = null
-  let currentRequestId = ''
-  let inflightKey = ''
-  let currentInteraction: 'hover' | 'selection' | null = null
-  let hoveredTarget: { node: Text; start: number; end: number } | null = null
-  let pointerDown = false
-  let wordHovered = false
-  let bubbleHovered = false
-  let hoverTimer = 0
-  let closeTimer = 0
-  let selectionTimer = 0
-  let submitTimer = 0
+  // 交互状态机与演示页共享，这里只注入扩展端的差异：
+  // 消息通道收发 + 全页面生效（含站点黑名单检查）。
+  const interaction = createInteraction({
+    getSettings: () => settings,
+    renderer,
+    highlight,
+    isActive: (current) => current.enabled && !isSiteBlocked(location.href, current.siteBlacklist),
+    acceptHoverTarget: () => true,
+    acceptSelectTarget: () => true,
+    send: (text, requestId) =>
+      browser.runtime.sendMessage({ type: 'translation.request', requestId: `cs-${requestId}`, text }) as Promise<ExtensionResponse>,
+    cancel: (requestId) => {
+      void browser.runtime.sendMessage({ type: 'translation.cancel', requestId: `cs-${requestId}` })
+    },
+  })
 
-  const unsubscribe = storage.subscribe((next) => {
+  const unsubscribe = watchContentSettings((next) => {
     settings = next
-    renderer.applySettings(settings.bubble)
-    if (!isActive(settings)) close()
-    else if (currentRange && renderer.isVisible()) position(currentRange)
+    interaction.updateSettings(next)
   })
 
-  ctx.addEventListener(document, 'mousemove', (event) => {
-    const pointerEvent = event as MouseEvent
-    if (!isActive(settings) || !settings.hoverEnabled || pointerDown || hasActiveSelection()) {
-      leaveHoverWord()
-      return
-    }
-    if (renderer.root.contains(event.target as Node) || isIgnorableElement(event.target instanceof Element ? event.target : null)) {
-      leaveHoverWord()
-      return
-    }
-    const caret = getCaretFromPoint(pointerEvent.clientX, pointerEvent.clientY)
-    if (!caret || !(caret.node instanceof Text) || isIgnorableElement(caret.node.parentElement)) {
-      leaveHoverWord()
-      return
-    }
-    const word = getWordAtOffset(caret.node.textContent ?? '', caret.offset)
-    if (!word) {
-      leaveHoverWord()
-      return
-    }
-    const range = document.createRange()
-    range.setStart(caret.node, word.start)
-    range.setEnd(caret.node, word.end)
-    const rect = range.getBoundingClientRect()
-    if (!rect.width || !rect.height || pointerEvent.clientX < rect.left || pointerEvent.clientX > rect.right || pointerEvent.clientY < rect.top || pointerEvent.clientY > rect.bottom) {
-      leaveHoverWord()
-      return
-    }
-    wordHovered = true
-    window.clearTimeout(closeTimer)
-    if (hoveredTarget?.node === caret.node && hoveredTarget.start === word.start && hoveredTarget.end === word.end) return
-    hoveredTarget = { node: caret.node, start: word.start, end: word.end }
-    showHighlight(highlight, rect)
-    window.clearTimeout(hoverTimer)
-    hoverTimer = window.setTimeout(() => {
-      if (!wordHovered || hoveredTarget?.node !== caret.node) return
-      currentInteraction = 'hover'
-      currentKind = 'dictionary'
-      currentRange = range
-      currentText = word.word
-      void submit('dictionary', word.word, range)
-    }, wordLookupDelay(settings.hoverDelayMs))
-  }, true)
-
-  ctx.addEventListener(document, 'mousedown', () => {
-    pointerDown = true
-  }, true)
-
-  ctx.addEventListener(document, 'mouseup', () => {
-    pointerDown = false
-    window.clearTimeout(selectionTimer)
-    selectionTimer = window.setTimeout(handleSelection, SELECTION_DELAY)
-  }, true)
-
-  ctx.addEventListener(document, 'selectionchange', () => {
-    window.clearTimeout(selectionTimer)
-    selectionTimer = window.setTimeout(() => {
-      if (!pointerDown) handleSelection()
-    }, SELECTION_DELAY)
-  })
-
-  ctx.addEventListener(window, 'scroll', () => {
-    if (currentInteraction === 'hover') close()
-    else if (currentRange && renderer.isVisible()) position(currentRange)
-  }, true)
-
-  ctx.addEventListener(window, 'resize', () => {
-    if (currentRange && renderer.isVisible()) position(currentRange)
-  })
-
-  ctx.addEventListener(document, 'keydown', (event) => {
-    if ((event as KeyboardEvent).key === 'Escape') {
-      window.getSelection()?.removeAllRanges()
-      close()
-    }
-  }, true)
-
-  renderer.root.addEventListener('mouseenter', () => {
-    bubbleHovered = true
-    window.clearTimeout(closeTimer)
-  })
-  renderer.root.addEventListener('mouseleave', () => {
-    bubbleHovered = false
-    scheduleClose()
-  })
+  interaction.start()
 
   ctx.onInvalidated(() => {
     unsubscribe()
+    interaction.destroy()
     highlight.remove()
-    close()
     renderer.destroy()
   })
-
-  function handleSelection(): void {
-    if (!isActive(settings) || !settings.selectionEnabled) return
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      if (currentInteraction === 'selection') close()
-      return
-    }
-    const range = selection.getRangeAt(0).cloneRange()
-    const target = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement
-    // 显式划词比悬停宽松：pre/code 也允许翻译（悬停仍忽略代码区）
-    if (isSelectionIgnorableElement(target)) return
-    const action = classifySelection(selection.toString())
-    if (action.type === 'empty') return
-    window.clearTimeout(hoverTimer)
-    window.clearTimeout(submitTimer)
-    hideHighlight(highlight)
-    currentInteraction = 'selection'
-    currentKind = action.type
-    currentRange = range
-    currentText = action.text
-    // 划词查单词与悬停选词同一套延迟约束：遵守悬停延迟设置且最低 300ms；
-    // 句子 / 段落翻译保持即时（划词是主动操作）。
-    if (action.type === 'dictionary') {
-      submitTimer = window.setTimeout(() => void submit('dictionary', action.text, range), wordLookupDelay(settings.hoverDelayMs))
-    } else {
-      void submit(action.type, action.text, range)
-    }
-  }
-
-  async function submit(
-    kind: 'dictionary' | 'ai',
-    text: string,
-    range: Range,
-  ): Promise<void> {
-    const cacheKey = `${kind}:${text.toLowerCase()}`
-    // ponytail: 同文本同类型请求在途时直接复用，不重复发起消息
-    if (inflightKey === cacheKey) {
-      position(range)
-      return
-    }
-    abortRequest()
-    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    currentRequestId = requestId
-    const cached = cache.get(cacheKey)
-    if (cached) {
-      renderResponse(cached, text, range)
-      return
-    }
-    inflightKey = cacheKey
-    renderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', text)
-    position(range)
-    try {
-      const response = await browser.runtime.sendMessage({
-        type: 'translation.request',
-        requestId,
-        text,
-      }) as ExtensionResponse
-      if (response.requestId !== currentRequestId || text !== currentText) return
-      if (response.ok) cache.set(cacheKey, response)
-      renderResponse(response, text, range)
-    } finally {
-      if (inflightKey === cacheKey) inflightKey = ''
-    }
-  }
-
-  function renderResponse(
-    response: ExtensionResponse,
-    text: string,
-    range: Range,
-  ): void {
-    if (!response.ok) {
-      renderer.showError(response.error.message, response.error.retryable && currentKind ? () => void submit(currentKind!, text, range) : undefined)
-    } else if (response.kind === 'dictionary') {
-      const wordResult = response.result
-      const speakable = settings.word.enabled && settings.word.speakEnabled
-      renderer.showDictionary(text, wordResult, speakable
-        ? { onSpeak: () => speakWord(text, settings.word.accent) }
-        : undefined)
-    } else if (response.kind === 'text') {
-      renderer.showText(response.result, text)
-    }
-    position(range)
-  }
-
-  function position(range: Range): void {
-    const bounds = boundsFromRange(range)
-    if (!bounds) return
-    const sizing = getBubbleSizing(bounds.right - bounds.left, window.innerWidth, settings.bubble.side)
-    renderer.prepareForMeasure(sizing.minWidth, sizing.maxWidth)
-    const rect = renderer.root.getBoundingClientRect()
-    const placement = getBubblePlacement(bounds, rect.width, rect.height, window.innerWidth, window.innerHeight, settings.bubble)
-    renderer.applyPlacement(placement)
-  }
-
-  function leaveHoverWord(): void {
-    wordHovered = false
-    hoveredTarget = null
-    window.clearTimeout(hoverTimer)
-    hideHighlight(highlight)
-    if (currentInteraction === 'hover') scheduleClose()
-  }
-
-  function scheduleClose(): void {
-    if (currentInteraction !== 'hover') return
-    window.clearTimeout(closeTimer)
-    closeTimer = window.setTimeout(() => {
-      if (!wordHovered && !bubbleHovered) close()
-    }, CLOSE_DELAY)
-  }
-
-  function close(): void {
-    abortRequest()
-    window.clearTimeout(hoverTimer)
-    window.clearTimeout(submitTimer)
-    window.clearTimeout(closeTimer)
-    currentRange = null
-    currentText = ''
-    currentKind = null
-    currentInteraction = null
-    hoveredTarget = null
-    wordHovered = false
-    renderer.hide()
-    hideHighlight(highlight)
-  }
-
-  function abortRequest(): void {
-    inflightKey = ''
-    if (!currentRequestId) return
-    void browser.runtime.sendMessage({ type: 'translation.cancel', requestId: currentRequestId })
-    currentRequestId = ''
-  }
 }
-
-function isActive(settings: TranslationSettings): boolean {
-  return settings.enabled && !isSiteBlocked(location.href, settings.siteBlacklist)
-}
-
