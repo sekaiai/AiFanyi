@@ -62,34 +62,6 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
       <BubblePreview :settings="settings.bubble" />
     </section>
 
-    <section class="settings-section trigger-wide">
-      <h2 class="section-title">触发</h2>
-      <div class="hfields">
-        <label class="hfield"><span class="hlbl">全局启用</span><input v-model="settings.enabled" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">悬停翻译</span><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">选中翻译</span><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">显示原文</span><input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">显示箭头</span><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /></label>
-        <div class="hfield">
-          <span class="hlbl">悬停延迟<span class="hlbl-sub">单词查询最低 300ms</span></span>
-          <input
-            v-model.number="settings.hoverDelayMs"
-            type="range"
-            min="0"
-            max="5000"
-            step="50"
-            class="range-inline"
-            :style="{ '--fill': fillPct(settings.hoverDelayMs, 0, 5000) }"
-          />
-          <span class="range-val">{{ settings.hoverDelayMs }} ms</span>
-        </div>
-        <div class="hfield grow">
-          <span class="hlbl">站点黑名单<span class="hlbl-sub">每行一个域名</span></span>
-          <textarea v-model="blacklistText" class="blacklist" placeholder="example.com&#10;*.internal.example" />
-        </div>
-      </div>
-    </section>
-
     <section class="settings-section">
       <h2 class="section-title">位置</h2>
       <div class="control-grid two">
@@ -225,6 +197,34 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
           <span class="range-label">行高 <output>{{ settings.bubble.lineHeight }}</output></span>
           <input v-model.number="settings.bubble.lineHeight" type="range" min="1.2" max="2" step="0.05" :style="{ '--fill': fillPct(settings.bubble.lineHeight, 1.2, 2) }" />
         </label>
+      </div>
+    </section>
+
+    <section class="settings-section trigger-wide">
+      <h2 class="section-title">触发</h2>
+      <div class="hfields">
+        <label class="hfield"><span class="hlbl">全局启用</span><input v-model="settings.enabled" type="checkbox" class="checkbox" /></label>
+        <label class="hfield"><span class="hlbl">悬停翻译</span><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /></label>
+        <label class="hfield"><span class="hlbl">选中翻译</span><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /></label>
+        <label class="hfield"><span class="hlbl">显示原文</span><input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" /></label>
+        <label class="hfield"><span class="hlbl">显示箭头</span><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /></label>
+        <div class="hfield">
+          <span class="hlbl">悬停延迟<span class="hlbl-sub">单词查询最低 300ms</span></span>
+          <input
+            v-model.number="settings.hoverDelayMs"
+            type="range"
+            min="0"
+            max="5000"
+            step="50"
+            class="range-inline"
+            :style="{ '--fill': fillPct(settings.hoverDelayMs, 0, 5000) }"
+          />
+          <span class="range-val">{{ settings.hoverDelayMs }} ms</span>
+        </div>
+        <div class="hfield grow">
+          <span class="hlbl">站点黑名单<span class="hlbl-sub">每行一个域名</span></span>
+          <textarea v-model="blacklistText" class="blacklist" placeholder="example.com&#10;*.internal.example" />
+        </div>
       </div>
     </section>
   </form>
