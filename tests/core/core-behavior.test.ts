@@ -96,10 +96,13 @@ describe('settings', () => {
   })
 
   it('migrates the hover highlight color independently of presets', () => {
-    expect(cloneDefaultSettings().bubble.highlightColor).toBe('#4f84e8')
-    expect(migrateSettings({ bubble: { highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff8800')
+    expect(cloneDefaultSettings().bubble.highlightColor).toBe('#4f84e838')
+    // 旧版 6 位 hex 渲染时固定附加约 22% 透明度，迁移补上 alpha 位保持观感一致
+    expect(migrateSettings({ bubble: { highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff880038')
     // 颜色预设只覆盖气泡三色，不吞掉单词高亮色
-    expect(migrateSettings({ bubble: { colorPreset: 'night', highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff8800')
+    expect(migrateSettings({ bubble: { colorPreset: 'night', highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff880038')
+    // 新版 8 位 hex 自带透明度，迁移保持原样
+    expect(migrateSettings({ bubble: { highlightColor: '#ff880080' } }).bubble.highlightColor).toBe('#ff880080')
   })
 
   it('migrates v1 AI settings into an enabled scheme', () => {

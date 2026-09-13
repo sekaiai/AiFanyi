@@ -98,7 +98,7 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     showOriginal: true,
     colorPreset: 'paper',
     ...COLOR_PRESETS.paper,
-    highlightColor: '#4f84e8',
+    highlightColor: '#4f84e838',
     borderWidth: 1,
     radius: 8,
     shadow: 'soft',
@@ -131,6 +131,8 @@ export function migrateSettings(value: unknown): TranslationSettings {
   const rawBubble = isRecord(input.bubble) ? input.bubble : {}
   const defaults = cloneDefaultSettings()
   const bubble = { ...defaults.bubble, ...rawBubble } as BubbleSettings
+  // 旧版高亮色为 6 位 hex（渲染时固定附加约 22% 透明度）：迁移补上 alpha 位，让选择器显示与实际渲染一致。
+  if (typeof bubble.highlightColor === 'string' && /^#[0-9a-f]{6}$/i.test(bubble.highlightColor)) bubble.highlightColor += '38'
   const preset = bubble.colorPreset !== 'custom' && bubble.colorPreset in COLOR_PRESETS
     ? COLOR_PRESETS[bubble.colorPreset as Exclude<BubbleColorPreset, 'custom'>]
     : null

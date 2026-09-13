@@ -4,6 +4,7 @@ import { COLOR_PRESETS } from '../core/settings'
 import type { BubbleColorPreset, TranslationSettings, WordSourceId } from '../core/types'
 import { WORD_SOURCE_LABELS, type WordProbeState } from '../core/word-sources'
 import BubblePreview from './BubblePreview.vue'
+import ColorField from './ColorField.vue'
 
 const settings = defineModel<TranslationSettings>({ required: true })
 
@@ -65,6 +66,11 @@ function setColorPreset(value: BubbleColorPreset): void {
 
 function markCustomColor(): void {
   settings.value.bubble.colorPreset = 'custom'
+}
+
+function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: string): void {
+  settings.value.bubble[key] = value
+  markCustomColor()
 }
 
 </script>
@@ -204,10 +210,22 @@ function markCustomColor(): void {
             <option value="custom">自定义</option>
           </select>
         </label>
-        <label class="field"><span class="field-label">背景</span><input v-model="settings.bubble.background" type="color" @input="markCustomColor" /></label>
-        <label class="field"><span class="field-label">文字</span><input v-model="settings.bubble.textColor" type="color" @input="markCustomColor" /></label>
-        <label class="field"><span class="field-label">边框</span><input v-model="settings.bubble.borderColor" type="color" @input="markCustomColor" /></label>
-        <label class="field"><span class="field-label">单词高亮</span><input v-model="settings.bubble.highlightColor" type="color" /></label>
+        <label class="field">
+          <span class="field-label">背景</span>
+          <ColorField :model-value="settings.bubble.background" @update:model-value="setBubbleColor('background', $event)" />
+        </label>
+        <label class="field">
+          <span class="field-label">文字</span>
+          <ColorField :model-value="settings.bubble.textColor" @update:model-value="setBubbleColor('textColor', $event)" />
+        </label>
+        <label class="field">
+          <span class="field-label">边框</span>
+          <ColorField :model-value="settings.bubble.borderColor" @update:model-value="setBubbleColor('borderColor', $event)" />
+        </label>
+        <label class="field">
+          <span class="field-label">单词高亮</span>
+          <ColorField v-model="settings.bubble.highlightColor" />
+        </label>
         <label class="field">
           <span class="field-label">阴影</span>
           <select v-model="settings.bubble.shadow">
@@ -280,7 +298,7 @@ function markCustomColor(): void {
   min-width: 0;
 }
 
-.field :is(input:not([type="color"]), select, textarea) {
+.field :is(input, select, textarea) {
   width: 100%;
   min-width: 0;
   padding: 8px 10px;
@@ -291,15 +309,15 @@ function markCustomColor(): void {
   transition: border-color 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out;
 }
 
-.field :is(input:not([type="color"]), select) {
+.field :is(input, select) {
   min-height: 38px;
 }
 
-.field :is(input:not([type="color"]), select, textarea):hover {
+.field :is(input, select, textarea):hover {
   border-color: var(--af-control-border-hover);
 }
 
-.field :is(input:not([type="color"]), select, textarea):focus {
+.field :is(input, select, textarea):focus {
   border-color: var(--af-accent);
   outline: 0;
   box-shadow: 0 0 0 3px var(--af-focus-ring);
@@ -308,25 +326,6 @@ function markCustomColor(): void {
 .field textarea {
   min-height: 78px;
   resize: vertical;
-}
-
-.field input[type="color"] {
-  width: 100%;
-  height: 38px;
-  padding: 4px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  cursor: pointer;
-}
-
-.field input[type="color"]::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.field input[type="color"]::-webkit-color-swatch {
-  border: 0;
-  border-radius: 4px;
 }
 
 .button {

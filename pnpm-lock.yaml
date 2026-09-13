@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@simonwep/pickr':
+        specifier: ^1.10.2
+        version: 1.10.2
       vue:
         specifier: 3.5.42
         version: 3.5.42(typescript@5.9.2)
@@ -313,6 +316,9 @@ packages:
 
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
+
+  '@simonwep/pickr@1.10.2':
+    resolution: {integrity: sha512-R7t4ETDcZrM7unKWaHy3aMDUV4WL1TRVEWfKjy/orO4tRlWEPGDcUYZ75f5b0Qrmr2m7YeL0DOcEH6/zY+n5vQ==}
 
   '@topcli/prompts@4.0.0':
     resolution: {integrity: sha512-kkKYPb4k/6kRdnESt77B5vJrrYnYHIYczwv0P1c+tfN/IWEx3KZeKEHoUq7sImIyBEXWdA2uakIroD9pmRJziQ==}
@@ -2392,6 +2398,8 @@ snapshots:
     optional: true
 
   '@rolldown/pluginutils@1.0.1': {}
+
+  '@simonwep/pickr@1.10.2': {}
 
   '@topcli/prompts@4.0.0': {}
 

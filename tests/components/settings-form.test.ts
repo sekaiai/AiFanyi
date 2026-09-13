@@ -3,6 +3,7 @@ import { defineComponent, ref } from 'vue'
 import { describe, expect, it } from 'vitest'
 import SchemesSection from '../../src/components/SchemesSection.vue'
 import SettingsForm from '../../src/components/SettingsForm.vue'
+import ColorField from '../../src/components/ColorField.vue'
 import { cloneDefaultSettings, COLOR_PRESETS } from '../../src/core/settings'
 
 const SettingsHarness = defineComponent({
@@ -50,10 +51,10 @@ describe('SettingsForm', () => {
 
   it('marks the preset as custom after a color is edited', async () => {
     const wrapper = mount(SettingsHarness)
-    const colorInput = wrapper.find('input[type="color"]')
+    const colorField = wrapper.findComponent(ColorField)
 
-    await colorInput.setValue('#123456')
-    await colorInput.trigger('input')
+    colorField.vm.$emit('update:modelValue', '#123456')
+    await flushPromises()
 
     expect(wrapper.vm.settings.bubble.colorPreset).toBe('custom')
     expect(wrapper.vm.settings.bubble.background).toBe('#123456')

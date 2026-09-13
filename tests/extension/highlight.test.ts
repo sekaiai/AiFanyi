@@ -23,6 +23,13 @@ describe('word highlight', () => {
     expect(highlight.style.background).toBe('#4f84e838')
   })
 
+  it('passes through 8-digit hex with alpha as-is', () => {
+    const highlight = createHighlight()
+    showHighlight(highlight, { left: 0, top: 0, width: 1, height: 1 } as DOMRect, '#ff880080')
+
+    expect(highlight.style.background).toBe('#ff880080')
+  })
+
   it('uses the default color when none is given', () => {
     const highlight = createHighlight()
     showHighlight(highlight, { left: 0, top: 0, width: 1, height: 1 } as DOMRect)

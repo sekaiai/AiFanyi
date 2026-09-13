@@ -24,6 +24,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@simonwep/pickr": "^1.10.2",
     "vue": "3.5.42"
   },
   "devDependencies": {
