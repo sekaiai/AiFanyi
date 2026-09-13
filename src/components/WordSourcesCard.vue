@@ -151,10 +151,10 @@ const wordProbeTime = computed(() => {
   user-select: none;
 }
 
-/* 源行：【checkbox | 名称 | 延迟】，延迟恒显，一行排两个源 */
+/* 源行：【checkbox | 名称 | 延迟】，延迟恒显，一行排四个源 */
 .src-rows {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px 16px;
   margin-top: 10px;
 }
@@ -169,6 +169,7 @@ const wordProbeTime = computed(() => {
   font-size: 12px;
   cursor: pointer;
   user-select: none;
+  background-color: var(--af-page);
 }
 .src-row:hover {
   background: var(--af-control-hover);
@@ -179,7 +180,6 @@ const wordProbeTime = computed(() => {
   text-overflow: ellipsis;
 }
 .src-row .latency {
-  margin-left: auto;
   color: var(--af-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;

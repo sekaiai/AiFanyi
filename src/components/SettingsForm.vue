@@ -28,6 +28,13 @@ function fillPct(value: number, min: number, max: number): string {
   return `${Math.min(100, Math.max(0, pct))}%`
 }
 
+/** 悬停延迟文案：满 1 秒改用「s」单位，避免出现 4 位毫秒数撑宽文案。 */
+const hoverDelayText = computed(() => {
+  const ms = settings.value.hoverDelayMs
+  if (ms >= 1000) return `${Number((ms / 1000).toFixed(2))}s`
+  return `${ms}ms`
+})
+
 function setColorPreset(value: BubbleColorPreset): void {
   settings.value.bubble.colorPreset = value
   if (value !== 'custom') Object.assign(settings.value.bubble, COLOR_PRESETS[value])
@@ -184,7 +191,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
             </select>
           </label>
         </div>
-        <div class="control-grid two">
+        <div class="control-grid three">
           <label class="range-field">
             <span class="range-label">字号 <output>{{ settings.bubble.fontSize }} px</output></span>
             <input v-model.number="settings.bubble.fontSize" type="range" min="12" max="22" step="1" :style="{ '--fill': fillPct(settings.bubble.fontSize, 12, 22) }" />
@@ -200,13 +207,15 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
     <section class="settings-section trigger-wide">
       <h2 class="section-title">触发</h2>
       <div class="hfields">
-        <label class="hfield"><span class="hlbl">全局启用</span><input v-model="settings.enabled" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">悬停翻译</span><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">选中翻译</span><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">显示原文</span><input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" /></label>
-        <label class="hfield"><span class="hlbl">显示箭头</span><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /></label>
+        <div class="check-rows">
+          <label class="check-row"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>全局启用</span></label>
+          <label class="check-row"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>悬停翻译</span></label>
+          <label class="check-row"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>选中翻译</span></label>
+          <label class="check-row"><input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" /><span>显示原文</span></label>
+          <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>显示箭头</span></label>
+        </div>
         <div class="hfield">
-          <span class="hlbl">悬停延迟<span class="hlbl-sub">单词查询最低 300ms</span></span>
+          <span class="hlbl">鼠标悬停 <output class="delay-val">{{ hoverDelayText }}</output> 后显式翻译</span>
           <input
             v-model.number="settings.hoverDelayMs"
             type="range"
@@ -216,7 +225,6 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
             class="range-inline"
             :style="{ '--fill': fillPct(settings.hoverDelayMs, 0, 5000) }"
           />
-          <span class="range-val">{{ settings.hoverDelayMs }} ms</span>
         </div>
         <div class="hfield grow">
           <span class="hlbl">站点黑名单<span class="hlbl-sub">每行一个域名</span></span>
@@ -353,15 +361,36 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   flex: 1 1 100%;
   cursor: default;
 }
+/* 复选组：与「单词查询」源行同款芯片样式，空间足够时一排放下 5 个 */
+.check-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 4px 8px;
+  flex: 1 1 100%;
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  background-color: var(--af-page);
+}
+.check-row:hover {
+  background: var(--af-control-hover);
+}
 .range-inline {
   width: 130px;
 }
-.range-val {
-  flex: none;
-  width: 52px;
-  color: var(--af-muted);
-  font-size: 12px;
-  text-align: right;
+/* 数值槽位定宽 + 等宽数字：拖动时文案宽度不变，滑块不跳动 */
+.hfield .delay-val {
+  display: inline-block;
+  min-width: 44px;
   font-variant-numeric: tabular-nums;
 }
 textarea.blacklist {
