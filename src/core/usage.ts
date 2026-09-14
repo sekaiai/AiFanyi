@@ -1,6 +1,6 @@
 export const USAGE_STORAGE_KEY = 'aifanyi.usage.v1'
 
-export interface UsageCounter {
+interface UsageCounter {
   month: number
   monthChars: number
   total: number

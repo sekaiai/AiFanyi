@@ -9,11 +9,11 @@ export type ExtensionMessage =
   | { type: 'translation.cancel'; requestId: RequestId }
   | { type: 'settings.testScheme'; requestId: RequestId; scheme: SchemeSettings }
 
-export type PublicSettingsRequest = { type: 'settings.public.request' }
+type PublicSettingsRequest = { type: 'settings.public.request' }
 export type PublicSettingsUpdate = { type: 'settings.public.update'; settings: TranslationSettings }
 export type PublicSettingsResponse = { type: 'settings.public.response'; settings: TranslationSettings }
 
-export type WordSourcesMessage =
+type WordSourcesMessage =
   | { type: 'wordSources.state'; requestId: RequestId }
   | { type: 'wordSources.probe'; requestId: RequestId }
 

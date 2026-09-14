@@ -1,11 +1,11 @@
 import type { SchemeType } from './types'
 
-export interface SchemeGuideLink {
+interface SchemeGuideLink {
   label: string
   href: string
 }
 
-export interface SchemeGuide {
+interface SchemeGuide {
   title: string
   tagline: string
   steps: string[]

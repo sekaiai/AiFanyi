@@ -1,8 +1,8 @@
-export type BubbleSide = 'top' | 'bottom' | 'left' | 'right'
-export type BubbleAlign = 'start' | 'center' | 'end'
-export type BubbleTextAlign = 'left' | 'center' | 'right'
-export type BubbleFontFamily = 'system' | 'serif' | 'mono'
-export type BubbleShadow = 'none' | 'soft' | 'medium' | 'strong'
+type BubbleSide = 'top' | 'bottom' | 'left' | 'right'
+type BubbleAlign = 'start' | 'center' | 'end'
+type BubbleTextAlign = 'left' | 'center' | 'right'
+type BubbleFontFamily = 'system' | 'serif' | 'mono'
+type BubbleShadow = 'none' | 'soft' | 'medium' | 'strong'
 export type BubbleColorPreset = 'paper' | 'warm' | 'mint' | 'sky' | 'night' | 'custom'
 
 export interface BubbleSettings {

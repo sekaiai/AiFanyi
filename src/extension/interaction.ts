@@ -13,7 +13,7 @@ import { speakWord } from './speech'
  * 扩展端 content script 与演示页共用同一套状态机（定时器、防抖、缓存与渲染策略），
  * 只注入差异，避免两份手抄实现随时间漂移。
  */
-export interface InteractionHost {
+interface InteractionHost {
   getSettings(): TranslationSettings
   renderer: BubbleRenderer
   highlight: HTMLElement
@@ -317,5 +317,3 @@ export function createInteraction(host: InteractionHost) {
 
   return { start, destroy, updateSettings }
 }
-
-export type InteractionController = ReturnType<typeof createInteraction>

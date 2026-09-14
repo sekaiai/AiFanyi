@@ -3,7 +3,7 @@ import { bubbleCssVariables } from '../core/bubble'
 import type { DictionaryResult } from '../core/dictionary'
 import type { BubbleSettings, RectLike } from '../core/types'
 
-export interface DictionaryRenderOptions {
+interface DictionaryRenderOptions {
   /** 提供时在单词卡片右上角渲染朗读按钮（▶）；仅当「显示原文」开启时生效。 */
   onSpeak?: () => void
 }

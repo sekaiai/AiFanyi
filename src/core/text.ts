@@ -3,7 +3,7 @@ import { MAX_TRANSLATION_TEXT_LENGTH } from './settings'
 const WORD_RE = /[A-Za-z]+(?:[’'-][A-Za-z]+)*/g
 const SINGLE_WORD_RE = /^\s*([A-Za-z]+(?:[’'-][A-Za-z]+)*)[.!?,;:\s]*$/
 
-export type TextAction = { type: 'dictionary' | 'ai'; text: string } | { type: 'empty'; text: '' }
+type TextAction = { type: 'dictionary' | 'ai'; text: string } | { type: 'empty'; text: '' }
 
 export function classifySelection(text: string): TextAction {
   const normalized = normalizeSourceText(text)
