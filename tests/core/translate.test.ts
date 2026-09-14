@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cloneDefaultSettings } from '../../src/core/settings'
-import { orderSchemes, hasRequiredConfig, runTranslation, translateWithScheme } from '../../src/core/translate'
+import { orderSchemes, hasRequiredConfig, resetSchemeCooldown, runTranslation, translateWithScheme } from '../../src/core/translate'
+import { resetWordSourceCooldown } from '../../src/core/word-sources'
 import { baiduTargetCode, createBaiduSignature } from '../../src/core/baidu'
 import { md5Hex } from '../../src/core/md5'
 import { createVolcengineAuthorization, sha256Hex, volcengineTargetCode } from '../../src/core/volcengine'
@@ -52,6 +53,12 @@ function jsonResponse(payload: unknown, status = 200): Response {
 function requestInit(callIndex: number): RequestInit {
   return fetchMock.mock.calls[callIndex]?.[1] as RequestInit
 }
+
+beforeEach(() => {
+  // 失败冷却是模块级状态：每个用例前清空，避免用例间相互影响。
+  resetSchemeCooldown()
+  resetWordSourceCooldown()
+})
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -543,5 +550,129 @@ describe('runTranslation', () => {
       .rejects.toThrow('HTTP 500')
 
     expect(onSentence).not.toHaveBeenCalled()
+  })
+})
+
+describe('方案失败冷却', () => {
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // DeepL 恒失败、Google 恒成功：用于观测方案链的调用顺序与次数
+  const gateDeepL = async (url: string): Promise<Response> =>
+    url.includes('deepl') ? new Response('down', { status: 500 }) : jsonResponse([[['你好']]])
+
+  it('失败的方案在冷却期内被跳过', async () => {
+    fetchMock.mockImplementation(gateDeepL)
+    const settings = settingsWithSchemes([deeplScheme, googleScheme])
+
+    // 第一次：DeepL 失败进入冷却，Google 兜底成功
+    await expect(runTranslation('hello world', settings)).resolves.toEqual({ kind: 'text', text: '你好' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    // 第二次：DeepL 仍在冷却 → 只打 Google
+    fetchMock.mockClear()
+    await expect(runTranslation('hello world', settings)).resolves.toEqual({ kind: 'text', text: '你好' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('translate_a/single')
+  })
+
+  it('只有一个方案时失败也不跳过，按原逻辑照常调用', async () => {
+    fetchMock.mockResolvedValue(new Response('down', { status: 500 }))
+    const settings = settingsWithSchemes([deeplScheme])
+
+    await expect(runTranslation('hello world', settings)).rejects.toThrow('HTTP 500')
+    await expect(runTranslation('hello world', settings)).rejects.toThrow('HTTP 500')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('全部方案都在冷却时回退原逻辑，逐个照常调用', async () => {
+    fetchMock.mockResolvedValue(new Response('down', { status: 500 }))
+    const settings = settingsWithSchemes([deeplScheme, googleScheme])
+
+    await expect(runTranslation('hello world', settings)).rejects.toThrow('HTTP 500')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    // 过滤后为空（全部冷却）→ 回退原候选，不再跳过
+    fetchMock.mockClear()
+    await expect(runTranslation('hello world', settings)).rejects.toThrow('HTTP 500')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('方案成功后清除冷却，后续重新参与调用', async () => {
+    fetchMock.mockImplementation(gateDeepL)
+    const settings = settingsWithSchemes([deeplScheme, googleScheme])
+    await runTranslation('hello world', settings)
+
+    // 单方案（候选不足 2 个，不跳过）成功 → 清除 DeepL 的冷却
+    fetchMock.mockImplementation(async () => jsonResponse({ translations: [{ text: '你好' }] }))
+    await runTranslation('hello world', settingsWithSchemes([deeplScheme]))
+
+    fetchMock.mockClear()
+    await runTranslation('hello world', settings)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://api-free.deepl.com/v2/translate')
+  })
+
+  it('冷却到期后方案重新参与调用', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    fetchMock.mockImplementation(gateDeepL)
+    const settings = settingsWithSchemes([deeplScheme, googleScheme])
+    await runTranslation('hello world', settings)
+
+    // 冷却期内：只打 Google
+    fetchMock.mockClear()
+    await runTranslation('hello world', settings)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // 超过 10 分钟：DeepL 重新参与
+    vi.setSystemTime(new Date('2026-01-01T00:11:00Z'))
+    fetchMock.mockClear()
+    await runTranslation('hello world', settings)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('冷却期内手动测试成功清除冷却，下次翻译重新调用该方案', async () => {
+    fetchMock.mockImplementation(gateDeepL)
+    const settings = settingsWithSchemes([deeplScheme, googleScheme])
+
+    // 第一次：DeepL 失败进入冷却
+    await runTranslation('hello world', settings)
+
+    // 冷却期内：DeepL 被跳过，只打 Google
+    fetchMock.mockClear()
+    await runTranslation('hello world', settings)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // 用户手动测试成功 → 经 translateWithScheme 自动清除 DeepL 冷却
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValueOnce(jsonResponse({ translations: [{ text: 'ok' }] }))
+    await translateWithScheme(deeplScheme, 'hello', '简体中文')
+    fetchMock.mockImplementation(gateDeepL)
+
+    // 再次翻译：DeepL 重新排在首位参与调用
+    fetchMock.mockClear()
+    await runTranslation('hello world', settings)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://api-free.deepl.com/v2/translate')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('手动测试失败也进入冷却，下次翻译跳过该方案', async () => {
+    fetchMock.mockImplementation(gateDeepL)
+    const settings = settingsWithSchemes([deeplScheme, googleScheme])
+
+    // 手动测试 DeepL：失败 → 由 translateWithScheme 记入冷却
+    await expect(translateWithScheme(deeplScheme, 'hello', '简体中文')).rejects.toThrow('HTTP 500')
+
+    // 随后翻译：DeepL 被跳过，只打 Google
+    fetchMock.mockClear()
+    await expect(runTranslation('hello world', settings)).resolves.toEqual({ kind: 'text', text: '你好' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain('deepl')
   })
 })

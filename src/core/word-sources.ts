@@ -1,3 +1,4 @@
+import { createCooldownTracker, withoutCoolingDown } from './cooldown'
 import { lookupDictionary, type DictionaryMeaning, type DictionaryResult } from './dictionary'
 import { readArray, readRecord, readText } from './read'
 import { fetchWithTimeout } from './request'
@@ -35,6 +36,14 @@ export interface WordProbeState {
 }
 
 export const WORD_PROBE_STORAGE_KEY = 'aifanyi.wordProbe.v1'
+
+// 单词源失败冷却：请求失败的源 10 分钟内跳过（候选不足 2 个或全部冷却时回退原逻辑）。
+const sourceCooldown = createCooldownTracker()
+
+/** 清空单词源失败冷却记录（重置 / 测试用）。 */
+export function resetWordSourceCooldown(): void {
+  sourceCooldown.reset()
+}
 
 const REQUEST_TIMEOUT_MS = 8000
 const BING_DICT_TIMEOUT_MS = 6000
@@ -291,15 +300,20 @@ export function selectSourceOrder(enabled: readonly WordSourceId[], probe: WordP
 }
 
 export async function lookupWord(word: string, options: WordLookupOptions, signal?: AbortSignal): Promise<WordResult> {
-  const order = selectSourceOrder(options.sources, options.probe ?? null)
-  if (!order.length) throw new Error('未启用任何单词翻译源')
+  const candidates = selectSourceOrder(options.sources, options.probe ?? null)
+  if (!candidates.length) throw new Error('未启用任何单词翻译源')
+  // 冷却过滤：跳过冷却中的源；候选不足 2 个或全部冷却时回退原顺序。
+  const order = withoutCoolingDown(candidates, (source) => source, sourceCooldown)
   let lastError: unknown = null
   for (const source of order) {
     try {
-      return await fetchWordResult(source, word, options, signal)
+      const result = await fetchWordResult(source, word, options, signal)
+      sourceCooldown.succeed(source)
+      return result
     } catch (error) {
       // 只有外层取消才向上抛；单源超时/失败换下一个。
       if (signal?.aborted) throw error
+      sourceCooldown.fail(source)
       lastError = error
     }
   }

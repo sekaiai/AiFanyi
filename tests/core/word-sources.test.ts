@@ -8,6 +8,7 @@ import {
   parseYoudaoMeaningLine,
   parseYoudaoResult,
   probeWordSources,
+  resetWordSourceCooldown,
   selectSourceOrder,
   youdaoAudioUrl,
   type WordProbeState,
@@ -25,6 +26,8 @@ beforeEach(() => {
   // 否则上一个用例没消费完的队列会泄漏到下一个用例。
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  // 失败冷却是模块级状态：每个用例前清空，避免用例间相互影响。
+  resetWordSourceCooldown()
 })
 
 afterEach(() => {
@@ -227,5 +230,90 @@ describe('probeWordSources', () => {
       if (ok) expect(state.latency?.[source as WordSourceId]).toBeGreaterThanOrEqual(0)
       else expect(state.latency?.[source as WordSourceId]).toBeUndefined()
     }
+  })
+})
+
+describe('单词源失败冷却', () => {
+  // 有道恒失败、freedictionaryapi 恒成功：用于观测源池的调用顺序与次数
+  const gateYoudao = async (url: string): Promise<Response> =>
+    url.includes('youdao') ? new Response('down', { status: 503 }) : jsonResponse([
+      {
+        pronunciations: [{ type: 'ipa', text: '/həˈloʊ/' }],
+        partOfSpeech: 'int.',
+        senses: [{ translations: [{ language: { code: 'zh' }, word: '你好' }] }],
+      },
+    ])
+
+  // 探测把 youdao 固定到第一位（组内随机），mock 调用顺序才有确定性
+  const probe: WordProbeState = { checkedAt: 1, results: { youdao: true, freedictionaryapi: false } }
+  const options = { sources: ['youdao', 'freedictionaryapi'] as WordSourceId[], targetLanguage: '简体中文', accent: 'us' as const, probe }
+
+  it('失败的源在冷却期内被跳过', async () => {
+    fetchMock.mockImplementation(gateYoudao)
+
+    // 第一次：youdao 失败进入冷却，freedictionaryapi 兜底成功
+    await expect(lookupWord('hello', options)).resolves.toMatchObject({ pronunciation: '/həˈloʊ/' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    // 第二次：youdao 仍在冷却 → 只打 freedictionaryapi
+    fetchMock.mockClear()
+    await expect(lookupWord('hello', options)).resolves.toMatchObject({ pronunciation: '/həˈloʊ/' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('freedictionaryapi.com')
+  })
+
+  it('只有一个源时失败也不跳过，按原逻辑照常调用', async () => {
+    fetchMock.mockResolvedValue(new Response('boom', { status: 503 }))
+
+    await expect(lookupWord('hello', { sources: ['google'], targetLanguage: '简体中文', accent: 'us' })).rejects.toThrow('单词翻译失败：HTTP 503')
+    await expect(lookupWord('hello', { sources: ['google'], targetLanguage: '简体中文', accent: 'us' })).rejects.toThrow('单词翻译失败：HTTP 503')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('全部源都在冷却时回退原逻辑，逐个照常调用', async () => {
+    fetchMock.mockResolvedValue(new Response('boom', { status: 503 }))
+
+    await expect(lookupWord('hello', options)).rejects.toThrow('单词翻译失败：HTTP 503')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    // 过滤后为空（全部冷却）→ 回退原候选，不再跳过
+    fetchMock.mockClear()
+    await expect(lookupWord('hello', options)).rejects.toThrow('单词翻译失败：HTTP 503')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('冷却中的源经单源调用成功后清除冷却，后续重新参与', async () => {
+    fetchMock.mockImplementation(gateYoudao)
+    await lookupWord('hello', options)
+
+    // 单源（候选不足 2 个，不跳过）成功 → 清除 youdao 的冷却
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValueOnce(jsonResponse(YOUDAO_LOVED))
+    await lookupWord('loved', { sources: ['youdao'], targetLanguage: '简体中文', accent: 'us' })
+
+    // 再次双源查询：youdao 重新排首位并被调用
+    fetchMock.mockClear()
+    fetchMock.mockImplementation(gateYoudao)
+    await expect(lookupWord('hello', options)).resolves.toMatchObject({ pronunciation: '/həˈloʊ/' })
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('dict.youdao.com')
+  })
+
+  it('冷却到期后源重新参与调用', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    fetchMock.mockImplementation(gateYoudao)
+    await lookupWord('hello', options)
+
+    // 冷却期内：只打 freedictionaryapi
+    fetchMock.mockClear()
+    await lookupWord('hello', options)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // 超过 10 分钟：youdao 重新参与
+    vi.setSystemTime(new Date('2026-01-01T00:11:00Z'))
+    fetchMock.mockClear()
+    await lookupWord('hello', options)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
   })
 })

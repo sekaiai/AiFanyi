@@ -1,5 +1,6 @@
 import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
+import { createCooldownTracker, withoutCoolingDown } from './cooldown'
 import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
@@ -16,6 +17,8 @@ import type {
 } from './types'
 
 const SCHEME_TIMEOUT_MS = 15000
+// 方案失败冷却：请求失败的方案 10 分钟内跳过（候选不足 2 个或全部冷却时回退原逻辑）。
+const schemeCooldown = createCooldownTracker()
 const DEEPL_FREE_ENDPOINT = 'https://api-free.deepl.com/v2/translate'
 const DEEPL_PRO_ENDPOINT = 'https://api.deepl.com/v2/translate'
 const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t'
@@ -81,6 +84,11 @@ interface UsageSink {
   onWord?: (chars: number) => void
 }
 
+/** 清空方案失败冷却记录（重置 / 测试用）。 */
+export function resetSchemeCooldown(): void {
+  schemeCooldown.reset()
+}
+
 /**
  * 按用户选择的顺序重排方案链。
  * random：Fisher-Yates 洗牌后仍依次尝试（等价「随机抽取一个，失败后从剩余中随机再抽」）。
@@ -122,7 +130,27 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
 /** 各方案测试连通性时使用的固定探针文本。 */
 export const SCHEME_TEST_PHRASE = 'AiFanyi connection test.'
 
+/**
+ * 方案级调用：翻译链与手动测试的唯一共用入口。
+ * 冷却在此绑定——成功清除、失败（非 abort）进入冷却，调用方无需各自记录。
+ */
 export async function translateWithScheme(
+  scheme: SchemeSettings,
+  text: string,
+  targetLanguage: string,
+  signal?: AbortSignal,
+): Promise<TranslateOutcome> {
+  try {
+    const outcome = await dispatchScheme(scheme, text, targetLanguage, signal)
+    schemeCooldown.succeed(scheme.id)
+    return outcome
+  } catch (error) {
+    if (!isAbortError(error)) schemeCooldown.fail(scheme.id)
+    throw error
+  }
+}
+
+async function dispatchScheme(
   scheme: SchemeSettings,
   text: string,
   targetLanguage: string,
@@ -177,7 +205,8 @@ export async function runTranslation(
     }
   }
 
-  const schemes = orderSchemes(settings.schemes.filter((scheme) => scheme.enabled && hasRequiredConfig(scheme)), settings.schemeOrder)
+  const ordered = orderSchemes(settings.schemes.filter((scheme) => scheme.enabled && hasRequiredConfig(scheme)), settings.schemeOrder)
+  const schemes = withoutCoolingDown(ordered, (scheme) => scheme.id, schemeCooldown)
   const sourceChars = normalizeSourceText(text).length
   let schemeError: unknown = null
   let schemeTried = false
