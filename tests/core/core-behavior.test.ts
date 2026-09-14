@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getBubblePlacement, getBubbleSizing } from '../../src/core/bubble'
 import { isTargetLanguageText } from '../../src/core/lang'
 import {
+  COLOR_PRESETS,
   DEFAULT_GOOGLE_SCHEME,
   MAX_TRANSLATION_TEXT_LENGTH,
   cloneDefaultSettings,
@@ -103,14 +104,22 @@ describe('settings', () => {
     expect(migrateSettings({ targetLanguage: 'ไทย' }).targetLanguage).toBe('ไทย')
   })
 
-  it('migrates the hover highlight color independently of presets', () => {
-    expect(cloneDefaultSettings().bubble.highlightColor).toBe('#4f84e838')
+  it('migrates the hover highlight color with the color presets', () => {
+    expect(cloneDefaultSettings().bubble.highlightColor).toBe('#4f84e81c')
     // 旧版 6 位 hex 渲染时固定附加约 22% 透明度，迁移补上 alpha 位保持观感一致
+    expect(migrateSettings({ bubble: { colorPreset: 'custom', highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff880038')
+    // 旧版存档没有 colorPreset 字段：手改的高亮不得被缺省的 paper 预设吞掉
     expect(migrateSettings({ bubble: { highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff880038')
-    // 颜色预设只覆盖气泡三色，不吞掉单词高亮色
-    expect(migrateSettings({ bubble: { colorPreset: 'night', highlightColor: '#ff8800' } }).bubble.highlightColor).toBe('#ff880038')
+    // 高亮色属于配色预设：显式选择预设的存档迁移后跟随预设
+    expect(migrateSettings({ bubble: { colorPreset: 'night', highlightColor: '#ff8800' } }).bubble.highlightColor).toBe(COLOR_PRESETS.night.highlightColor)
     // 新版 8 位 hex 自带透明度，迁移保持原样
-    expect(migrateSettings({ bubble: { highlightColor: '#ff880080' } }).bubble.highlightColor).toBe('#ff880080')
+    expect(migrateSettings({ bubble: { colorPreset: 'custom', highlightColor: '#ff880080' } }).bubble.highlightColor).toBe('#ff880080')
+    // 迁移必须幂等：content script 会把 background 已迁移的结果再迁移一次，缺省补全的 paper 不得被当成显式选择去覆盖手改高亮
+    const once = migrateSettings({ bubble: { highlightColor: '#ff8800' } })
+    expect(migrateSettings(once).bubble.highlightColor).toBe('#ff880038')
+    // 未显式选预设的存档按颜色反推归属：手改高亮不匹配任何预设 → custom；纯默认配色 → paper
+    expect(once.bubble.colorPreset).toBe('custom')
+    expect(migrateSettings(undefined).bubble.colorPreset).toBe('paper')
   })
 
   it('migrates v1 AI settings into an enabled scheme', () => {

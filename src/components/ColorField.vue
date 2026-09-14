@@ -75,4 +75,9 @@ onBeforeUnmount(() => {
 .pcr-app {
   font-size: 18px;
 }
+
+.pcr-app[data-theme=nano] .pcr-selection .pcr-color-palette .pcr-palette::before,
+.pickr .pcr-button::before{
+  background-size: 0.86em
+}
 </style>

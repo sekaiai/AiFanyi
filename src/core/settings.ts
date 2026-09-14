@@ -55,12 +55,12 @@ export const TARGET_LANGUAGES = [
   'हिन्दी',
 ] as const
 
-export const COLOR_PRESETS: Record<Exclude<BubbleColorPreset, 'custom'>, Pick<BubbleSettings, 'background' | 'textColor' | 'borderColor'>> = {
-  paper: { background: '#fbfbfc', textColor: '#30323a', borderColor: '#d6dae1' },
-  warm: { background: '#fff8df', textColor: '#352b17', borderColor: '#ead38f' },
-  mint: { background: '#effcf6', textColor: '#18352a', borderColor: '#a8dfc5' },
-  sky: { background: '#eff7ff', textColor: '#1d3047', borderColor: '#a9caeb' },
-  night: { background: '#20242d', textColor: '#f2f5f8', borderColor: '#495160' },
+export const COLOR_PRESETS: Record<Exclude<BubbleColorPreset, 'custom'>, Pick<BubbleSettings, 'background' | 'textColor' | 'borderColor' | 'highlightColor'>> = {
+  paper: { background: '#fbfbfc', textColor: '#30323a', borderColor: '#d6dae1', highlightColor: '#4f84e81c' },
+  warm: { background: '#fff8df', textColor: '#352b17', borderColor: '#ead38f', highlightColor: '#e8964f1c' },
+  mint: { background: '#effcf6', textColor: '#18352a', borderColor: '#a8dfc5', highlightColor: '#3fae7f1c' },
+  sky: { background: '#eff7ff', textColor: '#1d3047', borderColor: '#a9caeb', highlightColor: '#4f84e81c' },
+  night: { background: '#20242d', textColor: '#f2f5f8', borderColor: '#495160', highlightColor: '#6f9ff21c' },
 }
 
 export const FONT_STACKS: Record<BubbleSettings['fontFamily'], string> = {
@@ -106,7 +106,6 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     showOriginal: true,
     colorPreset: 'paper',
     ...COLOR_PRESETS.paper,
-    highlightColor: '#4f84e838',
     borderWidth: 1,
     radius: 8,
     shadow: 'soft',
@@ -167,6 +166,15 @@ function pickBubbleFields(raw: Record<string, unknown>): Partial<BubbleSettings>
   return picked as Partial<BubbleSettings>
 }
 
+const PRESET_COLOR_KEYS = ['background', 'textColor', 'borderColor', 'highlightColor'] as const
+
+/** 按四项颜色反推配色预设归属：与某预设完全一致归该预设，否则视为自定义。 */
+function inferColorPreset(bubble: BubbleSettings): BubbleColorPreset {
+  const match = (Object.keys(COLOR_PRESETS) as Exclude<BubbleColorPreset, 'custom'>[])
+    .find((key) => PRESET_COLOR_KEYS.every((field) => bubble[field] === COLOR_PRESETS[key][field]))
+  return match ?? 'custom'
+}
+
 export function migrateSettings(value: unknown): TranslationSettings {
   const input = isRecord(value) ? value : {}
   const rawBubble = isRecord(input.bubble) ? input.bubble : {}
@@ -174,9 +182,18 @@ export function migrateSettings(value: unknown): TranslationSettings {
   const bubble = { ...defaults.bubble, ...pickBubbleFields(rawBubble) } as BubbleSettings
   // 旧版高亮色为 6 位 hex（渲染时固定附加约 22% 透明度）：迁移补上 alpha 位，让选择器显示与实际渲染一致。
   if (typeof bubble.highlightColor === 'string' && /^#[0-9a-f]{6}$/i.test(bubble.highlightColor)) bubble.highlightColor += '38'
-  const preset = bubble.colorPreset !== 'custom' && bubble.colorPreset in COLOR_PRESETS
-    ? COLOR_PRESETS[bubble.colorPreset as Exclude<BubbleColorPreset, 'custom'>]
+  // 预设判定用存档原值：旧版存档没有 colorPreset 字段（会被缺省补成 paper），不得因此吞掉手改的高亮；
+  // 仅当存档显式选择了某个预设时，高亮才随预设配色一起刷新。
+  const rawPreset = typeof rawBubble.colorPreset === 'string' ? rawBubble.colorPreset : ''
+  const preset = rawPreset !== 'custom' && rawPreset in COLOR_PRESETS
+    ? COLOR_PRESETS[rawPreset as Exclude<BubbleColorPreset, 'custom'>]
     : null
+  // colorPreset 归属必须幂等：content script 会把 background 已迁移的结果再迁移一次。
+  // 存档未显式选预设时不沿用缺省补全的 paper，而是按颜色反推归属（custom 不会被预设覆盖），
+  // 否则二次迁移会把第一次迁移保下来的手改高亮刷成预设色。
+  const colorPreset = rawPreset === 'custom' || rawPreset in COLOR_PRESETS
+    ? rawPreset as BubbleColorPreset
+    : inferColorPreset(bubble)
 
   return {
     version: 2,
@@ -193,6 +210,7 @@ export function migrateSettings(value: unknown): TranslationSettings {
     bubble: {
       ...bubble,
       ...(preset ?? {}),
+      colorPreset,
       side: readEnum(bubble.side, ['top', 'bottom', 'left', 'right'], defaults.bubble.side),
       align: readEnum(bubble.align, ['start', 'center', 'end'], defaults.bubble.align),
       gap: clampNumber(bubble.gap, 0, 48, defaults.bubble.gap),
