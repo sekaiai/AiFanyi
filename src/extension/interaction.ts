@@ -221,7 +221,13 @@ export function createInteraction(host: InteractionHost) {
     const controller = new AbortController()
     pending = { requestId, controller }
     inflightKey = cacheKey
-    host.renderer.showLoading(kind === 'dictionary' ? '正在查询释义...' : '正在翻译...', text)
+    const settings = host.getSettings()
+    // 加载态原词行跟随所属类型：单词看 word.showOriginal，句子看 bubble.showOriginal
+    host.renderer.showLoading(
+      kind === 'dictionary' ? '正在查询释义...' : '正在翻译...',
+      text,
+      kind === 'dictionary' ? settings.word.showOriginal : settings.bubble.showOriginal,
+    )
     position(range)
     try {
       const response = await host.send(text, requestId, controller.signal)
@@ -247,9 +253,10 @@ export function createInteraction(host: InteractionHost) {
       host.renderer.showError(response.error.message, response.error.retryable && kind ? () => void submit(kind, text, range) : undefined)
     } else if (response.kind === 'dictionary') {
       const speakable = settings.word.speakEnabled
-      host.renderer.showDictionary(text, response.result, speakable
-        ? { onSpeak: () => speakWord(text, settings.word.accent) }
-        : undefined)
+      host.renderer.showDictionary(text, response.result, {
+        showOriginal: settings.word.showOriginal,
+        ...(speakable ? { onSpeak: () => speakWord(text, settings.word.accent) } : {}),
+      })
     } else if (response.kind === 'text') {
       host.renderer.showText(response.result, text)
     }

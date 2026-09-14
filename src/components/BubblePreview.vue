@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { bubbleCssVariables, getBubblePlacement, getBubbleSizing } from '../core/bubble'
-import type { BubbleSettings } from '../core/types'
+import type { BubbleSettings, WordQuerySettings } from '../core/types'
 
 const props = defineProps<{
   settings: BubbleSettings
+  /** 预览的是单词卡片：原词行与朗读按钮跟随 word.showOriginal（与句子开关独立）。 */
+  word: WordQuerySettings
 }>()
 
 const stageRef = useTemplateRef<HTMLElement>('stage')
@@ -82,7 +84,7 @@ onMounted(() => {
 
 onUnmounted(() => observer?.disconnect())
 
-watch(() => props.settings, async () => {
+watch([() => props.settings, () => props.word], async () => {
   await nextTick()
   measure()
 }, { deep: true, flush: 'post' })
@@ -93,12 +95,12 @@ watch(() => props.settings, async () => {
     <span ref="source" class="preview-source" :style="sourcePosition">loved</span>
     <div ref="bubble" class="preview-bubble" data-testid="bubble-preview" :data-side="placement.side" :data-arrow="String(settings.showArrow)" :style="bubbleStyle">
       <div class="preview-content">
-        <div v-if="settings.showOriginal" class="preview-word">
+        <div v-if="word.showOriginal" class="preview-word">
           loved<span class="preview-pronunciation">/lʌvd/</span>
         </div>
         <div class="preview-result"><span class="preview-pos">v.</span>爱；喜欢</div>
-        <!-- 与真实气泡的朗读按钮一致：仅「显示原文」开启时渲染 -->
-        <span v-if="settings.showOriginal" class="preview-speak" aria-hidden="true">▶</span>
+        <!-- 与真实气泡的朗读按钮一致：仅单词「显示原文」开启时渲染 -->
+        <span v-if="word.showOriginal" class="preview-speak" aria-hidden="true">▶</span>
       </div>
       <span class="preview-arrow" aria-hidden="true"></span>
     </div>

@@ -171,7 +171,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
             data-testid="sync-toggle"
             @change="emit('toggleSync', ($event.target as HTMLInputElement).checked)"
           />
-          <span class="field-label">同步到浏览器账号</span>
+          <span>同步到浏览器账号</span>
         </label>
       </div>
     </div>
@@ -285,9 +285,19 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
+/* 与「单词翻译」源行同款芯片样式 */
 .sync-field {
+  min-height: 26px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 14px;
+  white-space: nowrap;
   cursor: pointer;
   user-select: none;
+  background-color: var(--af-page);
+}
+.sync-field:hover {
+  background: var(--af-control-hover);
 }
 
 .notice,

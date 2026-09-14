@@ -155,7 +155,7 @@ describe('settings', () => {
       model: 'm',
       timeoutMs: 8000,
     }]
-    current.word = { speakEnabled: false, accent: 'uk', sources: { youdao: false, bing: true, google: true, freedictionaryapi: true } }
+    current.word = { showOriginal: false, speakEnabled: false, accent: 'uk', sources: { youdao: false, bing: true, google: true, freedictionaryapi: true } }
 
     const next = resetToDefaults(current)
 

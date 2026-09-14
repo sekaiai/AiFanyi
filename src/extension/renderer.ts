@@ -4,15 +4,17 @@ import type { DictionaryResult } from '../core/dictionary'
 import type { BubbleSettings, RectLike } from '../core/types'
 
 interface DictionaryRenderOptions {
-  /** 提供时在单词卡片右上角渲染朗读按钮（▶）；仅当「显示原文」开启时生效。 */
+  /** 提供时在单词卡片右上角渲染朗读按钮（▶）；仅当显示原词（showOriginal）时生效。 */
   onSpeak?: () => void
+  /** 单词卡片的原词开关，由调用方传入（与句子开关 bubble.showOriginal 相互独立），缺省显示。 */
+  showOriginal?: boolean
 }
 
 export interface BubbleRenderer {
   root: HTMLElement
   content: HTMLElement
   container: HTMLElement
-  showLoading(message: string, sourceWord?: string): void
+  showLoading(message: string, sourceWord?: string, showOriginal?: boolean): void
   showDictionary(sourceWord: string, result: DictionaryResult, options?: DictionaryRenderOptions): void
   showText(text: string, sourceWord?: string): void
   showError(message: string, retry?: () => void): void
@@ -51,9 +53,9 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
     root: bubble,
     container: host,
     content,
-    showLoading(message, sourceWord = '') {
+    showLoading(message, sourceWord = '', showOriginal = true) {
       const nodes: Node[] = []
-      if (sourceWord && settings.showOriginal) nodes.push(sourceNode(sourceWord))
+      if (sourceWord && showOriginal) nodes.push(sourceNode(sourceWord))
       const loading = document.createElement('div')
       loading.className = 'muted'
       loading.textContent = message
@@ -62,10 +64,12 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
       replaceContent(nodes)
     },
     showDictionary(sourceWord, result, options) {
-      // 朗读按钮跟随「显示原文」：原文行隐藏时按钮没有落点，直接不渲染。
-      const speakable = Boolean(options?.onSpeak) && settings.showOriginal
+      // 单词卡片的原词开关由调用方传入，与句子开关（showText 用的 bubble.showOriginal）相互独立。
+      const showOriginal = options?.showOriginal ?? true
+      // 朗读按钮跟随原词行：原词隐藏时按钮没有落点，直接不渲染。
+      const speakable = Boolean(options?.onSpeak) && showOriginal
       const nodes: Node[] = []
-      if (settings.showOriginal) nodes.push(wordNode(sourceWord, result.pronunciation, speakable))
+      if (showOriginal) nodes.push(wordNode(sourceWord, result.pronunciation, speakable))
       if (result.meanings.length) {
         for (const meaning of result.meanings) {
           const line = document.createElement('div')

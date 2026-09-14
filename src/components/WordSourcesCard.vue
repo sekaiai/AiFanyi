@@ -68,8 +68,9 @@ const wordProbeTime = computed(() => {
     </div>
 
     <div class="speak-row">
-      <label class="field-label speak-toggle">朗读单词
+      <label class="src-row">
         <input v-model="settings.word.speakEnabled" type="checkbox" class="checkbox" />
+        <span>朗读单词</span>
       </label>
       <span class="field-label">朗读音色</span>
       <span class="seg">
@@ -102,20 +103,13 @@ const wordProbeTime = computed(() => {
   font-size: 14px;
 }
 
-/* 朗读两项同排：朗读单词（复选）+ 朗读音色（分段胶囊），标签样式一致 */
+/* 朗读两项同排：朗读单词（复选，与源行同款芯片）+ 朗读音色（分段胶囊） */
 .speak-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px 14px;
   margin-top: 10px;
-}
-.speak-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
 }
 
 /* 源行：【checkbox | 名称 | 延迟】，延迟恒显，一行排四个源 */

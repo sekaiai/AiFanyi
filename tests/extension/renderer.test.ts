@@ -119,15 +119,32 @@ describe('createBubbleRenderer 原文显示', () => {
     expect(renderer.content.querySelector('.word')?.className).toBe('word')
   })
 
-  it('showOriginal 为假时不渲染朗读按钮（即使传了 onSpeak）', () => {
-    renderer = createBubbleRenderer(bubbleSettings({ showOriginal: false }))
+  it('单词 showOriginal 为假时不渲染原词行与朗读按钮（即使传了 onSpeak）', () => {
+    renderer = createBubbleRenderer(bubbleSettings())
     renderer.showDictionary('loved', {
       pronunciation: '/lʌvd/',
       meanings: [{ partOfSpeech: 'v.', translations: ['爱，热爱'] }],
-    }, { onSpeak: () => {} })
+    }, { onSpeak: () => {}, showOriginal: false })
 
     expect(renderer.content.querySelector('.speak')).toBeNull()
     expect(renderer.content.querySelector('.word')).toBeNull()
+  })
+
+  it('单词与句子的原文开关相互独立：句子开关关闭不影响单词卡片', () => {
+    renderer = createBubbleRenderer(bubbleSettings({ showOriginal: false }))
+    renderer.showDictionary('loved', {
+      pronunciation: '/lʌvd/',
+      meanings: [{ partOfSpeech: 'v.', translations: ['爱；喜欢'] }],
+    })
+
+    expect(renderer.content.querySelector('.word')).not.toBeNull()
+  })
+
+  it('showLoading 第三参可关闭单词加载态的原词行', () => {
+    renderer = createBubbleRenderer(bubbleSettings({ showOriginal: true }))
+    renderer.showLoading('正在查询释义...', 'loved', false)
+
+    expect(renderer.content.querySelector('.source')).toBeNull()
   })
 
   // 释义行 CSS 限单行省略（.result white-space:nowrap），完整文本挂在 title 上悬停可见。

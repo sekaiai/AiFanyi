@@ -91,6 +91,8 @@ export type WordAccent = 'us' | 'uk'
 export type SchemeOrder = 'random' | 'sequential'
 
 export interface WordQuerySettings {
+  /** 单词卡片是否显示原词与音标（含朗读按钮）；句子气泡的原文由 bubble.showOriginal 控制，两者独立。 */
+  showOriginal: boolean
   speakEnabled: boolean
   accent: WordAccent
   sources: Record<WordSourceId, boolean>

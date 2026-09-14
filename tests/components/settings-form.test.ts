@@ -89,6 +89,19 @@ describe('SettingsForm', () => {
     expect(wrapper.vm.settings.bubble.showOriginal).toBe(false)
   })
 
+  it('binds the word show-original checkbox to the word settings', async () => {
+    const wrapper = mount(SettingsHarness)
+
+    const toggle = wrapper.get('[data-testid="show-original-word"]')
+    expect((toggle.element as HTMLInputElement).checked).toBe(true)
+    expect(toggle.element.closest('label')?.textContent).toContain('显示原文')
+    expect(toggle.element.closest('label')?.getAttribute('title')).toContain('句子显示原文')
+
+    await toggle.setValue(false)
+
+    expect(wrapper.vm.settings.word.showOriginal).toBe(false)
+  })
+
   it('shows the sync toggle with a title and emits its state changes', async () => {
     const wrapper = mount(SyncHarness)
 
