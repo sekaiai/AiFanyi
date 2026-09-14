@@ -98,7 +98,7 @@ function readCount(value: unknown): number {
 }
 
 function formatCount(value: number): string {
-  return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return value.toLocaleString('en-US')
 }
 
 function formatChars(value: number, locale: UiLocale): string {

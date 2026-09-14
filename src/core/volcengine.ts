@@ -138,13 +138,8 @@ export async function requestVolcengineTranslation(
 }
 
 function formatVolcengineDate(value: Date): string {
-  const year = value.getUTCFullYear()
-  const month = String(value.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(value.getUTCDate()).padStart(2, '0')
-  const hours = String(value.getUTCHours()).padStart(2, '0')
-  const minutes = String(value.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(value.getUTCSeconds()).padStart(2, '0')
-  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`
+  // ISO 形如 2026-09-14T08:30:00.000Z，压缩成签名要的 20260914T083000Z。
+  return value.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
 }
 
 function bytesToHex(bytes: Uint8Array): string {
