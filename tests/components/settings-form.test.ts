@@ -65,7 +65,7 @@ const SettingsHarness = defineComponent({
     return { settings }
   },
   template: `<SettingsForm v-model="settings" status="已加载" />
-    <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" />`,
+    <SchemesSection v-model="settings.schemes" />`,
 })
 
 const EnSettingsHarness = defineComponent({
@@ -93,22 +93,7 @@ const TestHarness = defineComponent({
     }
     return { settings, testScheme, failure, calls, usage }
   },
-  template: `<SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" :usage="usage" :test-scheme="testScheme" />`,
-})
-
-const SyncHarness = defineComponent({
-  components: { SchemesSection },
-  setup() {
-    const settings = ref(cloneDefaultSettings())
-    const syncEnabled = ref(true)
-    const toggles: boolean[] = []
-    const toggleSync = (enabled: boolean) => {
-      syncEnabled.value = enabled
-      toggles.push(enabled)
-    }
-    return { settings, syncEnabled, toggleSync, toggles }
-  },
-  template: `<SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" show-sync :sync-enabled="syncEnabled" @toggle-sync="toggleSync" />`,
+  template: `<SchemesSection v-model="settings.schemes" :usage="usage" :test-scheme="testScheme" />`,
 })
 
 describe('SettingsForm', () => {
@@ -201,28 +186,6 @@ describe('SettingsForm', () => {
     await toggle.setValue(false)
 
     expect(wrapper.vm.settings.word.showOriginal).toBe(false)
-  })
-
-  it('shows the sync toggle with a title and emits its state changes', async () => {
-    const wrapper = mount(SyncHarness)
-
-    const toggle = () => wrapper.get('[data-testid="sync-toggle"]')
-    expect((toggle().element as HTMLInputElement).checked).toBe(true)
-    expect(wrapper.get('.sync-field').text()).toContain('同步到浏览器账号')
-    expect(wrapper.get('.sync-field').attributes('title')).toContain('取消勾选后设置仅保存在本机')
-
-    await toggle().setValue(false)
-    expect(wrapper.vm.toggles).toEqual([false])
-    expect((toggle().element as HTMLInputElement).checked).toBe(false)
-
-    await toggle().setValue(true)
-    expect(wrapper.vm.toggles).toEqual([false, true])
-  })
-
-  it('hides the sync toggle when the sync state is not provided', () => {
-    const wrapper = mount(TestHarness)
-
-    expect(wrapper.find('[data-testid="sync-toggle"]').exists()).toBe(false)
   })
 
   it('adds scheme cards with per-type defaults', async () => {
@@ -460,27 +423,6 @@ describe('SettingsForm', () => {
     expect(addSelect.findAll('option').some((option) => option.attributes('value') === 'google')).toBe(false)
   })
 
-  it('defaults the scheme order to random and two-way binds the select', async () => {
-    const wrapper = mount(TestHarness)
-
-    const orderSelect = wrapper.get('[data-testid="scheme-order"]')
-    expect((orderSelect.element as HTMLSelectElement).value).toBe('random')
-    expect(wrapper.vm.settings.schemeOrder).toBe('random')
-    expect(orderSelect.findAll('option').map((option) => option.text())).toEqual(['随机', '依次使用'])
-
-    await orderSelect.setValue('sequential')
-    expect(wrapper.vm.settings.schemeOrder).toBe('sequential')
-  })
-
-  it('switches the order hint with the selected mode', async () => {
-    const wrapper = mount(TestHarness)
-
-    expect(wrapper.get('.section-hint').text()).toContain('随机挑选可用方案')
-
-    await wrapper.get('[data-testid="scheme-order"]').setValue('sequential')
-    expect(wrapper.get('.section-hint').text()).toContain('按顺序依次尝试')
-  })
-
   it('drops the configured badge from scheme cards', async () => {
     const wrapper = mount(TestHarness)
 
@@ -505,28 +447,9 @@ describe('SettingsForm', () => {
       .toBe('本月 2 次 · 25 / 共 8 次 · 120')
   })
 
-  it('defaults the UI language to Chinese and two-way binds the switcher', async () => {
-    const wrapper = mount(SettingsHarness)
-
-    const group = wrapper.get('[data-testid="ui-locale"]')
-    expect(group.attributes('role')).toBe('radiogroup')
-    expect((group.get('input[value="zh"]').element as HTMLInputElement).checked).toBe(true)
-    expect((group.get('input[value="en"]').element as HTMLInputElement).checked).toBe(false)
-    expect(group.findAll('label').map((label) => label.text())).toEqual(['中文', 'English'])
-    expect(wrapper.get('.settings-title').text()).toBe('设置')
-
-    await group.get('input[value="en"]').setValue()
-    expect(wrapper.vm.settings.uiLocale).toBe('en')
-  })
-
-  it('translates the form through the provided UI locale context', async () => {
+  it('translates the form through the provided UI locale context', () => {
     const wrapper = mount(EnSettingsHarness)
 
-    const group = wrapper.get('[data-testid="ui-locale"]')
-    expect((group.get('input[value="en"]').element as HTMLInputElement).checked).toBe(true)
     expect(wrapper.get('.settings-title').text()).toBe('Settings')
-
-    await group.get('input[value="zh"]').setValue()
-    expect(wrapper.get('.settings-title').text()).toBe('设置')
   })
 })

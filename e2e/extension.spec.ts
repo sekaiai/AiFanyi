@@ -306,8 +306,8 @@ test.describe('AiFanyi extension', () => {
       if (side === 'right') expect(bubbleBox!.x).toBeGreaterThanOrEqual(sourceBox!.x + sourceBox!.width)
     }
 
-    // 中文段落 + 默认目标简体中文：同语言不触发翻译，气泡不出现
-    await page.locator('.reading-copy p', { hasText: '你曾经深爱的人' }).evaluate((element) => {
+    // 中文说明段落 + 默认目标简体中文：同语言不触发翻译，气泡不出现
+    await page.locator('.reading-copy p', { hasText: '悬停或选中单词查词典' }).evaluate((element) => {
       const text = element.firstChild
       if (!text) throw new Error('演示文本不可用')
       const range = document.createRange()
@@ -321,12 +321,12 @@ test.describe('AiFanyi extension', () => {
     await page.waitForTimeout(300)
     await expect(page.locator('#aifanyi-shadow-host .bubble')).toBeHidden()
 
-    await page.locator('.reading-copy p', { hasText: 'Someone you loved' }).evaluate((element) => {
+    await page.locator('.reading-copy p', { hasText: 'Hover over or select a word' }).evaluate((element) => {
       const text = element.firstChild
       if (!text) throw new Error('演示文本不可用')
       const range = document.createRange()
       range.setStart(text, 0)
-      range.setEnd(text, 7)
+      range.setEnd(text, 5)
       const selection = window.getSelection()
       selection?.removeAllRanges()
       selection?.addRange(range)

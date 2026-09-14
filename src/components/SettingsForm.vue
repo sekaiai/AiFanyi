@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { COLOR_PRESETS } from '../core/settings'
-import type { BubbleColorPreset, TranslationSettings, UiLocale } from '../core/types'
+import type { BubbleColorPreset, TranslationSettings } from '../core/types'
 import BubblePreview from './BubblePreview.vue'
 import ColorField from './ColorField.vue'
 import { useUiLocale } from '../composables/useUiLocale'
@@ -17,11 +17,6 @@ defineProps<{
 const emit = defineEmits<{
   reset: []
 }>()
-
-const UI_LOCALE_OPTIONS: { value: UiLocale; label: string }[] = [
-  { value: 'zh', label: '中文' },
-  { value: 'en', label: 'English' },
-]
 
 const blacklistText = computed({
   get: () => settings.value.siteBlacklist.join('\n'),
@@ -52,7 +47,7 @@ function markCustomColor(): void {
   settings.value.bubble.colorPreset = 'custom'
 }
 
-function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: string): void {
+function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highlightColor', value: string): void {
   settings.value.bubble[key] = value
   markCustomColor()
 }
@@ -67,15 +62,6 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
         <p class="settings-status">{{ status }}</p>
       </div>
       <div class="header-actions">
-        <div class="locale-switch">
-          <span class="field-label">{{ t('app.uiLanguage') }}</span>
-          <div class="locale-options" role="radiogroup" :aria-label="t('app.uiLanguage')" data-testid="ui-locale">
-            <label v-for="option in UI_LOCALE_OPTIONS" :key="option.value" class="locale-option">
-              <input v-model="settings.uiLocale" type="radio" name="ui-locale" :value="option.value" />
-              <span>{{ option.label }}</span>
-            </label>
-          </div>
-        </div>
         <button style="height: 36px;" class="button button-secondary" type="button" @click="emit('reset')">{{ t('form.reset') }}</button>
       </div>
     </header>
@@ -161,7 +147,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
           </label>
           <label class="field">
             <span class="field-label">{{ t('form.highlight') }}</span>
-            <ColorField v-model="settings.bubble.highlightColor" />
+            <ColorField :model-value="settings.bubble.highlightColor" @update:model-value="setBubbleColor('highlightColor', $event)" />
           </label>
         </div>
         <div class="control-grid two">
@@ -415,58 +401,6 @@ textarea.blacklist:focus {
   gap: 12px;
 }
 
-.locale-switch {
-  display: grid;
-  gap: 5px;
-  justify-items: start;
-}
-
-.locale-options {
-  display: inline-flex;
-  gap: 4px;
-  min-height: 34px;
-  padding: 3px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 8px;
-  background: var(--af-control-background);
-}
-
-.locale-option {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 14px;
-  border-radius: 6px;
-  font-size: 14px;
-  color: var(--af-text);
-  cursor: pointer;
-  user-select: none;
-  transition: background 160ms ease-out, color 160ms ease-out;
-}
-
-.locale-option:hover {
-  background: var(--af-control-hover);
-}
-
-.locale-option:has(input:checked) {
-  background: var(--af-accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.locale-option:has(input:focus-visible) {
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
-}
-
-.locale-option input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .settings-section {
   min-width: 0;
   padding: 14px 20px 16px;
@@ -475,12 +409,6 @@ textarea.blacklist:focus {
 
 .preview-section {
   grid-column: 1 / -1;
-}
-
-.section-title {
-  margin: 0 0 10px;
-  font-size: 14px;
-  font-weight: 720;
 }
 
 .control-grid {

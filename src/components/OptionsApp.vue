@@ -10,6 +10,7 @@ import { uid } from '../core/settings'
 import { createBrowserSettingsStorage } from '../extension/storage'
 import { createUsageStorage } from '../extension/usage-storage'
 import DemoApp from '../demo/DemoApp.vue'
+import GeneralSection from './GeneralSection.vue'
 import SchemesSection from './SchemesSection.vue'
 import SettingsForm from './SettingsForm.vue'
 import WordSourcesCard from './WordSourcesCard.vue'
@@ -102,28 +103,25 @@ async function requestDemo(
       <section :aria-label="t('app.demoInteraction')">
         <DemoApp :settings="settings" :request="requestDemo" :show-settings="false" />
       </section>
-            <section class="word-slot" :aria-label="t('section.word')">
-        <WordSourcesCard
-          v-model="settings"
-          :word-probe="wordProbe"
-          :probing="probingWords"
-          @probe-words="probeWords"
-        />
-      </section>
-
-      <section class="schemes-slot" :aria-label="t('section.sentence')">
-        <SchemesSection
-          v-model="settings.schemes"
-          v-model:target-language="settings.targetLanguage"
-          v-model:scheme-order="settings.schemeOrder"
-          show-sync
-          :sync-enabled="syncEnabled"
-          @toggle-sync="toggleSync"
-          :usage="usage"
-          :test-scheme="testScheme"
-        />
-      </section>
-
+      <GeneralSection
+        v-model:ui-locale="settings.uiLocale"
+        v-model:target-language="settings.targetLanguage"
+        v-model:scheme-order="settings.schemeOrder"
+        show-sync
+        :sync-enabled="syncEnabled"
+        @toggle-sync="toggleSync"
+      />
+      <WordSourcesCard
+        v-model="settings"
+        :word-probe="wordProbe"
+        :probing="probingWords"
+        @probe-words="probeWords"
+      />
+      <SchemesSection
+        v-model="settings.schemes"
+        :usage="usage"
+        :test-scheme="testScheme"
+      />
     </div>
     <aside class="settings-column" :aria-label="t('app.extensionSettings')">
       <SettingsForm

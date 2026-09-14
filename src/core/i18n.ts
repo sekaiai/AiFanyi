@@ -12,6 +12,7 @@ const zh = {
   'app.demoInteraction': '翻译交互演示',
   'app.extensionSettings': '扩展设置',
 
+  'section.general': '通用',
   'section.word': '单词翻译',
   'section.sentence': '句子翻译',
 
@@ -102,7 +103,7 @@ const zh = {
   'schemes.order': '顺序',
   'schemes.orderRandom': '随机',
   'schemes.orderSequential': '依次使用',
-  'schemes.syncLabel': '同步到浏览器账号',
+  'schemes.syncLabel': '所有设置同步到浏览器账号',
   'schemes.syncTitle': '将全部设置（含各翻译方案与密钥）通过浏览器账号在登录的设备间自动同步；取消勾选后设置仅保存在本机，不再上传，也不会接收其他设备的改动。',
   'schemes.hint.random': '每次随机挑选可用方案，失败后从剩余方案中随机再试。',
   'schemes.hint.sequential': '按顺序依次尝试，排在最前面的优先使用。',
@@ -259,6 +260,7 @@ const en: Record<MessageKey, string> = {
   'app.demoInteraction': 'Translation demo interaction',
   'app.extensionSettings': 'Extension settings',
 
+  'section.general': 'General',
   'section.word': 'Word translation',
   'section.sentence': 'Sentence translation',
 
@@ -349,7 +351,7 @@ const en: Record<MessageKey, string> = {
   'schemes.order': 'Order',
   'schemes.orderRandom': 'Random',
   'schemes.orderSequential': 'Sequential',
-  'schemes.syncLabel': 'Sync with account',
+  'schemes.syncLabel': 'Sync all settings with browser account',
   'schemes.syncTitle': 'Sync everything (schemes and keys) across signed-in devices via your browser account. When off, settings stay on this device only, and are not uploaded or updated from other devices.',
   'schemes.hint.random': 'Pick a random available scheme each time; on failure another one is tried at random.',
   'schemes.hint.sequential': 'Schemes are tried in order; the ones at the front come first.',

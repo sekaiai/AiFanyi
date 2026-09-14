@@ -1,28 +1,17 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, shallowRef, toRaw } from 'vue'
+import { onUnmounted, ref, shallowRef, toRaw } from 'vue'
 import { useUiLocale } from '../composables/useUiLocale'
-import { TARGET_LANGUAGES } from '../core/settings'
-import type { SchemeOrder, SchemeSettings } from '../core/types'
+import type { SchemeSettings } from '../core/types'
 import { hasRequiredConfig } from '../core/translate'
 import { formatUsageCounter, type UsageStats } from '../core/usage'
 import SchemeEditorModal from './SchemeEditorModal.vue'
 
 const schemes = defineModel<SchemeSettings[]>({ required: true })
-const targetLanguage = defineModel<string>('targetLanguage', { required: true })
-const schemeOrder = defineModel<SchemeOrder>('schemeOrder', { required: true })
 
 const props = defineProps<{
   testScheme?: (scheme: SchemeSettings) => Promise<string>
   demoMode?: boolean
   usage?: UsageStats | null
-  /** 是否渲染本机同步开关（演示模式不传则不渲染）。 */
-  showSync?: boolean
-  /** 本机是否参与设置同步；仅 showSync 为 true 时有意义。 */
-  syncEnabled?: boolean
-}>()
-
-const emit = defineEmits<{
-  toggleSync: [enabled: boolean]
 }>()
 
 const { t, locale } = useUiLocale()
@@ -42,9 +31,6 @@ interface SchemeTestOutcome {
 }
 
 const schemeTestStatus = ref<Record<string, SchemeTestOutcome>>({})
-const orderHint = computed(() => schemeOrder.value === 'random'
-  ? t('schemes.hint.random')
-  : t('schemes.hint.sequential'))
 
 function speedTone(ms: number): SchemeTestOutcome['tone'] {
   if (ms < 800) return 'fast'
@@ -137,36 +123,8 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 </script>
 
 <template>
-  <section class="schemes-section">
-    <div class="section-head">
-      <h2 class="section-title">{{ t('section.sentence') }}</h2>
-      <div class="head-controls">
-        <label class="target-field">
-          <span class="field-label">{{ t('schemes.translateInto') }}</span>
-          <select v-model="targetLanguage" data-testid="target-language">
-            <option v-for="lang in TARGET_LANGUAGES" :key="lang" :value="lang">{{ lang }}</option>
-          </select>
-        </label>
-        <label class="target-field">
-          <span class="field-label">{{ t('schemes.order') }}</span>
-          <select v-model="schemeOrder" data-testid="scheme-order">
-            <option value="random">{{ t('schemes.orderRandom') }}</option>
-            <option value="sequential">{{ t('schemes.orderSequential') }}</option>
-          </select>
-        </label>
-        <label v-if="showSync" class="target-field sync-field" :title="t('schemes.syncTitle')">
-          <input
-            type="checkbox"
-            class="checkbox"
-            :checked="syncEnabled"
-            data-testid="sync-toggle"
-            @change="emit('toggleSync', ($event.target as HTMLInputElement).checked)"
-          />
-          <span>{{ t('schemes.syncLabel') }}</span>
-        </label>
-      </div>
-    </div>
-    <p class="section-hint">{{ orderHint }}</p>
+  <section class="af-card">
+    <h2 class="section-title">{{ t('section.sentence') }}</h2>
     <p v-if="demoMode" class="notice">{{ t('schemes.notice.demo') }}</p>
 
     <div class="scheme-list">
@@ -205,91 +163,6 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 </template>
 
 <style scoped>
-.schemes-section {
-  min-width: 0;
-  padding: 18px 20px;
-  border: 1px solid var(--af-line);
-  border-radius: 12px;
-  background: var(--af-panel);
-  font-size: 14px;
-}
-
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-bottom: 6px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 720;
-}
-
-.section-hint {
-  margin: 0 0 10px;
-  color: var(--af-muted);
-  font-size: 14px;
-}
-
-.head-controls {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-}
-
-.target-field {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.target-field .field-label {
-  color: var(--af-muted);
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.target-field select {
-  min-height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
-  font-size: 14px;
-  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
-}
-
-.target-field select:hover {
-  border-color: var(--af-control-border-hover);
-}
-
-.target-field select:focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
-}
-
-/* 与「单词翻译」源行同款芯片样式 */
-.sync-field {
-  min-height: 26px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 14px;
-  white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  background-color: var(--af-page);
-}
-.sync-field:hover {
-  background: var(--af-control-hover);
-}
-
 .notice,
 .settings-status {
   margin: 4px 0 0;

@@ -45,7 +45,7 @@ const wordProbeTime = computed(() => {
 </script>
 
 <template>
-  <section class="word-sources-card" :aria-label="t('section.word')">
+  <section class="af-card" :aria-label="t('section.word')">
     <h2 class="section-title">{{ t('section.word') }}</h2>
 
     <div class="src-rows">
@@ -90,21 +90,6 @@ const wordProbeTime = computed(() => {
 </template>
 
 <style scoped>
-.word-sources-card {
-  min-width: 0;
-  padding: 16px 18px;
-  border: 1px solid var(--af-line);
-  border-radius: 12px;
-  background: var(--af-panel);
-  font-size: 14px;
-}
-
-.section-title {
-  margin: 0 0 10px;
-  font-size: 14px;
-  font-weight: 720;
-}
-
 .field-label {
   color: var(--af-muted);
   font-size: 14px;
