@@ -1,5 +1,6 @@
 import { lookupDictionary, type DictionaryMeaning, type DictionaryResult } from './dictionary'
 import { readArray, readRecord, readText } from './read'
+import { fetchWithTimeout } from './request'
 import type { WordSourceId } from './types'
 
 /**
@@ -46,9 +47,7 @@ const BING_DICT_PAGE = 'https://cn.bing.com/dict/search?q='
 const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t'
 
 // word-sources 不能 import translate.ts（会循环依赖），目标语言映射独立维护一份。
-const GOOGLE_TARGET_CODES: Record<string, string> = {
-  '简体中文': 'zh-CN',
-  '繁體中文': 'zh-TW',
+const FREE_TARGET_CODES: Record<string, string> = {
   'English': 'en',
   '日本語': 'ja',
   '한국어': 'ko',
@@ -70,45 +69,14 @@ const GOOGLE_TARGET_CODES: Record<string, string> = {
   'Svenska': 'sv',
   'Dansk': 'da',
   'Suomi': 'fi',
-  'Norsk': 'no',
   'Čeština': 'cs',
   'Magyar': 'hu',
   'Română': 'ro',
   'Українська': 'uk',
   'हिन्दी': 'hi',
 }
-
-const BING_TARGET_CODES: Record<string, string> = {
-  '简体中文': 'zh-Hans',
-  '繁體中文': 'zh-Hant',
-  'English': 'en',
-  '日本語': 'ja',
-  '한국어': 'ko',
-  'Français': 'fr',
-  'Deutsch': 'de',
-  'Español': 'es',
-  'Português': 'pt',
-  'Italiano': 'it',
-  'Русский': 'ru',
-  'Nederlands': 'nl',
-  'Polski': 'pl',
-  'Türkçe': 'tr',
-  'العربية': 'ar',
-  'ไทย': 'th',
-  'Tiếng Việt': 'vi',
-  'Bahasa Indonesia': 'id',
-  'Bahasa Melayu': 'ms',
-  'Ελληνικά': 'el',
-  'Svenska': 'sv',
-  'Dansk': 'da',
-  'Suomi': 'fi',
-  'Norsk': 'nb',
-  'Čeština': 'cs',
-  'Magyar': 'hu',
-  'Română': 'ro',
-  'Українська': 'uk',
-  'हिन्दी': 'hi',
-}
+const GOOGLE_TARGET_CODES: Record<string, string> = { ...FREE_TARGET_CODES, '简体中文': 'zh-CN', '繁體中文': 'zh-TW', 'Norsk': 'no' }
+const BING_TARGET_CODES: Record<string, string> = { ...FREE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
 
 function googleTargetCode(targetLanguage: string): string {
   const code = GOOGLE_TARGET_CODES[targetLanguage]
@@ -120,19 +88,6 @@ function bingTargetCode(targetLanguage: string): string {
   const code = BING_TARGET_CODES[targetLanguage]
   if (!code) throw new Error(`Bing 词典不支持目标语言「${targetLanguage}」`)
   return code
-}
-
-async function fetchWithTimeout(url: string, init: RequestInit, signal?: AbortSignal, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
-  const timeout = new AbortController()
-  const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), timeoutMs)
-  try {
-    return await fetch(url, {
-      ...init,
-      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
-    })
-  } finally {
-    clearTimeout(timeoutId)
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +138,7 @@ export async function lookupYoudao(word: string, accent: 'us' | 'uk', signal?: A
   const response = await fetchWithTimeout(
     `${YOUDAO_DICT_ENDPOINT}${encodeURIComponent(word.toLowerCase())}`,
     { headers: { Accept: 'application/json' } },
+    REQUEST_TIMEOUT_MS,
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -225,7 +181,7 @@ export function parseBingPronunciation(html: string, accent: 'us' | 'uk'): strin
 }
 
 export async function lookupBing(word: string, targetLanguage: string, accent: 'us' | 'uk', signal?: AbortSignal): Promise<WordResult> {
-  const pageResponse = await fetchWithTimeout(BING_TRANSLATOR_PAGE, { headers: { Accept: 'text/html' } }, signal)
+  const pageResponse = await fetchWithTimeout(BING_TRANSLATOR_PAGE, { headers: { Accept: 'text/html' } }, REQUEST_TIMEOUT_MS, signal)
   if (!pageResponse.ok) throw new Error(`HTTP ${pageResponse.status}`)
   const { ig, key, token } = parseBingPage(await pageResponse.text())
 
@@ -243,6 +199,7 @@ export async function lookupBing(word: string, targetLanguage: string, accent: '
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
     },
+    REQUEST_TIMEOUT_MS,
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -254,8 +211,8 @@ export async function lookupBing(word: string, targetLanguage: string, accent: '
     const dictResponse = await fetchWithTimeout(
       `${BING_DICT_PAGE}${encodeURIComponent(word.toLowerCase())}`,
       {},
-      signal,
       BING_DICT_TIMEOUT_MS,
+      signal,
     )
     if (dictResponse.ok) pronunciation = parseBingPronunciation(await dictResponse.text(), accent)
   } catch {
@@ -287,6 +244,7 @@ export async function lookupGoogleFree(word: string, targetLanguage: string, sig
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
       body: new URLSearchParams({ q: word }).toString(),
     },
+    REQUEST_TIMEOUT_MS,
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -376,10 +334,10 @@ export async function probeWordSources(): Promise<WordProbeState> {
   return { checkedAt: Date.now(), results, latency }
 }
 
-function shuffle<T>(items: readonly T[]): T[] {
+export function shuffle<T>(items: readonly T[], random: () => number = Math.random): T[] {
   const result = [...items]
   for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor(random() * (i + 1))
     const a = result[i] as T
     const b = result[j] as T
     result[i] = b

@@ -1,9 +1,10 @@
 import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
+import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
 import { extractSingleWord, normalizeSourceText } from './text'
-import { lookupWord, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
+import { lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
   DeeplSchemeSettings,
@@ -70,12 +71,12 @@ export type TranslateOutcome =
   | { kind: 'dictionary'; result: WordResult }
   | { kind: 'text'; text: string }
 
-export interface WordLookupContext {
+interface WordLookupContext {
   sources?: WordSourceId[]
   probe?: WordProbeState | null
 }
 
-export interface UsageSink {
+interface UsageSink {
   onSentence?: (schemeId: string, chars: number) => void
   onWord?: (chars: number) => void
 }
@@ -87,14 +88,7 @@ export interface UsageSink {
  */
 export function orderSchemes(schemes: SchemeSettings[], order: SchemeOrder, random: () => number = Math.random): SchemeSettings[] {
   if (order !== 'random' || schemes.length < 2) return schemes
-  const result = [...schemes]
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1))
-    const tmp = result[i]!
-    result[i] = result[j]!
-    result[j] = tmp
-  }
-  return result
+  return shuffle(schemes, random)
 }
 
 export function hasRequiredConfig(scheme: SchemeSettings): boolean {
@@ -210,7 +204,7 @@ async function translateWithDeepl(
   targetLanguage: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const payload = await requestJsonWithTimeout(
+  const payload = await requestJson(
     scheme.endpoint === 'pro' ? DEEPL_PRO_ENDPOINT : DEEPL_FREE_ENDPOINT,
     {
       method: 'POST',
@@ -220,6 +214,7 @@ async function translateWithDeepl(
       },
       body: JSON.stringify({ text: [source], target_lang: deeplTargetCode(targetLanguage) }),
     },
+    SCHEME_TIMEOUT_MS,
     signal,
   )
   const translations = readArray(readRecord(payload).translations)
@@ -229,11 +224,11 @@ async function translateWithDeepl(
 }
 
 async function translateWithGoogle(source: string, targetLanguage: string, signal?: AbortSignal): Promise<string> {
-  const payload = await requestJsonWithTimeout(`${GOOGLE_FREE_ENDPOINT}&tl=${encodeURIComponent(googleTargetCode(targetLanguage))}`, {
+  const payload = await requestJson(`${GOOGLE_FREE_ENDPOINT}&tl=${encodeURIComponent(googleTargetCode(targetLanguage))}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
     body: new URLSearchParams({ q: source }).toString(),
-  }, signal)
+  }, SCHEME_TIMEOUT_MS, signal)
   const segments = readArray(readArray(payload)[0])
   const text = segments.map((segment) => readText(readArray(segment)[0])).join('').trim()
   if (!text) throw new Error('Google 返回内容为空。')
@@ -246,36 +241,20 @@ async function translateWithGoogleCloud(
   targetLanguage: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const payload = await requestJsonWithTimeout(
+  const payload = await requestJson(
     `${GOOGLE_CLOUD_ENDPOINT}?key=${encodeURIComponent(scheme.apiKey)}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: source, target: googleTargetCode(targetLanguage), format: 'text' }),
     },
+    SCHEME_TIMEOUT_MS,
     signal,
   )
   const translations = readArray(readRecord(readRecord(payload).data).translations)
   const text = readText(readRecord(translations[0]).translatedText)
   if (!text) throw new Error('Google Cloud 返回内容为空。')
   return text
-}
-
-async function requestJsonWithTimeout(url: string, init: RequestInit, signal?: AbortSignal): Promise<unknown> {
-  const timeout = new AbortController()
-  const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), SCHEME_TIMEOUT_MS)
-  try {
-    const response = await fetch(url, {
-      ...init,
-      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
-    })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const contentType = response.headers.get('content-type') ?? ''
-    if (contentType && !contentType.includes('application/json')) throw new Error('响应不是 JSON。')
-    return await response.json().catch(() => null)
-  } finally {
-    clearTimeout(timeoutId)
-  }
 }
 
 function isAbortError(error: unknown): boolean {

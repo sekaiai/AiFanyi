@@ -1,3 +1,4 @@
+import { requestJson } from './request'
 import { validateAiUrl } from './settings'
 import type { AiSchemeSettings } from './types'
 import { normalizeSourceText } from './text'
@@ -10,10 +11,9 @@ export async function requestAiTranslation(text: string, settings: AiSchemeSetti
   if (!settings.model.trim()) throw new Error('请填写模型。')
 
   const endpoint = validateAiUrl(settings.apiUrl)
-  const timeout = new AbortController()
-  const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), settings.timeoutMs)
-  try {
-    const response = await fetch(endpoint, {
+  const payload = await requestJson(
+    endpoint,
+    {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -25,17 +25,13 @@ export async function requestAiTranslation(text: string, settings: AiSchemeSetti
         temperature: 0.1,
         stream: false,
       }),
-      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
-    })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const contentType = response.headers.get('content-type') ?? ''
-    if (contentType && !contentType.includes('application/json')) throw new Error('AI 返回不是 JSON。')
-    const result = readAssistantContent(await response.json().catch(() => null))
-    if (!result) throw new Error('AI 返回内容为空。')
-    return result
-  } finally {
-    clearTimeout(timeoutId)
-  }
+    },
+    settings.timeoutMs,
+    signal,
+  )
+  const result = readAssistantContent(payload)
+  if (!result) throw new Error('AI 返回内容为空。')
+  return result
 }
 
 export function readAssistantContent(payload: unknown): string {

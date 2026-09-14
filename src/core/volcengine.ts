@@ -1,3 +1,4 @@
+import { requestJson } from './request'
 import { readRecord, readText } from './read'
 import type { VolcengineSchemeSettings } from './types'
 
@@ -100,10 +101,9 @@ export async function requestVolcengineTranslation(
     scheme.region,
   )
   const url = `${VOLCENGINE_TRANSLATE_ENDPOINT}/?Action=${VOLCENGINE_TRANSLATE_ACTION}&Version=${VOLCENGINE_TRANSLATE_VERSION}`
-  const timeout = new AbortController()
-  const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), VOLCENGINE_TIMEOUT_MS)
-  try {
-    const response = await fetch(url, {
+  const payload = await requestJson(
+    url,
+    {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -113,33 +113,28 @@ export async function requestVolcengineTranslation(
         'X-Content-Sha256': signed.bodyHash,
       },
       body,
-      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
-    })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const contentType = response.headers.get('content-type') ?? ''
-    if (contentType && !contentType.includes('application/json')) throw new Error('响应不是 JSON。')
-    const payload = await response.json().catch(() => null)
-    const record = readRecord(payload)
-    const metadata = readRecord(record.ResponseMetadata ?? record.ResponseMetaData)
-    const upstreamError = readRecord(metadata.Error ?? record.Error)
-    if (Object.keys(upstreamError).length) {
-      const code = readText(upstreamError.Code) || readText(upstreamError.code) || '请求失败'
-      const message = readText(upstreamError.Message) || readText(upstreamError.message) || '请求失败'
-      throw new Error(describeVolcengineError(code, message))
-    }
-    const resultRecord = readRecord(record.Result)
-    const rawTranslations = record.TranslationList ?? resultRecord.TranslationList
-    const translations = Array.isArray(rawTranslations) ? rawTranslations : []
-    const result = translations
-      .map((item) => readText(readRecord(item).Translation))
-      .filter(Boolean)
-      .join('\n')
-      .trim()
-    if (!result) throw new Error('火山引擎返回内容为空。')
-    return result
-  } finally {
-    clearTimeout(timeoutId)
+    },
+    VOLCENGINE_TIMEOUT_MS,
+    signal,
+  )
+  const record = readRecord(payload)
+  const metadata = readRecord(record.ResponseMetadata ?? record.ResponseMetaData)
+  const upstreamError = readRecord(metadata.Error ?? record.Error)
+  if (Object.keys(upstreamError).length) {
+    const code = readText(upstreamError.Code) || readText(upstreamError.code) || '请求失败'
+    const message = readText(upstreamError.Message) || readText(upstreamError.message) || '请求失败'
+    throw new Error(describeVolcengineError(code, message))
   }
+  const resultRecord = readRecord(record.Result)
+  const rawTranslations = record.TranslationList ?? resultRecord.TranslationList
+  const translations = Array.isArray(rawTranslations) ? rawTranslations : []
+  const result = translations
+    .map((item) => readText(readRecord(item).Translation))
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+  if (!result) throw new Error('火山引擎返回内容为空。')
+  return result
 }
 
 function formatVolcengineDate(value: Date): string {

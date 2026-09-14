@@ -1,9 +1,10 @@
+import { requestJson } from './request'
 import { md5Hex } from './md5'
 import { readRecord } from './read'
 import type { BaiduAiSchemeSettings, BaiduSchemeSettings } from './types'
 
-export const BAIDU_TRANSLATE_ENDPOINT = 'https://fanyi-api.baidu.com/api/trans/vip/translate'
-export const BAIDU_AI_ENDPOINT = 'https://fanyi-api.baidu.com/ait/api/aiTextTranslate'
+const BAIDU_TRANSLATE_ENDPOINT = 'https://fanyi-api.baidu.com/api/trans/vip/translate'
+const BAIDU_AI_ENDPOINT = 'https://fanyi-api.baidu.com/ait/api/aiTextTranslate'
 const BAIDU_TIMEOUT_MS = 15000
 
 const BAIDU_TARGET_CODES: Record<string, string> = {
@@ -59,34 +60,28 @@ export async function requestBaiduTranslation(
     sign: createBaiduSignature(scheme.appId.trim(), text, salt, scheme.secretKey.trim()),
     ...(isAi ? { model_type: scheme.modelType } : {}),
   })
-  const timeout = new AbortController()
-  const timeoutId = setTimeout(() => timeout.abort(new DOMException('Request timed out', 'TimeoutError')), BAIDU_TIMEOUT_MS)
-  try {
-    const response = await fetch(isAi ? BAIDU_AI_ENDPOINT : BAIDU_TRANSLATE_ENDPOINT, {
+  const payload = await requestJson(
+    isAi ? BAIDU_AI_ENDPOINT : BAIDU_TRANSLATE_ENDPOINT,
+    {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
-      signal: signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal,
-    })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const contentType = response.headers.get('content-type') ?? ''
-    if (contentType && !contentType.includes('application/json')) throw new Error('响应不是 JSON。')
-    const payload = await response.json().catch(() => null)
-    const record = readRecord(payload)
-    if (typeof record.error_code === 'string' || typeof record.error_code === 'number') {
-      const code = String(record.error_code)
-      const message = typeof record.error_msg === 'string' ? record.error_msg : '请求失败'
-      throw new Error(`百度翻译 ${code}：${message}`)
-    }
-    const translations = Array.isArray(record.trans_result) ? record.trans_result : []
-    const result = translations
-      .map((item) => readRecord(item).dst)
-      .filter((item): item is string => typeof item === 'string')
-      .join('\n')
-      .trim()
-    if (!result) throw new Error('百度翻译返回内容为空。')
-    return result
-  } finally {
-    clearTimeout(timeoutId)
+    },
+    BAIDU_TIMEOUT_MS,
+    signal,
+  )
+  const record = readRecord(payload)
+  if (typeof record.error_code === 'string' || typeof record.error_code === 'number') {
+    const code = String(record.error_code)
+    const message = typeof record.error_msg === 'string' ? record.error_msg : '请求失败'
+    throw new Error(`百度翻译 ${code}：${message}`)
   }
+  const translations = Array.isArray(record.trans_result) ? record.trans_result : []
+  const result = translations
+    .map((item) => readRecord(item).dst)
+    .filter((item): item is string => typeof item === 'string')
+    .join('\n')
+    .trim()
+  if (!result) throw new Error('百度翻译返回内容为空。')
+  return result
 }
