@@ -11,7 +11,7 @@ import {
   resetToDefaults,
   validateAiUrl,
 } from '../../src/core/settings'
-import { classifySelection, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
+import { classifySelection, extractSingleWord, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
 import { toContentSettings } from '../../src/extension/storage'
 
 describe('language detection', () => {
@@ -48,6 +48,8 @@ describe('text classification', () => {
     ['Hello', 'dictionary', 'Hello'],
     ['hello!', 'dictionary', 'hello'],
     ["don't", 'dictionary', "don't"],
+    ['你好', 'dictionary', '你好'],
+    ['你', 'ai', '你'],
     ['U.S.A.', 'ai', 'U.S.A.'],
     ['two words', 'ai', 'two words'],
     ['   ', 'empty', ''],
@@ -58,6 +60,20 @@ describe('text classification', () => {
   it('finds contractions at a text offset and excludes the end boundary', () => {
     expect(getWordAtOffset("A user's guide", 4)?.word).toBe("user's")
     expect(getWordAtOffset('word', 4)).toBeNull()
+  })
+
+  it('extracts CJK and accented words with a two-character CJK minimum', () => {
+    expect(extractSingleWord('你好')).toBe('你好')
+    expect(extractSingleWord('你')).toBeNull()
+    expect(extractSingleWord('你好世界')).toBeNull() // 两个词不算单词
+    expect(extractSingleWord('café')).toBe('café')
+    expect(extractSingleWord('こんにちは')).toBe('こんにちは')
+  })
+
+  it('finds CJK words at a text offset and rejects single characters', () => {
+    expect(getWordAtOffset('你好，世界', 0)).toEqual({ word: '你好', start: 0, end: 2 })
+    expect(getWordAtOffset('你好，世界', 3)).toEqual({ word: '世界', start: 3, end: 5 })
+    expect(getWordAtOffset('你好吗', 2)).toBeNull() // 单字不取词
   })
 
   it('normalizes and limits submitted content', () => {
