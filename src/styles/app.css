@@ -50,20 +50,41 @@ button {
   outline-offset: 2px;
 }
 
-.app-shell {
+.options-page {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
+  grid-template-columns: minmax(360px, 1fr) minmax(480px, 560px);
+  width: min(1440px, 100%);
   min-height: 100vh;
+  margin: 0 auto;
+}
+
+.demo-column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  background: var(--af-page);
+}
+
+.schemes-slot {
+  padding: 0 52px 8px;
+}
+
+.word-slot {
+  padding: 0 52px 0;
+}
+
+.settings-column {
+  min-width: 0;
+  border: 1px solid var(--af-line);
+  background: var(--af-panel);
+  margin-top: 40px;
+  border-radius: 12px;
+  align-self: flex-start;
 }
 
 .demo-surface {
   min-width: 0;
-}
-
-.options-shell {
-  grid-template-columns: minmax(0, 960px);
-  justify-content: center;
-  padding: 28px;
 }
 
 .demo-pane {
@@ -102,36 +123,6 @@ button {
   background: var(--af-soft);
   font-size: 15px;
   line-height: 1.55;
-}
-
-.settings-panel {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  max-height: 100vh;
-  overflow: auto;
-  scrollbar-gutter: stable;
-  border-left: 1px solid var(--af-line);
-  background: transparent;
-  font-size: 16px;
-  line-height: 1.4;
-}
-
-.options-shell .settings-panel {
-  position: static;
-  height: auto;
-  max-height: none;
-  border: 1px solid var(--af-line);
-  border-radius: 8px;
-  background: var(--af-panel);
-}
-
-.settings-panel > .schemes-section {
-  margin: 16px 20px 28px;
-}
-
-.settings-panel > .word-sources-card {
-  margin: 16px 20px 0;
 }
 
 .settings-form {
@@ -438,22 +429,23 @@ input[type="range"] {
   transform: translateY(-50%) rotate(45deg);
 }
 
-@media (max-width: 900px) {
-  .app-shell {
+@media (max-width: 980px) {
+  .options-page {
     grid-template-columns: 1fr;
-    padding: 16px;
   }
 
+  .schemes-slot {
+    padding: 0 52px 8px;
+  }
+
+  .word-slot {
+    padding: 0 52px 10px;
+  }
+}
+
+@media (max-width: 900px) {
   .demo-pane {
     padding: 34px 4px 44px;
-  }
-
-  .settings-panel {
-    position: static;
-    height: auto;
-    max-height: none;
-    border-left: 0;
-    border-top: 1px solid var(--af-line);
   }
 
   .settings-form {
@@ -462,6 +454,14 @@ input[type="range"] {
 
   .setting-section:last-child {
     grid-column: auto;
+  }
+
+  .schemes-slot {
+    padding: 0 4px 8px;
+  }
+
+  .word-slot {
+    padding: 0 4px 40px;
   }
 }
 

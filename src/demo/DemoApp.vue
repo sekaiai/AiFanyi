@@ -88,21 +88,29 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
 </script>
 
 <template>
-  <div :class="showSettings ? 'app-shell' : 'demo-surface'">
-    <main id="reading-area" class="demo-pane">
-      <h1>Translation demo</h1>
-      <p class="tip">悬停或选中单词查词典；选中多个词、句子或段落时按翻译方案顺序翻译。划词对代码区同样生效，悬停不会在代码区弹泡。与目标语言相同的文本不会触发翻译。</p>
-      <div class="reading-copy">
-        <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
-        <p>Learning another language can help you understand different cultures and communicate with people around the world.</p>
-        <p>Technology is changing the way people work, communicate and learn new things every day.</p>
-        <pre><code>const message = "代码区不触发悬停，但划词可显式翻译";</code></pre>
-      </div>
-    </main>
-    <aside v-if="showSettings" class="settings-panel" aria-label="演示设置">
+  <div :class="showSettings ? 'options-page' : 'demo-surface'">
+    <div :class="showSettings ? 'demo-column' : undefined">
+      <main id="reading-area" class="demo-pane">
+        <h1>Translation demo</h1>
+        <p class="tip">悬停或选中单词查词典；选中多个词、句子或段落时按翻译方案顺序翻译。划词对代码区同样生效，悬停不会在代码区弹泡。与目标语言相同的文本不会触发翻译。</p>
+        <div class="reading-copy">
+          <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
+          <p>Learning another language can help you understand different cultures and communicate with people around the world.</p>
+          <p>Technology is changing the way people work, communicate and learn new things every day.</p>
+          <pre><code>const message = "代码区不触发悬停，但划词可显式翻译";</code></pre>
+        </div>
+      </main>
+      <template v-if="showSettings">
+        <section class="word-slot" aria-label="单词翻译">
+          <WordSourcesCard v-model="settings" />
+        </section>
+        <section class="schemes-slot" aria-label="句子翻译">
+          <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" :test-scheme="testScheme" demo-mode />
+        </section>
+      </template>
+    </div>
+    <aside v-if="showSettings" class="settings-column" aria-label="演示设置">
       <SettingsForm v-model="settings" :status="status" @reset="reset" />
-      <WordSourcesCard v-model="settings" />
-      <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" :test-scheme="testScheme" demo-mode />
     </aside>
   </div>
 </template>

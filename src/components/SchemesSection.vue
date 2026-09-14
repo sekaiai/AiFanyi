@@ -331,6 +331,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 .scheme-card {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 8px 12px;
   border: 1px solid var(--af-line);
@@ -359,8 +360,10 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 }
 
 .scheme-name {
+  overflow: hidden;
   font-size: 14px;
   font-weight: 640;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -462,10 +465,6 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 }
 
 @media (max-width: 760px) {
-  .scheme-card {
-    flex-wrap: wrap;
-  }
-
   .scheme-status {
     flex-basis: 100%;
     order: 5;
