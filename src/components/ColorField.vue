@@ -23,7 +23,6 @@ onMounted(() => {
   pickr = Pickr.create({
     el,
     theme: 'nano',
-    default: color.value,
     comparison: false,
     components: {
       preview: true,
@@ -35,6 +34,9 @@ onMounted(() => {
       },
     },
   })
+  // pickr 1.10.2 的 default 选项失效：内部初始化恒用当前 _color（黑色），
+  // `?? default` 永不生效。挂载后必须显式播种当前颜色，否则取色按钮呈现为黑色。
+  pickr.setColor(color.value, true)
 
   pickr.on('change', (hsva: Pickr.HSVaColor, source: string | null) => {
     // pickr 的真实颜色编辑来源只有 'slider'（取色盘/色相/透明度拖动）与 'input'（hex 输入）。

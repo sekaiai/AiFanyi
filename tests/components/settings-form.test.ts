@@ -25,16 +25,19 @@ const pickrStub = vi.hoisted(() => {
     on: (event: string, listener: ChangeListener) => unknown
     setColor: (value: string, silent?: boolean) => boolean
     destroyAndRemove: () => void
+    setColors: Array<{ value: string; silent?: boolean }>
   }> = []
 
   const create = () => {
     const instance = {
       listeners: [] as ChangeListener[],
+      setColors: [] as Array<{ value: string; silent?: boolean }>,
       on(event: string, listener: ChangeListener) {
         if (event === 'change') instance.listeners.push(listener)
         return instance
       },
-      setColor(value: string) {
+      setColor(value: string, silent?: boolean) {
+        instance.setColors.push(silent === undefined ? { value } : { value, silent })
         const hsva = { toRGBA: () => hexToRgba(value) }
         for (const listener of [...instance.listeners]) listener(hsva, 'swatch')
         return true
@@ -127,6 +130,19 @@ describe('SettingsForm', () => {
     })
     expect(wrapper.get('[data-testid="bubble-preview"]').attributes('style'))
       .toContain(`--af-bubble-background: ${COLOR_PRESETS.night.background}`)
+  })
+
+  it('seeds pickr with the current colors on mount', () => {
+    const defaults = cloneDefaultSettings()
+    mount(SettingsHarness)
+
+    // pickr 1.10.2 的 default 选项失效（内部初始化恒用当前 _color），挂载后必须显式播种
+    expect(pickrStub.instances.map((instance) => instance.setColors[0])).toEqual([
+      { value: defaults.bubble.background, silent: true },
+      { value: defaults.bubble.textColor, silent: true },
+      { value: defaults.bubble.borderColor, silent: true },
+      { value: defaults.bubble.highlightColor, silent: true },
+    ])
   })
 
   it('marks the preset as custom after a color is edited', async () => {
