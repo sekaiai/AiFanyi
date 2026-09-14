@@ -31,11 +31,7 @@ async function readSettingsFrom(area: 'sync' | 'local'): Promise<TranslationSett
 
 /** 浏览器界面语言；取不到时按英文兜底。 */
 function getBrowserLanguage(): string {
-  try {
-    return navigator.language || 'en'
-  } catch {
-    return 'en'
-  }
+  return navigator.language || 'en'
 }
 
 async function loadSettings(): Promise<TranslationSettings> {

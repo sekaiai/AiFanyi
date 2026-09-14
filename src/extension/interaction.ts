@@ -35,7 +35,8 @@ const CACHE_LIMIT = 80
 
 export function createInteraction(host: InteractionHost) {
   const cache = new Map<string, ExtensionResponse>()
-  const bindings: Array<{ target: EventTarget; type: string; listener: EventListener; options?: AddEventListenerOptions | undefined }> = []
+  // 所有 listen() 注册的监听共享一个信号；destroy 时一次 abort 全部移除。
+  const listenerScope = new AbortController()
   let currentRange: Range | null = null
   let currentText = ''
   let currentKind: 'dictionary' | 'ai' | null = null
@@ -104,8 +105,7 @@ export function createInteraction(host: InteractionHost) {
   function destroy(): void {
     close()
     window.clearTimeout(selectionTimer)
-    for (const binding of bindings) binding.target.removeEventListener(binding.type, binding.listener, binding.options)
-    bindings.length = 0
+    listenerScope.abort()
   }
 
   /** 设置更新：应用气泡样式；全局停用时关闭气泡，否则按新设置重定位。 */
@@ -318,8 +318,7 @@ export function createInteraction(host: InteractionHost) {
   }
 
   function listen(target: EventTarget, type: string, listener: (event: Event) => void, options?: AddEventListenerOptions | undefined): void {
-    target.addEventListener(type, listener, options)
-    bindings.push({ target, type, listener, options })
+    target.addEventListener(type, listener, { ...options, signal: listenerScope.signal })
   }
 
   return { start, destroy, updateSettings }
