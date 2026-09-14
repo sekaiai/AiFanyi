@@ -116,6 +116,12 @@ export function createInteraction(host: InteractionHost) {
   }
 
   function onMouseMove(event: MouseEvent): void {
+    // 划词查单词处于延迟期时，鼠标移动即重新计时：静止满延迟才触发。
+    if (!pointerDown && submitTimer) {
+      window.clearTimeout(submitTimer)
+      submitTimer = 0
+      handleSelection()
+    }
     const settings = host.getSettings()
     const target = event.target instanceof Element ? event.target : null
     if (
@@ -155,12 +161,16 @@ export function createInteraction(host: InteractionHost) {
     }
     wordHovered = true
     window.clearTimeout(closeTimer)
-    if (hoveredTarget?.node === caret.node && hoveredTarget.start === word.start && hoveredTarget.end === word.end) return
+    const sameWord = hoveredTarget?.node === caret.node && hoveredTarget.start === word.start && hoveredTarget.end === word.end
     hoveredTarget = { node: caret.node, start: word.start, end: word.end }
-    showHighlight(host.highlight, rect, settings.bubble.highlightColor)
+    // 换词时先撤下旧词高亮，避免高亮残留在已不悬停的词上
+    if (!sameWord) hideHighlight(host.highlight)
+    // 鼠标移动中不计数：每次移动（含同一词内）都重置计时，静止满延迟才触发；高亮与气泡一起延迟出现。
     window.clearTimeout(hoverTimer)
     hoverTimer = window.setTimeout(() => {
+      hoverTimer = 0
       if (!wordHovered || hoveredTarget?.node !== caret.node) return
+      showHighlight(host.highlight, rect, settings.bubble.highlightColor)
       currentInteraction = 'hover'
       currentKind = 'dictionary'
       currentRange = range
@@ -194,10 +204,13 @@ export function createInteraction(host: InteractionHost) {
     currentKind = action.type
     currentRange = range
     currentText = action.text
-    // 划词查单词与悬停选词同一套延迟约束：遵守悬停延迟设置且最低 300ms；
-    // 句子 / 段落翻译保持即时（划词是主动操作）。
+    // 划词查单词与悬停同一套「静止满延迟才触发」约束：遵守悬停延迟设置且最低 300ms，
+    // 延迟期内鼠标移动会重新计时（见 onMouseMove）；句子 / 段落翻译保持即时（划词是主动操作）。
     if (action.type === 'dictionary') {
-      submitTimer = window.setTimeout(() => void submit('dictionary', action.text, range), wordLookupDelay(settings.hoverDelayMs))
+      submitTimer = window.setTimeout(() => {
+        submitTimer = 0
+        void submit('dictionary', action.text, range)
+      }, wordLookupDelay(settings.hoverDelayMs))
     } else {
       void submit(action.type, action.text, range)
     }
