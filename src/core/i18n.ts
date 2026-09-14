@@ -519,47 +519,24 @@ export interface SchemeGuideKeys {
   links: MessageKey[]
 }
 
+/** 按统一的 guide.<type>.step.N 命名规则生成一份方案指南文案键。 */
+function guideKeys(type: SchemeType, stepCount: number, linkCount: number): SchemeGuideKeys {
+  const numbered = (part: string, count: number) =>
+    Array.from({ length: count }, (_, i) => `guide.${type}.${part}.${i + 1}`) as MessageKey[]
+  return {
+    title: `guide.${type}.title` as MessageKey,
+    tagline: `guide.${type}.tagline` as MessageKey,
+    steps: numbered('step', stepCount),
+    links: numbered('link', linkCount),
+  }
+}
+
 export const GUIDE_KEYS: Record<SchemeType, SchemeGuideKeys> = {
-  deepl: {
-    title: 'guide.deepl.title',
-    tagline: 'guide.deepl.tagline',
-    steps: ['guide.deepl.step.1', 'guide.deepl.step.2', 'guide.deepl.step.3'],
-    links: ['guide.deepl.link.1', 'guide.deepl.link.2'],
-  },
-  google: {
-    title: 'guide.google.title',
-    tagline: 'guide.google.tagline',
-    steps: ['guide.google.step.1', 'guide.google.step.2', 'guide.google.step.3'],
-    links: ['guide.google.link.1', 'guide.google.link.2'],
-  },
-  googleCloud: {
-    title: 'guide.googleCloud.title',
-    tagline: 'guide.googleCloud.tagline',
-    steps: ['guide.googleCloud.step.1', 'guide.googleCloud.step.2', 'guide.googleCloud.step.3', 'guide.googleCloud.step.4'],
-    links: ['guide.googleCloud.link.1', 'guide.googleCloud.link.2', 'guide.googleCloud.link.3'],
-  },
-  baidu: {
-    title: 'guide.baidu.title',
-    tagline: 'guide.baidu.tagline',
-    steps: ['guide.baidu.step.1', 'guide.baidu.step.2', 'guide.baidu.step.3', 'guide.baidu.step.4'],
-    links: ['guide.baidu.link.1', 'guide.baidu.link.2'],
-  },
-  baiduAi: {
-    title: 'guide.baiduAi.title',
-    tagline: 'guide.baiduAi.tagline',
-    steps: ['guide.baiduAi.step.1', 'guide.baiduAi.step.2', 'guide.baiduAi.step.3', 'guide.baiduAi.step.4'],
-    links: ['guide.baiduAi.link.1', 'guide.baiduAi.link.2'],
-  },
-  volcengine: {
-    title: 'guide.volcengine.title',
-    tagline: 'guide.volcengine.tagline',
-    steps: ['guide.volcengine.step.1', 'guide.volcengine.step.2', 'guide.volcengine.step.3', 'guide.volcengine.step.4'],
-    links: ['guide.volcengine.link.1', 'guide.volcengine.link.2', 'guide.volcengine.link.3'],
-  },
-  ai: {
-    title: 'guide.ai.title',
-    tagline: 'guide.ai.tagline',
-    steps: ['guide.ai.step.1', 'guide.ai.step.2', 'guide.ai.step.3', 'guide.ai.step.4'],
-    links: ['guide.ai.link.1', 'guide.ai.link.2'],
-  },
+  deepl: guideKeys('deepl', 3, 2),
+  google: guideKeys('google', 3, 2),
+  googleCloud: guideKeys('googleCloud', 4, 3),
+  baidu: guideKeys('baidu', 4, 2),
+  baiduAi: guideKeys('baiduAi', 4, 2),
+  volcengine: guideKeys('volcengine', 4, 3),
+  ai: guideKeys('ai', 4, 2),
 }

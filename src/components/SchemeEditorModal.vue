@@ -27,12 +27,12 @@ const saving = ref(false)
 const saveError = ref('')
 const guide = computed(() => {
   const keys = GUIDE_KEYS[draft.value.type]
-  const links = SCHEME_GUIDES[draft.value.type].links
+  const hrefs = SCHEME_GUIDES[draft.value.type]
   return {
     title: t(keys.title),
     tagline: t(keys.tagline),
     steps: keys.steps.map((key) => t(key)),
-    links: keys.links.map((key, index) => ({ label: t(key), href: links[index]?.href ?? '' })),
+    links: keys.links.map((key, index) => ({ label: t(key), href: hrefs[index] ?? '' })),
   }
 })
 
