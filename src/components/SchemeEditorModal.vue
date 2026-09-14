@@ -511,33 +511,6 @@ async function save(): Promise<void> {
   line-height: 1.55;
 }
 
-.button {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  font-size: 14px;
-  white-space: nowrap;
-  font-weight: 600;
-  transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: .6;
-}
-
-.button-secondary {
-  border-color: var(--af-control-border);
-  background: var(--af-control-background);
-  color: var(--af-text);
-}
-
-.button-secondary:hover {
-  border-color: var(--af-control-border-hover);
-  background: var(--af-control-hover);
-}
-
 .button-primary {
   background: var(--af-accent);
   color: var(--af-accent-contrast);

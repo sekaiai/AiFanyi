@@ -310,35 +310,8 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   color: oklch(55% 0.19 25);
 }
 
-.button {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  font-size: 14px;
-  font-weight: 400;
-  transition: background 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
-  white-space: nowrap;
-}
-
-.button-secondary {
-  border-color: var(--af-control-border);
-  background: var(--af-control-background);
-  color: var(--af-text);
-}
-
-.button-secondary:hover {
-  border-color: var(--af-control-border-hover);
-  background: var(--af-control-hover);
-}
-
 .button-primary {
   color: var(--af-accent);
-}
-
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
 }
 
 .switch-field {
@@ -348,36 +321,6 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   gap: 8px;
   user-select: none;
   cursor: pointer;
-}
-
-/* 复选框：appearance 自绘，选中 accent 底 + 白色对勾 */
-.checkbox {
-  appearance: none;
-  flex: none;
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  border: 1px solid var(--af-control-border);
-  border-radius: 4px;
-  background-color: var(--af-control-background);
-  cursor: pointer;
-  transition: background-color 160ms ease-out, border-color 160ms ease-out, box-shadow 160ms ease-out;
-}
-.checkbox:hover {
-  border-color: var(--af-control-border-hover);
-}
-.checkbox:checked {
-  border-color: var(--af-accent);
-  background-color: var(--af-accent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-size: 12px;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-.checkbox:focus-visible {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
 .scheme-list {
