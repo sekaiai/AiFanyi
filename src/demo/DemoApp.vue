@@ -96,10 +96,10 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
         <h1>Translation demo</h1>
         <div class="reading-copy">
           <p>悬停或选中单词查词典；选中多个词、句子或段落时按翻译方案顺序翻译。划词对代码区同样生效，悬停不会在代码区弹泡。与目标语言相同的文本不会触发翻译。</p>
-          <p>Hover over or select a word to look it up; when multiple words, a sentence or a paragraph is selected, schemes are tried in order. Selection also works inside code blocks, while hover never pops up over them. Text identical to the target language is not translated.</p>
           <p>你曾经深爱的人，有时会变成你永远铭记的人。美好的回忆往往在人离开后依然留存。</p>
-          <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
           <p>配置与密钥通过浏览器账号同步存储，在各设备间自动同步；密钥仅由后台请求使用，网页内容脚本不会接收密钥。</p>
+          <p>Hover over or select a word to look it up; when multiple words, a sentence or a paragraph is selected, schemes are tried in order. Selection also works inside code blocks, while hover never pops up over them. Text identical to the target language is not translated.</p>
+          <p>Someone you loved can sometimes become someone you remember forever. Beautiful memories often remain even after people disappear from our lives.</p>
           <p>Settings and keys are stored with browser account sync and stay in sync across devices; keys are used only by background requests, and content scripts never receive them.</p>
           <pre><code>const message = "代码区不触发悬停，但划词可显式翻译";</code></pre>
         </div>
