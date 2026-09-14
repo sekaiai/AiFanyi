@@ -209,6 +209,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
       <div class="hfields">
         <div class="check-rows">
           <label class="check-row"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>全局启用</span></label>
+          <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>显示箭头</span></label>
           <label class="check-row"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>悬停翻译</span></label>
           <label class="check-row"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>选中翻译</span></label>
           <label class="check-row" title="单词卡片中是否显示原词与音标（含朗读按钮）；句子气泡的原文由「句子显示原文」单独控制。">
@@ -219,9 +220,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
             <input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" data-testid="show-original" />
             <span>句子显示原文</span>
           </label>
-          <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>显示箭头</span></label>
-        </div>
-        <div class="hfield">
+          <div class="hfield check-row">
           <span class="hlbl">鼠标悬停多久后触发翻译</span>
           <input
             v-model.number="settings.hoverDelayMs"
@@ -234,6 +233,8 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
           />
           <output class="delay-val">{{ hoverDelayText }}</output>
         </div>
+        </div>
+        
         <div class="hfield grow">
           <span class="hlbl">站点黑名单<span class="hlbl-sub">每行一个域名</span></span>
           <textarea v-model="blacklistText" class="blacklist" placeholder="example.com&#10;*.internal.example" />
@@ -319,10 +320,9 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
 }
 /* 复选组：与「单词翻译」源行同款芯片样式，空间足够时一排放下 6 个 */
 .check-rows {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px 8px;
-  flex: 1 1 100%;
 }
 .check-row {
   display: flex;
