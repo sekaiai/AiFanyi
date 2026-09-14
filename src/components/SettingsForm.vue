@@ -76,7 +76,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
             </label>
           </div>
         </div>
-        <button class="button button-secondary" type="button" @click="emit('reset')">{{ t('form.reset') }}</button>
+        <button style="height: 36px;" class="button button-secondary" type="button" @click="emit('reset')">{{ t('form.reset') }}</button>
       </div>
     </header>
 
@@ -424,7 +424,7 @@ textarea.blacklist:focus {
 .locale-options {
   display: inline-flex;
   gap: 4px;
-  min-height: 38px;
+  min-height: 34px;
   padding: 3px;
   border: 1px solid var(--af-control-border);
   border-radius: 8px;
