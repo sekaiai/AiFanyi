@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { COLOR_PRESETS } from '../core/settings'
-import type { BubbleColorPreset, TranslationSettings } from '../core/types'
+import type { BubbleColorPreset, TranslationSettings, UiLocale } from '../core/types'
 import BubblePreview from './BubblePreview.vue'
 import ColorField from './ColorField.vue'
+import { useUiLocale } from '../composables/useUiLocale'
 
 const settings = defineModel<TranslationSettings>({ required: true })
+
+const { t } = useUiLocale()
 
 defineProps<{
   status: string
@@ -14,6 +17,11 @@ defineProps<{
 const emit = defineEmits<{
   reset: []
 }>()
+
+const UI_LOCALE_OPTIONS: { value: UiLocale; label: string }[] = [
+  { value: 'zh', label: '中文' },
+  { value: 'en', label: 'English' },
+]
 
 const blacklistText = computed({
   get: () => settings.value.siteBlacklist.join('\n'),
@@ -55,10 +63,21 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
   <form class="settings-form" @submit.prevent>
     <header class="settings-header">
       <div>
-        <h1 class="settings-title">设置</h1>
+        <h1 class="settings-title">{{ t('form.title') }}</h1>
         <p class="settings-status">{{ status }}</p>
       </div>
-      <button class="button button-secondary" type="button" @click="emit('reset')">恢复默认</button>
+      <div class="header-actions">
+        <div class="locale-switch">
+          <span class="field-label">{{ t('app.uiLanguage') }}</span>
+          <div class="locale-options" role="radiogroup" :aria-label="t('app.uiLanguage')" data-testid="ui-locale">
+            <label v-for="option in UI_LOCALE_OPTIONS" :key="option.value" class="locale-option">
+              <input v-model="settings.uiLocale" type="radio" name="ui-locale" :value="option.value" />
+              <span>{{ option.label }}</span>
+            </label>
+          </div>
+        </div>
+        <button class="button button-secondary" type="button" @click="emit('reset')">{{ t('form.reset') }}</button>
+      </div>
     </header>
 
     <section class="settings-section preview-section">
@@ -66,96 +85,96 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
     </section>
 
     <section class="settings-section">
-      <h2 class="section-title">位置</h2>
+      <h2 class="section-title">{{ t('form.position') }}</h2>
       <div class="control-stack">
         <div class="control-grid two">
           <label class="field">
-            <span class="field-label">方向</span>
+            <span class="field-label">{{ t('form.direction') }}</span>
             <select v-model="settings.bubble.side" data-testid="bubble-side">
-              <option value="top">上</option>
-              <option value="bottom">下</option>
-              <option value="left">左</option>
-              <option value="right">右</option>
+              <option value="top">{{ t('form.side.top') }}</option>
+              <option value="bottom">{{ t('form.side.bottom') }}</option>
+              <option value="left">{{ t('form.side.left') }}</option>
+              <option value="right">{{ t('form.side.right') }}</option>
             </select>
           </label>
           <label class="field">
-            <span class="field-label">对齐</span>
+            <span class="field-label">{{ t('form.alignLabel') }}</span>
             <select v-model="settings.bubble.align">
-              <option value="start">起始</option>
-              <option value="center">居中</option>
-              <option value="end">末端</option>
+              <option value="start">{{ t('form.align.start') }}</option>
+              <option value="center">{{ t('form.align.center') }}</option>
+              <option value="end">{{ t('form.align.end') }}</option>
             </select>
           </label>
         </div>
         <label class="range-field">
-          <span class="range-label">间距 <output>{{ settings.bubble.gap }} px</output></span>
+          <span class="range-label">{{ t('form.gap') }} <output>{{ settings.bubble.gap }} px</output></span>
           <input v-model.number="settings.bubble.gap" type="range" min="0" max="24" step="1" :style="{ '--fill': fillPct(settings.bubble.gap, 0, 24) }" />
         </label>
         <label class="range-field">
-          <span class="range-label">水平微调 <output>{{ settings.bubble.offsetX }} px</output></span>
+          <span class="range-label">{{ t('form.offsetX') }} <output>{{ settings.bubble.offsetX }} px</output></span>
           <input v-model.number="settings.bubble.offsetX" type="range" min="-80" max="80" step="1" :style="{ '--fill': fillPct(settings.bubble.offsetX, -80, 80) }" />
         </label>
         <label class="range-field">
-          <span class="range-label">垂直微调 <output>{{ settings.bubble.offsetY }} px</output></span>
+          <span class="range-label">{{ t('form.offsetY') }} <output>{{ settings.bubble.offsetY }} px</output></span>
           <input v-model.number="settings.bubble.offsetY" type="range" min="-80" max="80" step="1" :style="{ '--fill': fillPct(settings.bubble.offsetY, -80, 80) }" />
         </label>
       </div>
     </section>
 
     <section class="settings-section">
-      <h2 class="section-title">气泡</h2>
+      <h2 class="section-title">{{ t('form.bubble') }}</h2>
       <div class="control-stack">
         <div class="control-grid two">
           <label class="field">
-            <span class="field-label">颜色预设</span>
+            <span class="field-label">{{ t('form.colorPreset') }}</span>
             <select data-testid="color-preset" :value="settings.bubble.colorPreset" @change="setColorPreset(($event.target as HTMLSelectElement).value as BubbleColorPreset)">
-              <option value="paper">柔白</option>
-              <option value="warm">暖黄</option>
-              <option value="mint">薄荷</option>
-              <option value="sky">浅蓝</option>
-              <option value="night">夜间</option>
-              <option value="custom">自定义</option>
+              <option value="paper">{{ t('form.preset.paper') }}</option>
+              <option value="warm">{{ t('form.preset.warm') }}</option>
+              <option value="mint">{{ t('form.preset.mint') }}</option>
+              <option value="sky">{{ t('form.preset.sky') }}</option>
+              <option value="night">{{ t('form.preset.night') }}</option>
+              <option value="custom">{{ t('form.preset.custom') }}</option>
             </select>
           </label>
           <label class="field">
-            <span class="field-label">阴影</span>
+            <span class="field-label">{{ t('form.shadow') }}</span>
             <select v-model="settings.bubble.shadow">
-              <option value="none">无</option>
-              <option value="soft">轻柔</option>
-              <option value="medium">适中</option>
-              <option value="strong">明显</option>
+              <option value="none">{{ t('form.shadow.none') }}</option>
+              <option value="soft">{{ t('form.shadow.soft') }}</option>
+              <option value="medium">{{ t('form.shadow.medium') }}</option>
+              <option value="strong">{{ t('form.shadow.strong') }}</option>
             </select>
           </label>
         </div>
         <div class="control-grid flex-between">
           <label class="field">
-            <span class="field-label">背景</span>
+            <span class="field-label">{{ t('form.background') }}</span>
             <ColorField :model-value="settings.bubble.background" @update:model-value="setBubbleColor('background', $event)" />
           </label>
           <label class="field">
-            <span class="field-label">文字</span>
+            <span class="field-label">{{ t('form.textColor') }}</span>
             <ColorField :model-value="settings.bubble.textColor" @update:model-value="setBubbleColor('textColor', $event)" />
           </label>
           <label class="field">
-            <span class="field-label">边框</span>
+            <span class="field-label">{{ t('form.borderColor') }}</span>
             <ColorField :model-value="settings.bubble.borderColor" @update:model-value="setBubbleColor('borderColor', $event)" />
           </label>
           <label class="field">
-            <span class="field-label">单词高亮</span>
+            <span class="field-label">{{ t('form.highlight') }}</span>
             <ColorField v-model="settings.bubble.highlightColor" />
           </label>
         </div>
         <div class="control-grid two">
           <label class="range-field">
-            <span class="range-label">边框宽度 <output>{{ settings.bubble.borderWidth }} px</output></span>
+            <span class="range-label">{{ t('form.borderWidth') }} <output>{{ settings.bubble.borderWidth }} px</output></span>
             <input v-model.number="settings.bubble.borderWidth" type="range" min="0" max="3" step="1" :style="{ '--fill': fillPct(settings.bubble.borderWidth, 0, 3) }" />
           </label>
           <label class="range-field">
-            <span class="range-label">圆角 <output>{{ settings.bubble.radius }} px</output></span>
+            <span class="range-label">{{ t('form.radius') }} <output>{{ settings.bubble.radius }} px</output></span>
             <input v-model.number="settings.bubble.radius" type="range" min="0" max="20" step="1" :style="{ '--fill': fillPct(settings.bubble.radius, 0, 20) }" />
           </label>
           <label class="range-field">
-            <span class="range-label">内边距 <output>{{ settings.bubble.padding }} px</output></span>
+            <span class="range-label">{{ t('form.padding') }} <output>{{ settings.bubble.padding }} px</output></span>
             <input v-model.number="settings.bubble.padding" type="range" min="4" max="20" step="1" :style="{ '--fill': fillPct(settings.bubble.padding, 4, 20) }" />
           </label>
         </div>
@@ -163,41 +182,41 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
     </section>
 
     <section class="settings-section text-wide">
-      <h2 class="section-title">文字</h2>
+      <h2 class="section-title">{{ t('form.text') }}</h2>
       <div class="control-stack">
         <div class="control-grid three">
           <label class="field">
-            <span class="field-label">字体</span>
+            <span class="field-label">{{ t('form.font') }}</span>
             <select v-model="settings.bubble.fontFamily">
-              <option value="system">系统</option>
-              <option value="serif">衬线</option>
-              <option value="mono">等宽</option>
+              <option value="system">{{ t('form.font.system') }}</option>
+              <option value="serif">{{ t('form.font.serif') }}</option>
+              <option value="mono">{{ t('form.font.mono') }}</option>
             </select>
           </label>
           <label class="field">
-            <span class="field-label">字重</span>
+            <span class="field-label">{{ t('form.fontWeight') }}</span>
             <select v-model="settings.bubble.fontWeight">
-              <option value="400">常规</option>
-              <option value="500">中等</option>
-              <option value="600">加粗</option>
+              <option value="400">{{ t('form.weight.400') }}</option>
+              <option value="500">{{ t('form.weight.500') }}</option>
+              <option value="600">{{ t('form.weight.600') }}</option>
             </select>
           </label>
           <label class="field">
-            <span class="field-label">文字对齐</span>
+            <span class="field-label">{{ t('form.textAlign') }}</span>
             <select v-model="settings.bubble.textAlign">
-              <option value="left">左</option>
-              <option value="center">中</option>
-              <option value="right">右</option>
+              <option value="left">{{ t('form.textAlign.left') }}</option>
+              <option value="center">{{ t('form.textAlign.center') }}</option>
+              <option value="right">{{ t('form.textAlign.right') }}</option>
             </select>
           </label>
         </div>
         <div class="control-grid three">
           <label class="range-field">
-            <span class="range-label">字号 <output>{{ settings.bubble.fontSize }} px</output></span>
+            <span class="range-label">{{ t('form.fontSize') }} <output>{{ settings.bubble.fontSize }} px</output></span>
             <input v-model.number="settings.bubble.fontSize" type="range" min="14" max="22" step="1" :style="{ '--fill': fillPct(settings.bubble.fontSize, 14, 22) }" />
           </label>
           <label class="range-field">
-            <span class="range-label">行高 <output>{{ settings.bubble.lineHeight }}</output></span>
+            <span class="range-label">{{ t('form.lineHeight') }} <output>{{ settings.bubble.lineHeight }}</output></span>
             <input v-model.number="settings.bubble.lineHeight" type="range" min="1.2" max="2" step="0.05" :style="{ '--fill': fillPct(settings.bubble.lineHeight, 1.2, 2) }" />
           </label>
         </div>
@@ -205,23 +224,23 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
     </section>
 
     <section class="settings-section trigger-wide">
-      <h2 class="section-title">触发</h2>
+      <h2 class="section-title">{{ t('form.trigger') }}</h2>
       <div class="hfields">
         <div class="check-rows">
-          <label class="check-row"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>全局启用</span></label>
-          <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>显示箭头</span></label>
-          <label class="check-row"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>悬停翻译</span></label>
-          <label class="check-row"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>选中翻译</span></label>
-          <label class="check-row" title="单词卡片中是否显示原词与音标（含朗读按钮）；句子气泡的原文由「句子显示原文」单独控制。">
+          <label class="check-row"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>{{ t('form.enabled') }}</span></label>
+          <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>{{ t('form.showArrow') }}</span></label>
+          <label class="check-row"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>{{ t('form.hoverTranslate') }}</span></label>
+          <label class="check-row"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>{{ t('form.selectionTranslate') }}</span></label>
+          <label class="check-row" :title="t('form.showOriginalWordTip')">
             <input v-model="settings.word.showOriginal" type="checkbox" class="checkbox" data-testid="show-original-word" />
-            <span>显示原文</span>
+            <span>{{ t('form.showOriginalWord') }}</span>
           </label>
-          <label class="check-row" title="句子翻译气泡中是否显示原文；单词卡片的原文由「显示原文」单独控制。">
+          <label class="check-row" :title="t('form.showOriginalTip')">
             <input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" data-testid="show-original" />
-            <span>句子显示原文</span>
+            <span>{{ t('form.showOriginal') }}</span>
           </label>
           <div class="hfield check-row">
-          <span class="hlbl">鼠标悬停多久后触发翻译</span>
+          <span class="hlbl">{{ t('form.hoverDelayLabel') }}</span>
           <input
             v-model.number="settings.hoverDelayMs"
             type="range"
@@ -236,7 +255,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor', value: 
         </div>
         
         <div class="hfield grow">
-          <span class="hlbl">站点黑名单<span class="hlbl-sub">每行一个域名</span></span>
+          <span class="hlbl">{{ t('form.blacklist') }}<span class="hlbl-sub">{{ t('form.blacklistHint') }}</span></span>
           <textarea v-model="blacklistText" class="blacklist" placeholder="example.com&#10;*.internal.example" />
         </div>
       </div>
@@ -388,6 +407,64 @@ textarea.blacklist:focus {
   margin: 4px 0 0;
   color: var(--af-muted);
   font-size: 14px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.locale-switch {
+  display: grid;
+  gap: 5px;
+  justify-items: start;
+}
+
+.locale-options {
+  display: inline-flex;
+  gap: 4px;
+  min-height: 38px;
+  padding: 3px;
+  border: 1px solid var(--af-control-border);
+  border-radius: 8px;
+  background: var(--af-control-background);
+}
+
+.locale-option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--af-text);
+  cursor: pointer;
+  user-select: none;
+  transition: background 160ms ease-out, color 160ms ease-out;
+}
+
+.locale-option:hover {
+  background: var(--af-control-hover);
+}
+
+.locale-option:has(input:checked) {
+  background: var(--af-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.locale-option:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px var(--af-focus-ring);
+}
+
+.locale-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .settings-section {

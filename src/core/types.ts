@@ -98,8 +98,13 @@ export interface WordQuerySettings {
   sources: Record<WordSourceId, boolean>
 }
 
+/** 设置页界面语言：中文 / 英文。 */
+export type UiLocale = 'zh' | 'en'
+
 export interface TranslationSettings {
   version: 2
+  /** 界面语言；仅设置页与演示页使用，跟随浏览器语言判定，非中英文一律英文。 */
+  uiLocale: UiLocale
   enabled: boolean
   siteBlacklist: string[]
   hoverEnabled: boolean

@@ -11,6 +11,7 @@ import type {
   SchemeSettings,
   SchemeType,
   TranslationSettings,
+  UiLocale,
   VolcengineSchemeSettings,
   WordAccent,
   WordQuerySettings,
@@ -87,6 +88,7 @@ export const DEFAULT_GOOGLE_SCHEME: GoogleSchemeSettings = { id: 'default-google
 
 export const DEFAULT_SETTINGS: TranslationSettings = {
   version: 2,
+  uiLocale: 'zh',
   enabled: true,
   siteBlacklist: [],
   hoverEnabled: true,
@@ -128,6 +130,11 @@ export function cloneDefaultSettings(): TranslationSettings {
   return structuredClone(DEFAULT_SETTINGS)
 }
 
+/** 根据浏览器语言判定界面语言：zh 开头用中文，其余（含无法识别）一律英文。 */
+export function detectUiLocale(language: string): UiLocale {
+  return language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
+}
+
 /** 恢复默认：仅重置右侧表单项（启用/黑名单/触发/气泡/文字），保留句子翻译与单词翻译两张卡片的全部配置。 */
 export function resetToDefaults(current: TranslationSettings): TranslationSettings {
   // 经 migrateSettings 深拷贝为纯数据，剥离 Vue 响应式代理
@@ -138,6 +145,7 @@ export function resetToDefaults(current: TranslationSettings): TranslationSettin
     targetLanguage: preserved.targetLanguage,
     schemeOrder: preserved.schemeOrder,
     word: preserved.word,
+    uiLocale: preserved.uiLocale,
   }
 }
 
@@ -172,6 +180,7 @@ export function migrateSettings(value: unknown): TranslationSettings {
 
   return {
     version: 2,
+    uiLocale: readEnum<UiLocale>(input.uiLocale, ['zh', 'en'], defaults.uiLocale),
     enabled: readBoolean(input.enabled, defaults.enabled),
     hoverEnabled: readBoolean(input.hoverEnabled, defaults.hoverEnabled),
     selectionEnabled: readBoolean(input.selectionEnabled, defaults.selectionEnabled),

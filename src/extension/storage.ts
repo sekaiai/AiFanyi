@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser'
-import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, migrateSettings, resetToDefaults, type TranslationSettings } from '../core/settings'
+import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, detectUiLocale, migrateSettings, resetToDefaults, type TranslationSettings } from '../core/settings'
 import { isPublicSettingsUpdate, type PublicSettingsResponse } from '../core/messages'
 
 /** 本机同步开关的存储键：保存在 local（每台设备独立），不进同步的设置数据本身。 */
@@ -29,6 +29,15 @@ async function readSettingsFrom(area: 'sync' | 'local'): Promise<TranslationSett
   }
 }
 
+/** 浏览器界面语言；取不到时按英文兜底。 */
+function getBrowserLanguage(): string {
+  try {
+    return navigator.language || 'en'
+  } catch {
+    return 'en'
+  }
+}
+
 async function loadSettings(): Promise<TranslationSettings> {
   const syncEnabled = await loadSyncEnabled()
   if (syncEnabled) {
@@ -41,7 +50,10 @@ async function loadSettings(): Promise<TranslationSettings> {
     if (syncEnabled) void browser.storage.sync.set({ [SETTINGS_STORAGE_KEY]: fromLocal }).catch(() => undefined)
     return fromLocal
   }
-  return migrateSettings(undefined)
+  // 全新安装：界面语言跟随浏览器，非中英文一律英文
+  const fresh = migrateSettings(undefined)
+  fresh.uiLocale = detectUiLocale(getBrowserLanguage())
+  return fresh
 }
 
 async function saveSettings(settings: TranslationSettings): Promise<void> {
@@ -56,6 +68,8 @@ async function saveSettings(settings: TranslationSettings): Promise<void> {
 
 async function resetSettings(): Promise<TranslationSettings> {
   const next = resetToDefaults(await loadSettings())
+  // 恢复默认时界面语言重新跟随浏览器判定
+  next.uiLocale = detectUiLocale(getBrowserLanguage())
   await saveSettings(next)
   return next
 }

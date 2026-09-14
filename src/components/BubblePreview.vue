@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, shallowRef, useTemplateRef, watch } from 'vue'
 import { bubbleCssVariables, getBubblePlacement, getBubbleSizing } from '../core/bubble'
+import { highlightBackground } from '../extension/highlight'
+import { useUiLocale } from '../composables/useUiLocale'
 import type { BubbleSettings, WordQuerySettings } from '../core/types'
 
 const props = defineProps<{
@@ -8,6 +10,13 @@ const props = defineProps<{
   /** 预览的是单词卡片：原词行与朗读按钮跟随 word.showOriginal（与句子开关独立）。 */
   word: WordQuerySettings
 }>()
+
+const { locale } = useUiLocale()
+
+// 示例与界面语言相反：中文界面展示英文查词，英文界面展示中文查词。
+const sample = computed(() => (locale.value === 'en'
+  ? { word: '爱', pronunciation: 'ài', pos: 'v.', result: 'love; like' }
+  : { word: 'loved', pronunciation: '/lʌvd/', pos: 'v.', result: '爱；喜欢' }))
 
 const stageRef = useTemplateRef<HTMLElement>('stage')
 const sourceRef = useTemplateRef<HTMLElement>('source')
@@ -28,6 +37,12 @@ const sourcePosition = computed(() => {
     top: side === 'bottom' ? '16%' : side === 'top' ? '84%' : '50%',
   }
 })
+
+// 源词底色与真实悬停高亮一致：半透明、跟随「高亮」颜色。
+const sourceStyle = computed(() => ({
+  ...sourcePosition.value,
+  background: highlightBackground(props.settings.highlightColor),
+}))
 
 const placement = computed(() => {
   const current = measurements.value
@@ -92,13 +107,13 @@ watch([() => props.settings, () => props.word], async () => {
 
 <template>
   <div ref="stage" class="preview-stage">
-    <span ref="source" class="preview-source" :style="sourcePosition">loved</span>
+    <span ref="source" class="preview-source" :style="sourceStyle">{{ sample.word }}</span>
     <div ref="bubble" class="preview-bubble" data-testid="bubble-preview" :data-side="placement.side" :data-arrow="String(settings.showArrow)" :style="bubbleStyle">
       <div class="preview-content">
         <div v-if="word.showOriginal" class="preview-word">
-          loved<span class="preview-pronunciation">/lʌvd/</span>
+          {{ sample.word }}<span class="preview-pronunciation">{{ sample.pronunciation }}</span>
         </div>
-        <div class="preview-result"><span class="preview-pos">v.</span>爱；喜欢</div>
+        <div class="preview-result"><span class="preview-pos">{{ sample.pos }}</span>{{ sample.result }}</div>
         <!-- 与真实气泡的朗读按钮一致：仅单词「显示原文」开启时渲染 -->
         <span v-if="word.showOriginal" class="preview-speak" aria-hidden="true">▶</span>
       </div>
@@ -126,7 +141,6 @@ watch([() => props.settings, () => props.word], async () => {
   position: absolute;
   padding: 3px 6px;
   border-radius: 5px;
-  background: rgba(45, 108, 223, 0.2);
   transform: translate(-50%, -50%);
   white-space: nowrap;
 }

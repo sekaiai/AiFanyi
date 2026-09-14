@@ -170,6 +170,20 @@ describe('settings', () => {
     expect(current.enabled).toBe(false)
   })
 
+  it('migrates the UI locale with a Chinese default and rejects invalid values', () => {
+    expect(cloneDefaultSettings().uiLocale).toBe('zh')
+    expect(migrateSettings({}).uiLocale).toBe('zh')
+    expect(migrateSettings({ uiLocale: 'en' }).uiLocale).toBe('en')
+    expect(migrateSettings({ uiLocale: 'fr' }).uiLocale).toBe('zh')
+  })
+
+  it('resetToDefaults keeps the chosen UI locale', () => {
+    const current = cloneDefaultSettings()
+    current.uiLocale = 'en'
+
+    expect(resetToDefaults(current).uiLocale).toBe('en')
+  })
+
   it('drops unknown scheme types and backfills missing ids', () => {
     const migrated = migrateSettings({
       schemes: [

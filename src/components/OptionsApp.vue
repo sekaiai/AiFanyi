@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { browser } from 'wxt/browser'
-import { onMounted, onUnmounted, shallowRef } from 'vue'
+import { onMounted, onUnmounted, shallowRef, watchEffect } from 'vue'
 import { useSettingsModel } from '../composables/useSettingsModel'
 import type { ExtensionResponse, WordSourcesResponse } from '../core/messages'
 import type { SchemeSettings } from '../core/types'
@@ -14,7 +14,12 @@ import SchemesSection from './SchemesSection.vue'
 import SettingsForm from './SettingsForm.vue'
 import WordSourcesCard from './WordSourcesCard.vue'
 
-const { settings, stateLabel, reset, syncEnabled, toggleSync } = useSettingsModel(createBrowserSettingsStorage())
+const { settings, stateLabel, reset, syncEnabled, toggleSync, t } = useSettingsModel(createBrowserSettingsStorage())
+
+watchEffect(() => {
+  document.title = t('app.docTitle')
+  document.documentElement.lang = settings.uiLocale === 'zh' ? 'zh-CN' : 'en'
+})
 
 const usage = shallowRef<UsageStats | null>(null)
 const usageStorage = createUsageStorage()
@@ -76,7 +81,7 @@ async function testScheme(scheme: SchemeSettings): Promise<string> {
     scheme,
   }) as ExtensionResponse
   if (!response.ok) throw new Error(response.error.message)
-  return '方案配置可用'
+  return t('status.schemeReady')
 }
 
 async function requestDemo(
@@ -94,10 +99,10 @@ async function requestDemo(
 <template>
   <main class="options-page">
     <div class="demo-column">
-      <section aria-label="翻译交互演示">
+      <section :aria-label="t('app.demoInteraction')">
         <DemoApp :settings="settings" :request="requestDemo" :show-settings="false" />
       </section>
-            <section class="word-slot" aria-label="单词翻译">
+            <section class="word-slot" :aria-label="t('section.word')">
         <WordSourcesCard
           v-model="settings"
           :word-probe="wordProbe"
@@ -106,7 +111,7 @@ async function requestDemo(
         />
       </section>
 
-      <section class="schemes-slot" aria-label="句子翻译">
+      <section class="schemes-slot" :aria-label="t('section.sentence')">
         <SchemesSection
           v-model="settings.schemes"
           v-model:target-language="settings.targetLanguage"
@@ -120,7 +125,7 @@ async function requestDemo(
       </section>
 
     </div>
-    <aside class="settings-column" aria-label="扩展设置">
+    <aside class="settings-column" :aria-label="t('app.extensionSettings')">
       <SettingsForm
         v-model="settings"
         :status="stateLabel"

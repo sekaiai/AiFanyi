@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 import { createBrowserSettingsStorage } from '../../src/extension/storage'
 import { SETTINGS_STORAGE_KEY, cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
@@ -36,6 +36,9 @@ describe('browser settings storage', () => {
   })
 
   it('falls back to defaults when both areas are empty', async () => {
+    // 新装会按浏览器语言覆写 uiLocale，这里固定中文环境以对齐默认值
+    vi.stubGlobal('navigator', { language: 'zh-CN' })
+
     const loaded = await createBrowserSettingsStorage().load()
 
     expect(loaded).toEqual(cloneDefaultSettings())
@@ -159,5 +162,37 @@ describe('browser settings storage', () => {
 
     expect(seen).toHaveLength(1)
     expect(seen[0]?.hoverDelayMs).toBe(700)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('overrides the fresh-install UI locale from the browser language', async () => {
+    vi.stubGlobal('navigator', { language: 'zh-CN' })
+    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('zh')
+
+    vi.stubGlobal('navigator', { language: 'en-US' })
+    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('en')
+
+    vi.stubGlobal('navigator', { language: 'ja' })
+    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('en')
+  })
+
+  it('keeps a stored UI locale and falls back on invalid values', async () => {
+    await browser.storage.sync.set({ [KEY]: { uiLocale: 'en' } })
+    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('en')
+
+    await browser.storage.sync.set({ [KEY]: { uiLocale: 'fr' } })
+    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('zh')
+  })
+
+  it('re-detects the UI locale from the browser language on reset', async () => {
+    await browser.storage.sync.set({ [KEY]: { uiLocale: 'en' } })
+    vi.stubGlobal('navigator', { language: 'zh-CN' })
+
+    const next = await createBrowserSettingsStorage().reset()
+
+    expect(next.uiLocale).toBe('zh')
   })
 })

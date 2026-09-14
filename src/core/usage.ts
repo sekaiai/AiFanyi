@@ -1,3 +1,6 @@
+import { translate } from './i18n'
+import type { UiLocale } from './types'
+
 export const USAGE_STORAGE_KEY = 'aifanyi.usage.v1'
 
 interface UsageCounter {
@@ -46,9 +49,14 @@ export function recordWord(stats: UsageStats, chars: number, now: Date = new Dat
   return { ...base, word: bump(base.word, chars) }
 }
 
-export function formatUsageCounter(counter?: UsageCounter): string {
+export function formatUsageCounter(counter?: UsageCounter, locale: UiLocale = 'zh'): string {
   const value = counter ?? emptyCounter()
-  return `本月 ${formatCount(value.month)} 次 · ${formatChars(value.monthChars)} / 共 ${formatCount(value.total)} 次 · ${formatChars(value.totalChars)}`
+  return translate(locale, 'usage.counter', {
+    month: formatCount(value.month),
+    monthChars: formatChars(value.monthChars, locale),
+    total: formatCount(value.total),
+    totalChars: formatChars(value.totalChars, locale),
+  })
 }
 
 function emptyCounter(): UsageCounter {
@@ -93,7 +101,8 @@ function formatCount(value: number): string {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
-function formatChars(value: number): string {
+function formatChars(value: number, locale: UiLocale): string {
+  if (locale === 'en' && value >= 1000) return `${(value / 1000).toFixed(1).replace(/\.0$/, '')}k`
   if (value >= 10000) return `${(value / 10000).toFixed(1).replace(/\.0$/, '')}万`
   return formatCount(value)
 }

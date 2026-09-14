@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, toRaw, watch } from 'vue'
+import { useUiLocale } from '../composables/useUiLocale'
+import { GUIDE_KEYS } from '../core/i18n'
 import { uid } from '../core/settings'
 import { SCHEME_GUIDES } from '../core/scheme-guides'
 import { describeMissingConfig } from '../core/translate'
@@ -17,11 +19,22 @@ const emit = defineEmits<{
   save: [scheme: SchemeSettings]
 }>()
 
+const { t } = useUiLocale()
+
 const draft = ref<SchemeSettings>(createScheme('ai'))
 const guideExpanded = ref(true)
 const saving = ref(false)
 const saveError = ref('')
-const guide = computed(() => SCHEME_GUIDES[draft.value.type])
+const guide = computed(() => {
+  const keys = GUIDE_KEYS[draft.value.type]
+  const links = SCHEME_GUIDES[draft.value.type].links
+  return {
+    title: t(keys.title),
+    tagline: t(keys.tagline),
+    steps: keys.steps.map((key) => t(key)),
+    links: keys.links.map((key, index) => ({ label: t(key), href: links[index]?.href ?? '' })),
+  }
+})
 
 // 弹窗每次开合都作废上一次保存尝试，避免"测试还在进行时关闭弹窗，结果回来后仍写入方案"。
 let saveAttempt = 0
@@ -90,7 +103,7 @@ async function save(): Promise<void> {
     } catch (error) {
       if (attempt !== saveAttempt) return
       saving.value = false
-      saveError.value = `接口测试未通过：${error instanceof Error ? error.message : '未知错误'}`
+      saveError.value = t('editor.testFailed', { error: error instanceof Error ? error.message : t('editor.unknownError') })
       return
     }
     if (attempt !== saveAttempt) return
@@ -106,37 +119,37 @@ async function save(): Promise<void> {
     <section class="editor-modal" data-testid="scheme-editor" role="dialog" aria-modal="true" aria-labelledby="scheme-editor-title">
       <div class="modal-header">
         <div>
-          <p class="modal-kicker">翻译方案</p>
-          <h2 id="scheme-editor-title">{{ initialScheme ? '编辑翻译方案' : '添加翻译方案' }}</h2>
+          <p class="modal-kicker">{{ t('editor.kicker') }}</p>
+          <h2 id="scheme-editor-title">{{ initialScheme ? t('editor.editTitle') : t('editor.addTitle') }}</h2>
         </div>
-        <button class="icon-button close-button" type="button" aria-label="关闭" title="关闭" @click="close">✕</button>
+        <button class="icon-button close-button" type="button" :aria-label="t('editor.close')" :title="t('editor.close')" @click="close">✕</button>
       </div>
 
       <div class="modal-body">
         <label class="field wide">
-          <span class="field-label">翻译方案</span>
+          <span class="field-label">{{ t('editor.typeLabel') }}</span>
           <select :value="draft.type" data-testid="scheme-editor-type" :disabled="draft.type === 'google'" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
-            <option value="baidu">百度翻译</option>
-            <option value="baiduAi">百度大模型翻译</option>
-            <option value="volcengine">火山引擎</option>
-            <option value="ai">自定义 AI</option>
-            <option value="deepl">DeepL</option>
-            <option v-if="draft.type === 'google'" value="google">Google 翻译（免密钥）</option>
-            <option value="googleCloud">Google Cloud</option>
+            <option value="baidu">{{ t('schemes.type.baidu') }}</option>
+            <option value="baiduAi">{{ t('schemes.type.baiduAi') }}</option>
+            <option value="volcengine">{{ t('schemes.type.volcengine') }}</option>
+            <option value="ai">{{ t('schemes.type.ai') }}</option>
+            <option value="deepl">{{ t('schemes.type.deepl') }}</option>
+            <option v-if="draft.type === 'google'" value="google">{{ t('schemes.type.google') }}</option>
+            <option value="googleCloud">{{ t('schemes.type.googleCloud') }}</option>
           </select>
         </label>
 
         <template v-if="draft.type === 'deepl'">
           <label class="field"><span class="field-label">Auth Key</span><input v-model="draft.authKey" type="password" autocomplete="off" placeholder="DeepL-Auth-Key" /></label>
           <label class="field">
-            <span class="field-label">接口</span>
+            <span class="field-label">{{ t('editor.api') }}</span>
             <select v-model="draft.endpoint">
-              <option value="free">免费（api-free.deepl.com）</option>
-              <option value="pro">Pro（api.deepl.com）</option>
+              <option value="free">{{ t('editor.deeplFree') }}</option>
+              <option value="pro">{{ t('editor.deeplPro') }}</option>
             </select>
           </label>
         </template>
-        <p v-else-if="draft.type === 'google'" class="field-hint wide">内置默认方案：使用免费接口 translate.googleapis.com，无需配置；可在方案列表中停用，但不可删除。</p>
+        <p v-else-if="draft.type === 'google'" class="field-hint wide">{{ t('editor.hint.google') }}</p>
         <template v-else-if="draft.type === 'googleCloud'">
           <label class="field wide">
             <span class="field-label">API Key</span>
@@ -144,47 +157,47 @@ async function save(): Promise<void> {
           </label>
         </template>
         <template v-else-if="draft.type === 'baidu'">
-          <p class="field-hint wide">使用百度通用文本翻译 API，源语言自动检测。密钥随浏览器账号同步保存。</p>
-          <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" placeholder="百度翻译 AppID" /></label>
+          <p class="field-hint wide">{{ t('editor.hint.baidu') }}</p>
+          <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" :placeholder="t('editor.placeholder.baiduAppId')" /></label>
           <label class="field">
-            <span class="field-label">密钥</span>
-            <input v-model="draft.secretKey" type="password" autocomplete="off" placeholder="百度翻译密钥" />
+            <span class="field-label">{{ t('editor.secretKey') }}</span>
+            <input v-model="draft.secretKey" type="password" autocomplete="off" :placeholder="t('editor.placeholder.baiduSecret')" />
           </label>
         </template>
         <template v-else-if="draft.type === 'baiduAi'">
-          <p class="field-hint wide">使用百度大模型文本翻译 API，源语言自动检测。密钥随浏览器账号同步保存。</p>
-          <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" placeholder="百度翻译 AppID" /></label>
+          <p class="field-hint wide">{{ t('editor.hint.baiduAi') }}</p>
+          <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" :placeholder="t('editor.placeholder.baiduAppId')" /></label>
           <label class="field">
-            <span class="field-label">密钥</span>
-            <input v-model="draft.secretKey" type="password" autocomplete="off" placeholder="百度翻译密钥" />
+            <span class="field-label">{{ t('editor.secretKey') }}</span>
+            <input v-model="draft.secretKey" type="password" autocomplete="off" :placeholder="t('editor.placeholder.baiduSecret')" />
           </label>
           <label class="field wide">
-            <span class="field-label">翻译模型</span>
+            <span class="field-label">{{ t('editor.modelLabel') }}</span>
             <select v-model="draft.modelType">
-              <option value="nmt">机器翻译 · 机器翻译 200万免费字符/月</option>
-              <option value="llm">大模型翻译 · 100万字符测试额度（总）</option>
+              <option value="nmt">{{ t('editor.model.machine') }}</option>
+              <option value="llm">{{ t('editor.model.llm') }}</option>
             </select>
           </label>
         </template>
         <template v-else-if="draft.type === 'volcengine'">
-          <p class="field-hint wide">使用火山引擎机器翻译文本接口，源语言自动检测。密钥随浏览器账号同步保存。</p>
-          <label class="field"><span class="field-label">访问密钥 ID（Access Key ID）</span><input v-model="draft.accessKeyId" autocomplete="off" placeholder="火山引擎 Access Key ID" /></label>
+          <p class="field-hint wide">{{ t('editor.hint.volcengine') }}</p>
+          <label class="field"><span class="field-label">{{ t('editor.volcAkLabel') }}</span><input v-model="draft.accessKeyId" autocomplete="off" :placeholder="t('editor.placeholder.volcAk')" /></label>
           <label class="field">
-            <span class="field-label">访问密钥（Secret Access Key）</span>
-            <input v-model="draft.secretAccessKey" type="password" autocomplete="off" placeholder="火山引擎 Secret Access Key" />
+            <span class="field-label">{{ t('editor.volcSkLabel') }}</span>
+            <input v-model="draft.secretAccessKey" type="password" autocomplete="off" :placeholder="t('editor.placeholder.volcSk')" />
           </label>
-          <label class="field wide"><span class="field-label">地域</span><input v-model="draft.region" autocomplete="off" placeholder="cn-north-1" /></label>
+          <label class="field wide"><span class="field-label">{{ t('editor.volcRegion') }}</span><input v-model="draft.region" autocomplete="off" placeholder="cn-north-1" /></label>
         </template>
         <template v-else>
-          <label class="field wide"><span class="field-label">方案标题</span><input v-model="draft.label" type="text" maxlength="50" placeholder="自定义 AI" /></label>
-          <label class="field wide"><span class="field-label">AI 地址</span><input v-model="draft.apiUrl" placeholder="https://api.example.com/v1/chat/completions" /></label>
-          <label class="field"><span class="field-label">模型</span><input v-model="draft.model" placeholder="gpt-4o-mini" /></label>
+          <label class="field wide"><span class="field-label">{{ t('editor.aiTitle') }}</span><input v-model="draft.label" type="text" maxlength="50" :placeholder="t('editor.aiTitlePlaceholder')" /></label>
+          <label class="field wide"><span class="field-label">{{ t('editor.aiUrl') }}</span><input v-model="draft.apiUrl" placeholder="https://api.example.com/v1/chat/completions" /></label>
+          <label class="field"><span class="field-label">{{ t('editor.aiModel') }}</span><input v-model="draft.model" placeholder="gpt-4o-mini" /></label>
           <label class="field">
-            <span class="field-label">API 密钥</span>
+            <span class="field-label">{{ t('editor.aiKey') }}</span>
             <input v-model="draft.apiKey" type="password" autocomplete="off" />
           </label>
           <label class="range-field wide">
-            <span class="range-label">超时 <output>{{ Math.round(draft.timeoutMs / 1000) }} 秒</output></span>
+            <span class="range-label">{{ t('editor.aiTimeout') }} <output>{{ Math.round(draft.timeoutMs / 1000) }} {{ t('editor.aiSeconds') }}</output></span>
             <input v-model.number="draft.timeoutMs" type="range" min="5000" max="60000" step="1000" />
           </label>
         </template>
@@ -199,21 +212,21 @@ async function save(): Promise<void> {
           aria-controls="scheme-guide-body"
           @click="guideExpanded = !guideExpanded"
         >
-          <span class="guide-toggle-label">新手指南 ·</span>
+          <span class="guide-toggle-label">{{ t('guide.header') }}</span>
           <span class="guide-toggle-title">{{ guide.title }}</span>
-          <span class="guide-badge">{{ draft.type === 'google' ? '无需密钥' : '配置随账号同步' }}</span>
+          <span class="guide-badge">{{ draft.type === 'google' ? t('guide.badge.keyless') : t('guide.badge.synced') }}</span>
           <span class="guide-chevron" aria-hidden="true"></span>
         </button>
         <div v-show="guideExpanded" id="scheme-guide-body" class="guide-body" data-testid="scheme-guide-body">
           <p class="guide-tagline">{{ guide.tagline }}</p>
           <div>
-            <p class="guide-block-label">怎么用</p>
+            <p class="guide-block-label">{{ t('guide.howTo') }}</p>
             <ol class="guide-steps">
               <li v-for="step in guide.steps" :key="step">{{ step }}</li>
             </ol>
           </div>
           <div>
-            <p class="guide-block-label">官方入口</p>
+            <p class="guide-block-label">{{ t('guide.officialLinks') }}</p>
             <ul class="guide-links">
               <li v-for="link in guide.links" :key="link.href"><a :href="link.href" target="_blank" rel="noopener noreferrer">{{ link.label }} ↗</a></li>
             </ul>
@@ -221,10 +234,10 @@ async function save(): Promise<void> {
         </div>
       </section>
 
-      <p v-if="demoMode" class="modal-notice">在线演示中的密钥只保存在当前页面内存，刷新后会消失。</p>
+      <p v-if="demoMode" class="modal-notice">{{ t('editor.notice.demo') }}</p>
       <div class="modal-footer">
         <p v-if="saveError" class="save-error" role="alert" data-testid="scheme-editor-error">{{ saveError }}</p>
-        <button class="button button-secondary" type="button" data-testid="scheme-editor-cancel" @click="close">取消</button>
+        <button class="button button-secondary" type="button" data-testid="scheme-editor-cancel" @click="close">{{ t('editor.cancel') }}</button>
         <button
           class="button button-primary"
           type="button"
@@ -232,7 +245,7 @@ async function save(): Promise<void> {
           :disabled="saving"
           :aria-busy="saving"
           @click="save"
-        >{{ saving ? '正在测试接口...' : '保存方案' }}</button>
+        >{{ saving ? t('editor.testing') : t('editor.save') }}</button>
       </div>
     </section>
   </div>

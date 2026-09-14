@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useUiLocale } from '../composables/useUiLocale'
 import type { TranslationSettings, WordSourceId } from '../core/types'
-import { WORD_SOURCE_IDS, WORD_SOURCE_LABELS, type WordProbeState } from '../core/word-sources'
+import { WORD_SOURCE_IDS, type WordProbeState } from '../core/word-sources'
 
 const settings = defineModel<TranslationSettings>({ required: true })
+
+const { t } = useUiLocale()
 
 const props = defineProps<{
   /** 连通性探测快照；宿主不支持探测（如演示环境）时为 undefined，隐藏「重新检测」。 */
@@ -15,9 +18,13 @@ const emit = defineEmits<{
   probeWords: []
 }>()
 
+function sourceLabel(id: WordSourceId): string {
+  return t(`words.source.${id}`)
+}
+
 /** 每个源都显示延迟：探测成功显示耗时，检测失败显示「不可用」，未检测显示「—」占位。 */
 function latencyText(source: WordSourceId): string {
-  if (props.wordProbe?.results[source] === false) return '不可用'
+  if (props.wordProbe?.results[source] === false) return t('words.unavailable')
   const ms = props.wordProbe?.latency?.[source]
   return typeof ms === 'number' ? `${ms}ms` : ''
 }
@@ -33,13 +40,13 @@ const wordProbeTime = computed(() => {
   if (!checkedAt) return ''
   const available = props.wordProbe?.results ?? {}
   const count = WORD_SOURCE_IDS.filter((id) => available[id] === true).length
-  return `上次检测：${new Date(checkedAt).toLocaleTimeString()} · ${count}/${WORD_SOURCE_IDS.length} 可用`
+  return t('words.probeTime', { time: new Date(checkedAt).toLocaleTimeString(), count, total: WORD_SOURCE_IDS.length })
 })
 </script>
 
 <template>
-  <section class="word-sources-card" aria-label="单词翻译">
-    <h2 class="section-title">单词翻译</h2>
+  <section class="word-sources-card" :aria-label="t('section.word')">
+    <h2 class="section-title">{{ t('section.word') }}</h2>
 
     <div class="src-rows">
       <label
@@ -47,22 +54,22 @@ const wordProbeTime = computed(() => {
         :key="id"
         class="src-row"
         :class="{ off: !settings.word.sources[id] }"
-        :title="WORD_SOURCE_LABELS[id]"
+        :title="sourceLabel(id)"
       >
         <input
           v-model="settings.word.sources[id]"
           type="checkbox"
           class="checkbox"
-          :aria-label="`启用${WORD_SOURCE_LABELS[id]}`"
+          :aria-label="t('words.toggleSource', { name: sourceLabel(id) })"
         />
-        <span class="src-name">{{ WORD_SOURCE_LABELS[id] }}</span>
+        <span class="src-name">{{ sourceLabel(id) }}</span>
         <span class="latency" :class="latencyCls(id)">{{ latencyText(id) }}</span>
       </label>
     </div>
 
     <div v-if="wordProbe !== undefined" class="source-foot">
       <button class="button button-secondary" type="button" data-testid="probe-words" :disabled="probing" @click="emit('probeWords')">
-        {{ probing ? '检测中…' : '检测连通率' }}
+        {{ probing ? t('words.probing') : t('words.probeRate') }}
       </button>
       <span v-if="wordProbeTime" class="source-time">{{ wordProbeTime }}</span>
     </div>
@@ -70,12 +77,12 @@ const wordProbeTime = computed(() => {
     <div class="speak-row">
       <label class="src-row">
         <input v-model="settings.word.speakEnabled" type="checkbox" class="checkbox" />
-        <span>朗读单词</span>
+        <span>{{ t('words.speakWord') }}</span>
       </label>
-      <span class="field-label">朗读音色</span>
+      <span class="field-label">{{ t('words.speakVoice') }}</span>
       <span class="seg">
-        <label><input v-model="settings.word.accent" type="radio" value="us" />美音</label>
-        <label><input v-model="settings.word.accent" type="radio" value="uk" />英音</label>
+        <label><input v-model="settings.word.accent" type="radio" value="us" />{{ t('words.accentUs') }}</label>
+        <label><input v-model="settings.word.accent" type="radio" value="uk" />{{ t('words.accentUk') }}</label>
       </span>
     </div>
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, shallowRef, toRaw } from 'vue'
+import { useUiLocale } from '../composables/useUiLocale'
 import { TARGET_LANGUAGES } from '../core/settings'
-import type { SchemeOrder, SchemeSettings, SchemeType } from '../core/types'
+import type { SchemeOrder, SchemeSettings } from '../core/types'
 import { hasRequiredConfig } from '../core/translate'
 import { formatUsageCounter, type UsageStats } from '../core/usage'
 import SchemeEditorModal from './SchemeEditorModal.vue'
@@ -24,21 +25,11 @@ const emit = defineEmits<{
   toggleSync: [enabled: boolean]
 }>()
 
-const SYNC_FIELD_TITLE = '将全部设置（含各翻译方案与密钥）通过浏览器账号在登录的设备间自动同步；取消勾选后设置仅保存在本机，不再上传，也不会接收其他设备的改动。'
-
-const SCHEME_TYPE_LABELS: Record<SchemeType, string> = {
-  ai: '自定义 AI',
-  baidu: '百度翻译',
-  baiduAi: '百度大模型翻译',
-  volcengine: '火山引擎',
-  deepl: 'DeepL',
-  google: 'Google 翻译（免密钥）',
-  googleCloud: 'Google Cloud',
-}
+const { t, locale } = useUiLocale()
 
 /** 方案显示名：自定义 AI 优先使用用户填写的标题，留空回退为类型默认名。 */
 function schemeName(scheme: SchemeSettings): string {
-  return scheme.type === 'ai' && scheme.label.trim() ? scheme.label.trim() : SCHEME_TYPE_LABELS[scheme.type]
+  return scheme.type === 'ai' && scheme.label.trim() ? scheme.label.trim() : t(`schemes.type.${scheme.type}`)
 }
 
 const testingSchemeId = shallowRef('')
@@ -52,8 +43,8 @@ interface SchemeTestOutcome {
 
 const schemeTestStatus = ref<Record<string, SchemeTestOutcome>>({})
 const orderHint = computed(() => schemeOrder.value === 'random'
-  ? '每次随机挑选可用方案，失败后从剩余方案中随机再试。'
-  : '按顺序依次尝试，排在最前面的优先使用。')
+  ? t('schemes.hint.random')
+  : t('schemes.hint.sequential'))
 
 function speedTone(ms: number): SchemeTestOutcome['tone'] {
   if (ms < 800) return 'fast'
@@ -127,18 +118,18 @@ function moveScheme(id: string, offset: -1 | 1): void {
 async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   if (!props.testScheme) return
   if (!hasRequiredConfig(scheme)) {
-    schemeTestStatus.value[scheme.id] = { text: '请先完善该方案配置', tone: 'error' }
+    schemeTestStatus.value[scheme.id] = { text: t('schemes.testIncomplete'), tone: 'error' }
     return
   }
   testingSchemeId.value = scheme.id
-  schemeTestStatus.value[scheme.id] = { text: '正在测试...', tone: 'idle' }
+  schemeTestStatus.value[scheme.id] = { text: t('schemes.testing'), tone: 'idle' }
   const startedAt = performance.now()
   try {
     await props.testScheme(scheme)
     const latencyMs = Math.round(performance.now() - startedAt)
-    schemeTestStatus.value[scheme.id] = { text: `成功 · ${latencyMs} ms`, tone: speedTone(latencyMs) }
+    schemeTestStatus.value[scheme.id] = { text: t('schemes.testOk', { ms: latencyMs }), tone: speedTone(latencyMs) }
   } catch (error) {
-    schemeTestStatus.value[scheme.id] = { text: error instanceof Error ? error.message : '测试失败', tone: 'error' }
+    schemeTestStatus.value[scheme.id] = { text: error instanceof Error ? error.message : t('schemes.testFail'), tone: 'error' }
   } finally {
     testingSchemeId.value = ''
   }
@@ -148,22 +139,22 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 <template>
   <section class="schemes-section">
     <div class="section-head">
-      <h2 class="section-title">句子翻译</h2>
+      <h2 class="section-title">{{ t('section.sentence') }}</h2>
       <div class="head-controls">
         <label class="target-field">
-          <span class="field-label">翻译成</span>
+          <span class="field-label">{{ t('schemes.translateInto') }}</span>
           <select v-model="targetLanguage" data-testid="target-language">
             <option v-for="lang in TARGET_LANGUAGES" :key="lang" :value="lang">{{ lang }}</option>
           </select>
         </label>
         <label class="target-field">
-          <span class="field-label">顺序</span>
+          <span class="field-label">{{ t('schemes.order') }}</span>
           <select v-model="schemeOrder" data-testid="scheme-order">
-            <option value="random">随机</option>
-            <option value="sequential">依次使用</option>
+            <option value="random">{{ t('schemes.orderRandom') }}</option>
+            <option value="sequential">{{ t('schemes.orderSequential') }}</option>
           </select>
         </label>
-        <label v-if="showSync" class="target-field sync-field" :title="SYNC_FIELD_TITLE">
+        <label v-if="showSync" class="target-field sync-field" :title="t('schemes.syncTitle')">
           <input
             type="checkbox"
             class="checkbox"
@@ -171,13 +162,12 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
             data-testid="sync-toggle"
             @change="emit('toggleSync', ($event.target as HTMLInputElement).checked)"
           />
-          <span>同步到浏览器账号</span>
+          <span>{{ t('schemes.syncLabel') }}</span>
         </label>
       </div>
     </div>
     <p class="section-hint">{{ orderHint }}</p>
-    <p v-if="demoMode" class="notice">在线演示中的 API 密钥只保存在当前页面内存，刷新后会消失。</p>
-    <p v-else class="notice security-notice">配置与密钥通过浏览器账号同步存储，在各设备间自动同步；密钥仅由后台请求使用，网页内容脚本不会接收密钥。</p>
+    <p v-if="demoMode" class="notice">{{ t('schemes.notice.demo') }}</p>
 
     <div class="scheme-list">
       <div v-for="(scheme, index) in schemes" :key="scheme.id" class="scheme-card" :class="{ 'is-off': !scheme.enabled }" :data-testid="`scheme-card-${scheme.type}`">
@@ -186,28 +176,28 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
           <input v-model="scheme.enabled" type="checkbox" class="checkbox" :data-testid="`scheme-toggle-${scheme.id}`" />
           <span class="scheme-name">{{ schemeName(scheme) }}</span>
         </label>
-        <span v-if="scheme.type === 'google'" class="scheme-badge">默认</span>
-        <span v-if="usage" class="scheme-usage" :data-testid="`scheme-usage-${scheme.id}`">{{ formatUsageCounter(usage.sentence[scheme.id]) }}</span>
+        <span v-if="scheme.type === 'google'" class="scheme-badge">{{ t('schemes.default') }}</span>
+        <span v-if="usage" class="scheme-usage" :data-testid="`scheme-usage-${scheme.id}`">{{ formatUsageCounter(usage.sentence[scheme.id], locale) }}</span>
         <span class="settings-status scheme-status" :class="schemeTestStatus[scheme.id]?.tone" :title="schemeTestStatus[scheme.id]?.text ?? ''">{{ schemeTestStatus[scheme.id]?.text ?? '' }}</span>
-        <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">测试</button>
+        <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">{{ t('schemes.test') }}</button>
         <div class="scheme-actions">
-          <button class="icon-button" type="button" title="上移" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
-          <button class="icon-button" type="button" title="下移" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
-          <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" title="编辑" @click="openEditScheme(scheme)">✎</button>
+          <button class="icon-button" type="button" :title="t('schemes.moveUp')" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
+          <button class="icon-button" type="button" :title="t('schemes.moveDown')" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
+          <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" :title="t('schemes.edit')" @click="openEditScheme(scheme)">✎</button>
           <button
             class="icon-button"
             type="button"
             :class="{ 'icon-button-danger': pendingDeleteId === scheme.id }"
-            :title="scheme.type === 'google' ? '默认方案，不可删除' : pendingDeleteId === scheme.id ? '再次点击确认删除' : '删除'"
+            :title="scheme.type === 'google' ? t('schemes.defaultScheme') : pendingDeleteId === scheme.id ? t('schemes.confirmDelete') : t('schemes.delete')"
             :disabled="scheme.type === 'google'"
             @click="requestRemoveScheme(scheme.id)"
-          >{{ pendingDeleteId === scheme.id ? '确认' : '✕' }}</button>
+          >{{ pendingDeleteId === scheme.id ? t('schemes.confirm') : '✕' }}</button>
         </div>
       </div>
     </div>
 
     <div class="scheme-add">
-      <button class="button button-secondary add-button" type="button" data-testid="add-scheme" @click="openAddScheme">添加翻译方案</button>
+      <button class="button button-secondary add-button" type="button" data-testid="add-scheme" @click="openAddScheme">{{ t('schemes.add') }}</button>
     </div>
 
     <SchemeEditorModal :visible="editorVisible" :initial-scheme="editorDraft" :test-scheme="testScheme" :demo-mode="demoMode" @close="closeEditor" @save="saveScheme" />

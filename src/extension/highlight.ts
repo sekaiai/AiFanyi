@@ -9,7 +9,7 @@ const DEFAULT_HIGHLIGHT_COLOR = '#4f84e8'
 const DEFAULT_HIGHLIGHT_BACKGROUND = `${DEFAULT_HIGHLIGHT_COLOR}${HIGHLIGHT_ALPHA}`
 
 /** 设置里的 hex 颜色 → 背景值；8 位 hex（自带透明度）直通，旧版 6 位补上固定透明度，非法值回退默认色。 */
-function highlightBackground(color: string): string {
+export function highlightBackground(color: string): string {
   if (/^#[0-9a-f]{8}$/i.test(color)) return color
   return `${/^#[0-9a-f]{6}$/i.test(color) ? color : DEFAULT_HIGHLIGHT_COLOR}${HIGHLIGHT_ALPHA}`
 }

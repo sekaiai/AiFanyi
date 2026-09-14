@@ -1,6 +1,7 @@
 import { computed, nextTick, onUnmounted, reactive, shallowRef, watch } from 'vue'
 import { cloneDefaultSettings, migrateSettings } from '../core/settings'
 import type { TranslationSettings } from '../core/settings'
+import { provideUiLocale } from './useUiLocale'
 
 export function useSettingsModel(storage: {
   load(): Promise<TranslationSettings>
@@ -11,9 +12,10 @@ export function useSettingsModel(storage: {
   saveSyncEnabled(enabled: boolean): Promise<void>
 }) {
   const settings = reactive<TranslationSettings>(cloneDefaultSettings())
+  const { t } = provideUiLocale(computed(() => settings.uiLocale))
   const loading = shallowRef(true)
   const saving = shallowRef(false)
-  const status = shallowRef('正在加载设置')
+  const status = shallowRef(t('status.loading'))
   const syncing = shallowRef(false)
   const syncEnabled = shallowRef(true)
   let latestSave = 0
@@ -28,14 +30,14 @@ export function useSettingsModel(storage: {
       syncing.value = true
       Object.assign(settings, loaded)
       loading.value = false
-      status.value = '设置已加载'
+      status.value = t('status.loaded')
       void nextTick(() => {
         syncing.value = false
       })
     })
     .catch(() => {
       loading.value = false
-      status.value = '设置加载失败，已使用默认设置'
+      status.value = t('status.loadFailed')
     })
 
   void storage.loadSyncEnabled()
@@ -77,12 +79,12 @@ export function useSettingsModel(storage: {
         .then(() => {
           if (!active || saveId !== latestSave) return
           saving.value = false
-          status.value = '已自动保存'
+          status.value = t('status.autoSaved')
         })
         .catch(() => {
           if (!active || saveId !== latestSave) return
           saving.value = false
-          status.value = '保存失败，请稍后重试'
+          status.value = t('status.saveFailed')
         })
     }, SAVE_DEBOUNCE_MS)
   }, { deep: true })
@@ -92,9 +94,9 @@ export function useSettingsModel(storage: {
     syncing.value = true
     try {
       Object.assign(settings, await storage.reset())
-      status.value = '已恢复默认'
+      status.value = t('status.resetDone')
     } catch {
-      status.value = '恢复默认失败，请稍后重试'
+      status.value = t('status.resetFailed')
     } finally {
       loading.value = false
       await nextTick()
@@ -102,7 +104,7 @@ export function useSettingsModel(storage: {
     }
   }
 
-  const stateLabel = computed(() => saving.value ? '正在保存...' : status.value)
+  const stateLabel = computed(() => saving.value ? t('status.saving') : status.value)
 
   /** 切换本机是否参与设置同步；重新开启时立即推送当前设置，让同步区拿到本机最新状态。 */
   async function toggleSync(enabled: boolean) {
@@ -113,20 +115,20 @@ export function useSettingsModel(storage: {
       await storage.saveSyncEnabled(enabled)
     } catch {
       syncEnabled.value = previous
-      status.value = '同步设置保存失败，请稍后重试'
+      status.value = t('status.syncSaveFailed')
       return
     }
     if (!enabled) {
-      status.value = '已关闭同步，设置仅保存在本机'
+      status.value = t('status.syncOff')
       return
     }
     saving.value = true
     const saveId = ++latestSave
     try {
       await storage.save(migrateSettings(settings))
-      if (saveId === latestSave) status.value = '已开启同步'
+      if (saveId === latestSave) status.value = t('status.syncOn')
     } catch {
-      if (saveId === latestSave) status.value = '保存失败，请稍后重试'
+      if (saveId === latestSave) status.value = t('status.saveFailed')
     } finally {
       if (saveId === latestSave) saving.value = false
     }
@@ -138,5 +140,6 @@ export function useSettingsModel(storage: {
     reset,
     syncEnabled,
     toggleSync,
+    t,
   }
 }

@@ -307,7 +307,7 @@ test.describe('AiFanyi extension', () => {
     }
 
     // 中文段落 + 默认目标简体中文：同语言不触发翻译，气泡不出现
-    await page.locator('.reading-copy p').last().evaluate((element) => {
+    await page.locator('.reading-copy p', { hasText: '你曾经深爱的人' }).evaluate((element) => {
       const text = element.firstChild
       if (!text) throw new Error('演示文本不可用')
       const range = document.createRange()
@@ -321,7 +321,7 @@ test.describe('AiFanyi extension', () => {
     await page.waitForTimeout(300)
     await expect(page.locator('#aifanyi-shadow-host .bubble')).toBeHidden()
 
-    await page.locator('.reading-copy p').first().evaluate((element) => {
+    await page.locator('.reading-copy p', { hasText: 'Someone you loved' }).evaluate((element) => {
       const text = element.firstChild
       if (!text) throw new Error('演示文本不可用')
       const range = document.createRange()

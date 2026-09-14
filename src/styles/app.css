@@ -100,12 +100,6 @@ button {
   line-height: 1.2;
 }
 
-.tip {
-  margin: 0 0 26px;
-  color: var(--af-muted);
-  font-size: 14px;
-}
-
 .reading-copy {
   max-width: 70ch;
 }

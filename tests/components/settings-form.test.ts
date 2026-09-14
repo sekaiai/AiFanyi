@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, ref, shallowRef } from 'vue'
+import { computed, defineComponent, ref, shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { provideUiLocale } from '../../src/composables/useUiLocale'
 import SchemesSection from '../../src/components/SchemesSection.vue'
 import SettingsForm from '../../src/components/SettingsForm.vue'
 import ColorField from '../../src/components/ColorField.vue'
@@ -62,6 +63,17 @@ const SettingsHarness = defineComponent({
   },
   template: `<SettingsForm v-model="settings" status="已加载" />
     <SchemesSection v-model="settings.schemes" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" />`,
+})
+
+const EnSettingsHarness = defineComponent({
+  components: { SettingsForm },
+  setup() {
+    const settings = ref(cloneDefaultSettings())
+    settings.value.uiLocale = 'en'
+    provideUiLocale(computed(() => settings.value.uiLocale))
+    return { settings }
+  },
+  template: `<SettingsForm v-model="settings" status="Loaded" />`,
 })
 
 const TestHarness = defineComponent({
@@ -475,5 +487,30 @@ describe('SettingsForm', () => {
 
     expect(wrapper.get('[data-testid="scheme-usage-default-google"]').text())
       .toBe('本月 2 次 · 25 / 共 8 次 · 120')
+  })
+
+  it('defaults the UI language to Chinese and two-way binds the switcher', async () => {
+    const wrapper = mount(SettingsHarness)
+
+    const group = wrapper.get('[data-testid="ui-locale"]')
+    expect(group.attributes('role')).toBe('radiogroup')
+    expect((group.get('input[value="zh"]').element as HTMLInputElement).checked).toBe(true)
+    expect((group.get('input[value="en"]').element as HTMLInputElement).checked).toBe(false)
+    expect(group.findAll('label').map((label) => label.text())).toEqual(['中文', 'English'])
+    expect(wrapper.get('.settings-title').text()).toBe('设置')
+
+    await group.get('input[value="en"]').setValue()
+    expect(wrapper.vm.settings.uiLocale).toBe('en')
+  })
+
+  it('translates the form through the provided UI locale context', async () => {
+    const wrapper = mount(EnSettingsHarness)
+
+    const group = wrapper.get('[data-testid="ui-locale"]')
+    expect((group.get('input[value="en"]').element as HTMLInputElement).checked).toBe(true)
+    expect(wrapper.get('.settings-title').text()).toBe('Settings')
+
+    await group.get('input[value="zh"]').setValue()
+    expect(wrapper.get('.settings-title').text()).toBe('设置')
   })
 })
