@@ -62,7 +62,7 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highl
         <p class="settings-status">{{ status }}</p>
       </div>
       <div class="header-actions">
-        <button style="height: 36px;" class="button button-secondary" type="button" @click="emit('reset')">{{ t('form.reset') }}</button>
+        <button class="button button-secondary" type="button" @click="emit('reset')">{{ t('form.reset') }}</button>
       </div>
     </header>
 
@@ -213,19 +213,19 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highl
       <h2 class="section-title">{{ t('form.trigger') }}</h2>
       <div class="hfields">
         <div class="check-rows">
-          <label class="check-row"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>{{ t('form.enabled') }}</span></label>
-          <label class="check-row"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>{{ t('form.showArrow') }}</span></label>
-          <label class="check-row"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>{{ t('form.hoverTranslate') }}</span></label>
-          <label class="check-row"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>{{ t('form.selectionTranslate') }}</span></label>
-          <label class="check-row" :title="t('form.showOriginalWordTip')">
+          <label class="check-row af-chip"><input v-model="settings.enabled" type="checkbox" class="checkbox" /><span>{{ t('form.enabled') }}</span></label>
+          <label class="check-row af-chip"><input v-model="settings.bubble.showArrow" type="checkbox" class="checkbox" /><span>{{ t('form.showArrow') }}</span></label>
+          <label class="check-row af-chip"><input v-model="settings.hoverEnabled" type="checkbox" class="checkbox" /><span>{{ t('form.hoverTranslate') }}</span></label>
+          <label class="check-row af-chip"><input v-model="settings.selectionEnabled" type="checkbox" class="checkbox" /><span>{{ t('form.selectionTranslate') }}</span></label>
+          <label class="check-row af-chip" :title="t('form.showOriginalWordTip')">
             <input v-model="settings.word.showOriginal" type="checkbox" class="checkbox" data-testid="show-original-word" />
             <span>{{ t('form.showOriginalWord') }}</span>
           </label>
-          <label class="check-row" :title="t('form.showOriginalTip')">
+          <label class="check-row af-chip" :title="t('form.showOriginalTip')">
             <input v-model="settings.bubble.showOriginal" type="checkbox" class="checkbox" data-testid="show-original" />
             <span>{{ t('form.showOriginal') }}</span>
           </label>
-          <div class="hfield check-row">
+          <div class="hfield check-row af-chip">
           <span class="hlbl">{{ t('form.hoverDelayLabel') }}</span>
           <input
             v-model.number="settings.hoverDelayMs"
@@ -253,33 +253,14 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highl
 .settings-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
   min-width: 0;
 }
 
-.field :is(input, select, textarea) {
-  width: 100%;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
-  transition: border-color 160ms ease-out, box-shadow 160ms ease-out, background 160ms ease-out;
-}
-
-.field :is(input, select) {
-  min-height: 38px;
-}
-
-.field :is(input, select, textarea):hover {
-  border-color: var(--af-control-border-hover);
-}
-
-.field :is(input, select, textarea):focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
+.settings-header,
+.trigger-wide,
+.text-wide,
+.preview-section {
+  grid-column: 1 / -1;
 }
 
 .field textarea {
@@ -287,15 +268,6 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highl
   resize: vertical;
 }
 
-/* 触发通宽：横向流式字段 */
-.trigger-wide {
-  grid-column: 1 / -1;
-}
-
-/* 文字通宽 */
-.text-wide {
-  grid-column: 1 / -1;
-}
 .hfields {
   display: flex;
   flex-wrap: wrap;
@@ -334,16 +306,6 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highl
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 26px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  user-select: none;
-  background-color: var(--af-page);
-}
-.check-row:hover {
-  background: var(--af-control-hover);
 }
 .range-inline {
   width: 130px;
@@ -356,26 +318,13 @@ function setBubbleColor(key: 'background' | 'textColor' | 'borderColor' | 'highl
 }
 textarea.blacklist {
   flex: 1;
-  min-height: 38px;
   padding: 6px 8px;
-  border: 1px solid var(--af-control-border);
   border-radius: 8px;
-  background: var(--af-control-background);
-  color: var(--af-text);
   font-size: 14px;
   resize: vertical;
 }
-textarea.blacklist:hover {
-  border-color: var(--af-control-border-hover);
-}
-textarea.blacklist:focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
-}
 
 .settings-header {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -401,14 +350,14 @@ textarea.blacklist:focus {
   gap: 12px;
 }
 
+.header-actions .button {
+  height: 36px;
+}
+
 .settings-section {
   min-width: 0;
   padding: 14px 20px 16px;
   border-top: 1px solid var(--af-line);
-}
-
-.preview-section {
-  grid-column: 1 / -1;
 }
 
 .control-grid {
@@ -432,31 +381,6 @@ textarea.blacklist:focus {
 .control-stack {
   display: grid;
   gap: 12px;
-}
-
-.field,
-.range-field {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  align-content: start;
-}
-
-.field-label,
-.range-label {
-  color: var(--af-muted);
-  font-size: 14px;
-}
-
-.range-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.range-label output {
-  color: var(--af-text);
-  font-variant-numeric: tabular-nums;
 }
 
 /* 滑杆：自定义轨道（进度填充） + 拇指；--fill 由 :style 响应式同步 */

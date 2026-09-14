@@ -52,7 +52,7 @@ const wordProbeTime = computed(() => {
       <label
         v-for="id in WORD_SOURCE_IDS"
         :key="id"
-        class="src-row"
+        class="src-row af-chip"
         :class="{ off: !settings.word.sources[id] }"
         :title="sourceLabel(id)"
       >
@@ -75,7 +75,7 @@ const wordProbeTime = computed(() => {
     </div>
 
     <div class="speak-row">
-      <label class="src-row">
+      <label class="src-row af-chip">
         <input v-model="settings.word.speakEnabled" type="checkbox" class="checkbox" />
         <span>{{ t('words.speakWord') }}</span>
       </label>
@@ -90,11 +90,6 @@ const wordProbeTime = computed(() => {
 </template>
 
 <style scoped>
-.field-label {
-  color: var(--af-muted);
-  font-size: 14px;
-}
-
 /* 朗读两项同排：朗读单词（复选，与源行同款芯片）+ 朗读音色（分段胶囊） */
 .speak-row {
   display: flex;
@@ -106,8 +101,8 @@ const wordProbeTime = computed(() => {
 
 /* 源行：【checkbox | 名称 | 延迟】，延迟恒显，一行排四个源 */
 .src-rows {
-    display: flex;
-    flex-wrap: wrap;
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px 16px;
   margin-top: 10px;
 }
@@ -116,16 +111,6 @@ const wordProbeTime = computed(() => {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 26px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  user-select: none;
-  background-color: var(--af-page);
-}
-.src-row:hover {
-  background: var(--af-control-hover);
 }
 .src-row .src-name {
   overflow: hidden;

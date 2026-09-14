@@ -241,7 +241,6 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
 }
 
 .scheme-switch {
-  gap: 8px;
   min-width: 0;
 }
 

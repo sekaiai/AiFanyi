@@ -201,9 +201,9 @@ watch([() => props.settings, () => props.word], async () => {
   white-space: nowrap;
 }
 
+.preview-pronunciation,
 .preview-pos {
   font-size: max(11px, calc(var(--af-bubble-font-size) - 2px));
-  font-weight: 400;
   opacity: 0.65;
 }
 
@@ -213,6 +213,7 @@ watch([() => props.settings, () => props.word], async () => {
 
 .preview-pos {
   margin-right: 5px;
+  font-weight: 400;
 }
 
 .preview-arrow {
@@ -222,6 +223,7 @@ watch([() => props.settings, () => props.word], async () => {
   width: 10px;
   height: 10px;
   background: var(--af-bubble-background);
+  pointer-events: none;
 }
 
 .preview-bubble[data-arrow="true"] .preview-arrow {

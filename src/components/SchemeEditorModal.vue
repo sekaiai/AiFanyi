@@ -312,51 +312,9 @@ async function save(): Promise<void> {
   padding: 20px;
 }
 
-.field,
-.range-field {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  align-content: start;
-}
-
 .field.wide,
 .range-field.wide {
   grid-column: 1 / -1;
-}
-
-.field-label,
-.range-label {
-  color: var(--af-muted);
-  font-size: 14px;
-}
-
-.range-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.field :is(input:not([type="color"]), select, textarea) {
-  width: 100%;
-  min-width: 0;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
-  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
-}
-
-.field :is(input:not([type="color"]), select, textarea):hover {
-  border-color: var(--af-control-border-hover);
-}
-
-.field :is(input:not([type="color"]), select, textarea):focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
 }
 
 .scheme-guide {

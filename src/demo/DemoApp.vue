@@ -96,8 +96,8 @@ async function translationResponse(text: string, signal?: AbortSignal): Promise<
       <main id="reading-area" class="demo-pane">
         <h1>Translation demo</h1>
         <div class="reading-copy">
-          <p>悬停或选中单词查词典；选中多个词、句子或段落时按翻译方案顺序翻译。划词对代码区同样生效，悬停不会在代码区弹泡。与目标语言相同的文本不会触发翻译。</p>
-          <p>Hover over or select a word to look it up; when multiple words, a sentence or a paragraph is selected, schemes are tried in order. Selection also works inside code blocks, while hover never pops up over them. Text identical to the target language is not translated.</p>
+          <p>悬停或选中文本时显示翻译；多个词或段落选中时按设定的翻译方案依次尝试翻译。代码不支持悬停翻译，需要选中才会触发翻译。文本与翻译语言相同时不进行翻译。</p>
+          <p>Hover over or select text to show a translation. When multiple words or paragraphs are selected, the configured translation schemes are tried in order. Hover translation is disabled for code; select the text to translate it. Text in the target language is not translated.</p>
           <pre><code>const zh = "代码区不触发悬停，但划词可显式翻译。
 const en = 'No hover in code blocks; select text to translate'</code></pre>
         </div>

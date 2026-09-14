@@ -50,7 +50,7 @@ const orderHint = computed(() => schemeOrder.value === 'random'
           <option value="sequential">{{ t('schemes.orderSequential') }}</option>
         </select>
       </label>
-      <label v-if="showSync" class="target-field sync-field" :title="t('schemes.syncTitle')">
+      <label v-if="showSync" class="target-field sync-field af-chip" :title="t('schemes.syncTitle')">
         <input
           type="checkbox"
           class="checkbox"
@@ -86,44 +86,16 @@ const orderHint = computed(() => schemeOrder.value === 'random'
 }
 
 .target-field .field-label {
-  color: var(--af-muted);
-  font-size: 14px;
   white-space: nowrap;
 }
 
 .target-field select {
   min-height: 30px;
   padding: 0 8px;
-  border: 1px solid var(--af-control-border);
-  border-radius: 7px;
-  background: var(--af-control-background);
-  color: var(--af-text);
   font-size: 14px;
-  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
 }
 
-.target-field select:hover {
-  border-color: var(--af-control-border-hover);
-}
-
-.target-field select:focus {
-  border-color: var(--af-accent);
-  outline: 0;
-  box-shadow: 0 0 0 3px var(--af-focus-ring);
-}
-
-/* 与「单词翻译」源行同款芯片样式 */
 .sync-field {
-  min-height: 26px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 14px;
   white-space: nowrap;
-  cursor: pointer;
-  user-select: none;
-  background-color: var(--af-page);
-}
-.sync-field:hover {
-  background: var(--af-control-hover);
 }
 </style>
