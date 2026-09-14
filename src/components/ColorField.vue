@@ -36,7 +36,11 @@ onMounted(() => {
     },
   })
 
-  pickr.on('change', (hsva: Pickr.HSVaColor) => {
+  pickr.on('change', (hsva: Pickr.HSVaColor, source: string | null) => {
+    // pickr 的真实颜色编辑来源只有 'slider'（取色盘/色相/透明度拖动）与 'input'（hex 输入）。
+    // 'swatch' 来自表示法按钮点击 —— setColor 内部即使 silent 也会同步模拟该点击（预设切换的回声即源于此）；
+    // null 来自 hex 输入框失焦重算。两者均非颜色编辑，忽略之，避免预设切换被误标为「自定义」。
+    if (source !== 'slider' && source !== 'input') return
     lastEmitted = toHex8(hsva)
     color.value = lastEmitted
   })
@@ -61,9 +65,12 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
-<style scoped>
-.color-field :deep(.pcr-button) {
+<style >
+.color-field .pcr-button {
   border: 1px solid;
   font-size: 11px;
+}
+.pcr-app {
+  font-size: 18px;
 }
 </style>

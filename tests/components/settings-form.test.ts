@@ -1,11 +1,58 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, ref, shallowRef } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SchemesSection from '../../src/components/SchemesSection.vue'
 import SettingsForm from '../../src/components/SettingsForm.vue'
 import ColorField from '../../src/components/ColorField.vue'
 import { cloneDefaultSettings, COLOR_PRESETS } from '../../src/core/settings'
 import type { UsageStats } from '../../src/core/usage'
+
+// 模拟 @simonwep/pickr：真实 pickr 的 setColor 即使 silent 也会同步点击表示法按钮，
+// 经 Selectable onchange（_updateOutput('swatch')）发出 source='swatch' 的 change 回声
+const pickrStub = vi.hoisted(() => {
+  type ChangeListener = (hsva: { toRGBA: () => number[] }, source: string | null) => void
+
+  const hexToRgba = (hex: string): number[] => {
+    const body = hex.replace('#', '')
+    const full = body.length === 6 ? `${body}ff` : body
+    const channel = (index: number) => Number.parseInt(full.slice(index, index + 2), 16) || 0
+    return [channel(0), channel(2), channel(4), channel(6) / 255]
+  }
+
+  const instances: Array<{
+    listeners: ChangeListener[]
+    on: (event: string, listener: ChangeListener) => unknown
+    setColor: (value: string, silent?: boolean) => boolean
+    destroyAndRemove: () => void
+  }> = []
+
+  const create = () => {
+    const instance = {
+      listeners: [] as ChangeListener[],
+      on(event: string, listener: ChangeListener) {
+        if (event === 'change') instance.listeners.push(listener)
+        return instance
+      },
+      setColor(value: string) {
+        const hsva = { toRGBA: () => hexToRgba(value) }
+        for (const listener of [...instance.listeners]) listener(hsva, 'swatch')
+        return true
+      },
+      destroyAndRemove() {},
+    }
+    instances.push(instance)
+    return instance
+  }
+
+  const emitChange = (instanceIndex: number, hex: string, source: string) => {
+    const hsva = { toRGBA: () => hexToRgba(hex) }
+    for (const listener of [...instances[instanceIndex]!.listeners]) listener(hsva, source)
+  }
+
+  return { instances, create, emitChange }
+})
+
+vi.mock('@simonwep/pickr', () => ({ default: { create: pickrStub.create } }))
 
 const SettingsHarness = defineComponent({
   components: { SettingsForm, SchemesSection },
@@ -50,6 +97,10 @@ const SyncHarness = defineComponent({
 })
 
 describe('SettingsForm', () => {
+  beforeEach(() => {
+    pickrStub.instances.length = 0
+  })
+
   it('applies a color preset without replacing the settings object', async () => {
     const wrapper = mount(SettingsHarness)
     const originalSettings = wrapper.vm.settings
@@ -75,6 +126,28 @@ describe('SettingsForm', () => {
 
     expect(wrapper.vm.settings.bubble.colorPreset).toBe('custom')
     expect(wrapper.vm.settings.bubble.background).toBe('#123456')
+  })
+
+  it('keeps the selected preset when pickr echoes a programmatic change', async () => {
+    const wrapper = mount(SettingsHarness)
+
+    await wrapper.get('[data-testid="color-preset"]').setValue('night')
+    await flushPromises()
+
+    // setColor 的程序化回声（source='swatch'）不得把预设冲成「自定义」
+    expect(wrapper.vm.settings.bubble.colorPreset).toBe('night')
+    expect((wrapper.get('[data-testid="color-preset"]').element as HTMLSelectElement).value).toBe('night')
+    expect(wrapper.vm.settings.bubble.background).toBe(COLOR_PRESETS.night.background)
+  })
+
+  it('marks the preset as custom when the user edits a color via pickr', async () => {
+    const wrapper = mount(SettingsHarness)
+
+    pickrStub.emitChange(0, '#123456', 'slider')
+    await flushPromises()
+
+    expect(wrapper.vm.settings.bubble.colorPreset).toBe('custom')
+    expect(wrapper.vm.settings.bubble.background).toBe('#123456ff')
   })
 
   it('binds the sentence show-original checkbox to the bubble settings', async () => {

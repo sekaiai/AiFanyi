@@ -287,6 +287,8 @@ test.describe('AiFanyi extension', () => {
 
     await expect(page.getByRole('heading', { name: 'Translation demo' })).toBeVisible()
     await page.getByTestId('color-preset').selectOption('night')
+    // 修复回归：setColor 的程序化回声不得把预设选择框冲成「自定义」
+    await expect(page.getByTestId('color-preset')).toHaveValue('night')
     await expect(page.getByTestId('bubble-preview')).toHaveCSS('background-color', 'rgb(32, 36, 45)')
 
     const preview = page.getByTestId('bubble-preview')
