@@ -185,7 +185,6 @@ function blockedResponse(settings: TranslationSettings, requestId: RequestId): E
     ok: false,
     requestId,
     error: {
-      code: !settings.enabled ? 'disabled' : 'blacklisted',
       message: !settings.enabled ? 'AiFanyi 已停用' : 'AiFanyi 已在当前站点停用',
       retryable: false,
     },

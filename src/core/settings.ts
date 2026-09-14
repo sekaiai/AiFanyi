@@ -15,8 +15,8 @@ import type {
   VolcengineSchemeSettings,
   WordAccent,
   WordQuerySettings,
-  WordSourceId,
 } from './types'
+import { WORD_SOURCE_IDS } from './word-sources'
 
 export type { TranslationSettings } from './types'
 
@@ -211,13 +211,11 @@ export function migrateSettings(value: unknown): TranslationSettings {
   }
 }
 
-const WORD_SOURCE_KEYS: readonly WordSourceId[] = ['youdao', 'bing', 'google', 'freedictionaryapi']
-
 function readWordSettings(value: unknown, fallback: WordQuerySettings): WordQuerySettings {
   const raw = isRecord(value) ? value : {}
   const rawSources = isRecord(raw.sources) ? raw.sources : {}
   const sources = Object.fromEntries(
-    WORD_SOURCE_KEYS.map((key) => [key, readBoolean(rawSources[key], fallback.sources[key])]),
+    WORD_SOURCE_IDS.map((key) => [key, readBoolean(rawSources[key], fallback.sources[key])]),
   ) as WordQuerySettings['sources']
   return {
     showOriginal: readBoolean(raw.showOriginal, fallback.showOriginal),

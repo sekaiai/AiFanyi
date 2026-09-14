@@ -5,7 +5,7 @@ import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
 import { extractSingleWord, normalizeSourceText } from './text'
-import { lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
+import { GOOGLE_TARGET_CODES, lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
   DeeplSchemeSettings,
@@ -13,7 +13,6 @@ import type {
   SchemeOrder,
   SchemeSettings,
   TranslationSettings,
-  WordSourceId,
 } from './types'
 
 const SCHEME_TIMEOUT_MS = 15000
@@ -26,48 +25,43 @@ const GOOGLE_CLOUD_ENDPOINT = 'https://translation.googleapis.com/language/trans
 
 // DeepL 保守收录确定支持的语言；不确定的（tr/th/vi/id/ms/hi）不收录，
 // 选中后显式报错由方案链顺延到下一方案，避免发出必然失败的请求。
-const TARGET_CODES: Record<string, { deepl?: string; google: string }> = {
-  '简体中文': { deepl: 'ZH', google: 'zh-CN' },
-  '繁體中文': { deepl: 'ZH', google: 'zh-TW' },
-  'English': { deepl: 'EN', google: 'en' },
-  '日本語': { deepl: 'JA', google: 'ja' },
-  '한국어': { deepl: 'KO', google: 'ko' },
-  'Français': { deepl: 'FR', google: 'fr' },
-  'Deutsch': { deepl: 'DE', google: 'de' },
-  'Español': { deepl: 'ES', google: 'es' },
-  'Português': { deepl: 'PT', google: 'pt' },
-  'Italiano': { deepl: 'IT', google: 'it' },
-  'Русский': { deepl: 'RU', google: 'ru' },
-  'Nederlands': { deepl: 'NL', google: 'nl' },
-  'Polski': { deepl: 'PL', google: 'pl' },
-  'Türkçe': { google: 'tr' },
-  'العربية': { deepl: 'AR', google: 'ar' },
-  'ไทย': { google: 'th' },
-  'Tiếng Việt': { google: 'vi' },
-  'Bahasa Indonesia': { google: 'id' },
-  'Bahasa Melayu': { google: 'ms' },
-  'Ελληνικά': { deepl: 'EL', google: 'el' },
-  'Svenska': { deepl: 'SV', google: 'sv' },
-  'Dansk': { deepl: 'DA', google: 'da' },
-  'Suomi': { deepl: 'FI', google: 'fi' },
-  'Norsk': { deepl: 'NB', google: 'no' },
-  'Čeština': { deepl: 'CS', google: 'cs' },
-  'Magyar': { deepl: 'HU', google: 'hu' },
-  'Română': { deepl: 'RO', google: 'ro' },
-  'Українська': { deepl: 'UK', google: 'uk' },
-  'हिन्दी': { google: 'hi' },
+// google 码共用 word-sources.ts 的权威表，这里只维护 DeepL 一列。
+const DEEPL_TARGET_CODES: Record<string, string> = {
+  '简体中文': 'ZH',
+  '繁體中文': 'ZH',
+  'English': 'EN',
+  '日本語': 'JA',
+  '한국어': 'KO',
+  'Français': 'FR',
+  'Deutsch': 'DE',
+  'Español': 'ES',
+  'Português': 'PT',
+  'Italiano': 'IT',
+  'Русский': 'RU',
+  'Nederlands': 'NL',
+  'Polski': 'PL',
+  'العربية': 'AR',
+  'Ελληνικά': 'EL',
+  'Svenska': 'SV',
+  'Dansk': 'DA',
+  'Suomi': 'FI',
+  'Norsk': 'NB',
+  'Čeština': 'CS',
+  'Magyar': 'HU',
+  'Română': 'RO',
+  'Українська': 'UK',
 }
 
 function deeplTargetCode(targetLanguage: string): string {
-  const codes = TARGET_CODES[targetLanguage]
-  if (!codes?.deepl) throw new Error(`DeepL 不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
-  return codes.deepl
+  const code = DEEPL_TARGET_CODES[targetLanguage]
+  if (!code) throw new Error(`DeepL 不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
+  return code
 }
 
 function googleTargetCode(targetLanguage: string): string {
-  const codes = TARGET_CODES[targetLanguage]
-  if (!codes) throw new Error(`Google 翻译不支持目标语言「${targetLanguage}」`)
-  return codes.google
+  const code = GOOGLE_TARGET_CODES[targetLanguage]
+  if (!code) throw new Error(`Google 翻译不支持目标语言「${targetLanguage}」`)
+  return code
 }
 
 export type TranslateOutcome =
@@ -75,7 +69,6 @@ export type TranslateOutcome =
   | { kind: 'text'; text: string }
 
 interface WordLookupContext {
-  sources?: WordSourceId[]
   probe?: WordProbeState | null
 }
 
@@ -189,7 +182,7 @@ export async function runTranslation(
   let poolError: unknown = null
   if (singleWord) {
     poolTried = true
-    const enabledSources = (wordContext?.sources ?? [...WORD_SOURCE_IDS]).filter((source) => settings.word.sources[source] !== false)
+    const enabledSources = [...WORD_SOURCE_IDS].filter((source) => settings.word.sources[source] !== false)
     try {
       const result = await lookupWord(singleWord, {
         sources: enabledSources,

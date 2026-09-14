@@ -24,11 +24,9 @@ export type WordSourcesResponse =
 export type ExtensionResponse =
   | { ok: true; requestId: RequestId; kind: 'dictionary'; result: DictionaryResult }
   | { ok: true; requestId: RequestId; kind: 'text'; result: string }
-  | { ok: true; requestId: RequestId; kind: 'cancelled' | 'tested' }
   | { ok: false; requestId: RequestId; error: DisplayError }
 
 export interface DisplayError {
-  code: 'cancelled' | 'bad_config' | 'disabled' | 'blacklisted' | 'http' | 'timeout' | 'empty' | 'parse' | 'network' | 'unknown'
   message: string
   retryable: boolean
 }
@@ -64,15 +62,15 @@ export function isPublicSettingsUpdate(value: unknown): value is PublicSettingsU
 
 export function toDisplayError(error: unknown): DisplayError {
   if (error instanceof DOMException && error.name === 'AbortError') {
-    return { code: 'cancelled', message: '请求已取消', retryable: false }
+    return { message: '请求已取消', retryable: false }
   }
   if (error instanceof DOMException && error.name === 'TimeoutError') {
-    return { code: 'timeout', message: '请求超时，请稍后重试', retryable: true }
+    return { message: '请求超时，请稍后重试', retryable: true }
   }
   const raw = error instanceof Error ? error.message : '未知错误'
   const message = raw.replace(/Bearer\s+[A-Za-z0-9._~+/-]+/g, 'Bearer [redacted]')
-  if (message.startsWith('HTTP')) return { code: 'http', message, retryable: true }
-  if (message.includes('JSON') || message.includes('为空')) return { code: 'parse', message, retryable: true }
-  if (message.includes('填写') || message.includes('地址')) return { code: 'bad_config', message, retryable: false }
-  return { code: 'network', message, retryable: true }
+  if (message.startsWith('HTTP')) return { message, retryable: true }
+  if (message.includes('JSON') || message.includes('为空')) return { message, retryable: true }
+  if (message.includes('填写') || message.includes('地址')) return { message, retryable: false }
+  return { message, retryable: true }
 }

@@ -18,13 +18,6 @@ import type { WordSourceId } from './types'
 
 export const WORD_SOURCE_IDS = ['youdao', 'bing', 'google', 'freedictionaryapi'] as const
 
-export const WORD_SOURCE_LABELS: Record<WordSourceId, string> = {
-  youdao: '有道词典',
-  bing: 'Bing 词典',
-  google: 'Google Free',
-  freedictionaryapi: 'freedictionaryapi',
-}
-
 /** 单词卡片结果直接复用 DictionaryResult，可直接喂给气泡的词典渲染。 */
 export type WordResult = DictionaryResult
 
@@ -55,8 +48,11 @@ const BING_TRANSLATE_ENDPOINT = 'https://cn.bing.com/ttranslatev3'
 const BING_DICT_PAGE = 'https://cn.bing.com/dict/search?q='
 const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t'
 
-// word-sources 不能 import translate.ts（会循环依赖），目标语言映射独立维护一份。
-const FREE_TARGET_CODES: Record<string, string> = {
+// 目标语言 → Google 语言码的唯一权威表；translate.ts 的方案链也从这里取 google 码。
+// word-sources 不能 import translate.ts（会循环依赖），所以规范表放在本模块。
+export const GOOGLE_TARGET_CODES: Record<string, string> = {
+  '简体中文': 'zh-CN',
+  '繁體中文': 'zh-TW',
   'English': 'en',
   '日本語': 'ja',
   '한국어': 'ko',
@@ -78,14 +74,14 @@ const FREE_TARGET_CODES: Record<string, string> = {
   'Svenska': 'sv',
   'Dansk': 'da',
   'Suomi': 'fi',
+  'Norsk': 'no',
   'Čeština': 'cs',
   'Magyar': 'hu',
   'Română': 'ro',
   'Українська': 'uk',
   'हिन्दी': 'hi',
 }
-const GOOGLE_TARGET_CODES: Record<string, string> = { ...FREE_TARGET_CODES, '简体中文': 'zh-CN', '繁體中文': 'zh-TW', 'Norsk': 'no' }
-const BING_TARGET_CODES: Record<string, string> = { ...FREE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
+const BING_TARGET_CODES: Record<string, string> = { ...GOOGLE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
 
 function googleTargetCode(targetLanguage: string): string {
   const code = GOOGLE_TARGET_CODES[targetLanguage]
@@ -276,7 +272,13 @@ export interface WordLookupOptions {
   probe?: WordProbeState | null
 }
 
-export async function fetchWordResult(source: WordSourceId, word: string, options: WordLookupOptions, signal?: AbortSignal): Promise<WordResult> {
+// fetchWordResult 只关心目标语言与口音，不参与源的选择（那是 lookupWord 的事）。
+export async function fetchWordResult(
+  source: WordSourceId,
+  word: string,
+  options: Pick<WordLookupOptions, 'targetLanguage' | 'accent'>,
+  signal?: AbortSignal,
+): Promise<WordResult> {
   switch (source) {
     case 'youdao':
       return lookupYoudao(word, options.accent, signal)
@@ -333,7 +335,7 @@ export async function probeWordSources(): Promise<WordProbeState> {
   const entries = await Promise.all(WORD_SOURCE_IDS.map(async (source): Promise<[WordSourceId, boolean, number | undefined]> => {
     const startedAt = performance.now()
     try {
-      await fetchWordResult(source, PROBE_WORD, { sources: [...WORD_SOURCE_IDS], targetLanguage: '简体中文', accent: 'us' }, AbortSignal.timeout(PROBE_TIMEOUT_MS))
+      await fetchWordResult(source, PROBE_WORD, { targetLanguage: '简体中文', accent: 'us' }, AbortSignal.timeout(PROBE_TIMEOUT_MS))
       return [source, true, Math.round(performance.now() - startedAt)]
     } catch {
       return [source, false, undefined]
