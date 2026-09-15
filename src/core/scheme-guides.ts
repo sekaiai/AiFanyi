@@ -38,6 +38,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   mymemory: [
     'https://mymemory.translated.net/',
   ],
+  yandex: [
+    'https://translate.yandex.com/',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',

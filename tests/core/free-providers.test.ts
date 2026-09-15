@@ -6,6 +6,7 @@ import { parseMyMemoryTranslation, translateWithMyMemory } from '../../src/core/
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { parseTencentTranslation, parseTencentWebPage, translateWithTencent } from '../../src/core/tencent'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
+import { parseYandexDetection, parseYandexTranslation, translateWithYandex } from '../../src/core/yandex'
 import { createYoudaoSign, parseYoudaoTranslation, translateWithYoudao } from '../../src/core/youdao'
 import type { SchemeSettings } from '../../src/core/types'
 
@@ -16,6 +17,7 @@ const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
 const tencentScheme: SchemeSettings = { id: 'tencent-1', type: 'tencent', enabled: true }
 const youdaoScheme: SchemeSettings = { id: 'youdao-1', type: 'youdao', enabled: true }
 const myMemoryScheme: SchemeSettings = { id: 'mymemory-1', type: 'mymemory', enabled: true }
+const yandexScheme: SchemeSettings = { id: 'yandex-1', type: 'yandex', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -362,6 +364,68 @@ describe('translateWithMyMemory', () => {
     vi.stubGlobal('fetch', fetchMock)
     const long = '测'.repeat(167)
     await expect(translateWithMyMemory(long, 'English')).rejects.toThrow('MyMemory 单次查询最多 500 字节')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('yandex scheme config', () => {
+  it('is a zero-config scheme', () => {
+    expect(hasRequiredConfig(yandexScheme)).toBe(true)
+    expect(describeMissingConfig(yandexScheme)).toBeNull()
+  })
+
+  it('survives a settings round-trip', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [yandexScheme]
+    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
+    expect(migrated.schemes).toEqual([yandexScheme])
+  })
+})
+
+describe('parseYandexDetection', () => {
+  it('reads the detected language and rejects error codes', () => {
+    expect(parseYandexDetection({ code: 200, lang: 'en' })).toBe('en')
+    expect(parseYandexDetection({ code: '200', lang: 'en' })).toBe('en')
+    expect(() => parseYandexDetection({ code: 400, message: 'Invalid lang' })).toThrow('Yandex 错误 400：Invalid lang')
+    expect(() => parseYandexDetection({ code: 200 })).toThrow('Yandex 未能识别源语言。')
+  })
+})
+
+describe('parseYandexTranslation', () => {
+  it('reads the first text segment and rejects empties', () => {
+    expect(parseYandexTranslation({ code: 200, lang: 'en-zh-CN', text: ['你好', '世界'] })).toBe('你好')
+    expect(() => parseYandexTranslation({ code: 200, text: [] })).toThrow('Yandex 返回内容为空。')
+    expect(() => parseYandexTranslation({ code: '501', message: 'The specified translation direction is not supported' })).toThrow('Yandex 错误 501')
+  })
+})
+
+describe('translateWithYandex', () => {
+  it('detects the source language then translates with an explicit pair', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 200, lang: 'en' }))
+      .mockResolvedValueOnce(jsonResponse({ code: 200, lang: 'en-zh-CN', text: ['你好'] }))
+
+    const result = await translateWithYandex('hello', '简体中文')
+
+    expect(result).toBe('你好')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://browser.translate.yandex.net/api/v1/tr.json/detect?srv=browser_video_translation')
+    const detectInit = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(detectInit.method).toBe('POST')
+    const detectBody = new URLSearchParams(detectInit.body as string)
+    expect(detectBody.get('text')).toBe('hello')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://browser.translate.yandex.net/api/v1/tr.json/translate?srv=browser_video_translation')
+    const translateInit = fetchMock.mock.calls[1]?.[1] as RequestInit
+    expect(translateInit.method).toBe('POST')
+    const translateBody = new URLSearchParams(translateInit.body as string)
+    expect(translateBody.get('text')).toBe('hello')
+    expect(translateBody.get('lang')).toBe('en-zh-CN')
+  })
+
+  it('throws locally for unsupported targets without any request', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(translateWithYandex('hello', '繁體中文')).rejects.toThrow('Yandex 翻译不支持目标语言「繁體中文」')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
