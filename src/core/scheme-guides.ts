@@ -35,6 +35,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   youdao: [
     'https://fanyi.youdao.com/',
   ],
+  mymemory: [
+    'https://mymemory.translated.net/',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',

@@ -3,6 +3,7 @@ import { requestBaiduTranslation } from './baidu'
 import { translateWithBaiduWeb } from './baidu-web'
 import { translateWithBing } from './bing'
 import { createCooldownTracker, withoutCoolingDown } from './cooldown'
+import { translateWithMyMemory } from './mymemory'
 import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
@@ -121,6 +122,8 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
       return null
     case 'youdao':
       return null
+    case 'mymemory':
+      return null
     case 'volcengine':
       return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
         ? null
@@ -181,6 +184,8 @@ async function dispatchScheme(
       return { kind: 'text', text: await translateWithTencent(source, targetLanguage, signal) }
     case 'youdao':
       return { kind: 'text', text: await translateWithYoudao(source, targetLanguage, signal) }
+    case 'mymemory':
+      return { kind: 'text', text: await translateWithMyMemory(source, targetLanguage, signal) }
     case 'volcengine':
       return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':

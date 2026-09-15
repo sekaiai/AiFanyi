@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBaiduWebSign, parseBaiduWebPage, translateWithBaiduWeb } from '../../src/core/baidu-web'
 import { translateWithBing } from '../../src/core/bing'
 import { md5Hex } from '../../src/core/md5'
+import { parseMyMemoryTranslation, translateWithMyMemory } from '../../src/core/mymemory'
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { parseTencentTranslation, parseTencentWebPage, translateWithTencent } from '../../src/core/tencent'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
@@ -14,6 +15,7 @@ const baiduWebScheme: SchemeSettings = { id: 'baidu-web-1', type: 'baiduWeb', en
 const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
 const tencentScheme: SchemeSettings = { id: 'tencent-1', type: 'tencent', enabled: true }
 const youdaoScheme: SchemeSettings = { id: 'youdao-1', type: 'youdao', enabled: true }
+const myMemoryScheme: SchemeSettings = { id: 'mymemory-1', type: 'mymemory', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -304,6 +306,62 @@ describe('translateWithYoudao', () => {
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(translateWithYoudao('hello', 'Türkçe')).rejects.toThrow('有道翻译不支持目标语言「Türkçe」')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('mymemory scheme config', () => {
+  it('is a zero-config scheme', () => {
+    expect(hasRequiredConfig(myMemoryScheme)).toBe(true)
+    expect(describeMissingConfig(myMemoryScheme)).toBeNull()
+  })
+
+  it('survives a settings round-trip', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [myMemoryScheme]
+    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
+    expect(migrated.schemes).toEqual([myMemoryScheme])
+  })
+})
+
+describe('parseMyMemoryTranslation', () => {
+  it('reads the translated text and rejects empty payloads', () => {
+    expect(parseMyMemoryTranslation({ responseData: { translatedText: '您好', match: 0.85 }, responseStatus: 200 })).toBe('您好')
+    expect(() => parseMyMemoryTranslation({ responseData: { translatedText: '' }, responseStatus: 200 })).toThrow('MyMemory 返回内容为空。')
+  })
+
+  it('rejects error statuses carried in a 200 response', () => {
+    expect(() => parseMyMemoryTranslation({
+      responseData: { translatedText: 'PLEASE SELECT TWO DISTINCT LANGUAGES' },
+      responseDetails: 'PLEASE SELECT TWO DISTINCT LANGUAGES',
+      responseStatus: '403',
+    })).toThrow('MyMemory 错误 403：PLEASE SELECT TWO DISTINCT LANGUAGES')
+  })
+
+  it('rejects quota warnings even when the status is 200', () => {
+    expect(() => parseMyMemoryTranslation({
+      responseData: { translatedText: 'MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY.' },
+      responseStatus: 200,
+    })).toThrow('MyMemory 免费额度已用完')
+  })
+})
+
+describe('translateWithMyMemory', () => {
+  it('queries the api with an autodetect langpair', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ responseData: { translatedText: '您好', match: 0.85 }, responseStatus: 200 }))
+
+    const result = await translateWithMyMemory('hello', '简体中文')
+
+    expect(result).toBe('您好')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.mymemory.translated.net/get?q=hello&langpair=Autodetect%7Czh-CN')
+  })
+
+  it('throws locally for oversized text without any request', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    const long = '测'.repeat(167)
+    await expect(translateWithMyMemory(long, 'English')).rejects.toThrow('MyMemory 单次查询最多 500 字节')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
