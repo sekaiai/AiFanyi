@@ -22,7 +22,7 @@ const emit = defineEmits<{
 const { t } = useUiLocale()
 
 // 免密方案在指南徽标中显示「无需密钥」，其余方案显示「配置随账号同步」。
-const KEYLESS_TYPES: SchemeType[] = ['google', 'baiduWeb', 'bing', 'tencent', 'youdao', 'mymemory', 'yandex', 'reverso']
+const KEYLESS_TYPES: SchemeType[] = ['google', 'bing', 'mymemory', 'yandex', 'reverso']
 
 const draft = ref<SchemeSettings>(createScheme('ai'))
 const guideExpanded = ref(true)
@@ -67,10 +67,7 @@ function createScheme(type: SchemeType, id = uid(), enabled = true): SchemeSetti
   if (type === 'googleCloud') return { id, type, enabled, apiKey: '' }
   if (type === 'baidu') return { id, type, enabled, appId: '', secretKey: '' }
   if (type === 'baiduAi') return { id, type, enabled, appId: '', secretKey: '', modelType: 'nmt' }
-  if (type === 'baiduWeb') return { id, type, enabled }
   if (type === 'bing') return { id, type, enabled }
-  if (type === 'tencent') return { id, type, enabled }
-  if (type === 'youdao') return { id, type, enabled }
   if (type === 'mymemory') return { id, type, enabled }
   if (type === 'yandex') return { id, type, enabled }
   if (type === 'reverso') return { id, type, enabled }
@@ -141,10 +138,7 @@ async function save(): Promise<void> {
           <select :value="draft.type" data-testid="scheme-editor-type" :disabled="draft.type === 'google'" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
             <option value="baidu">{{ t('schemes.type.baidu') }}</option>
             <option value="baiduAi">{{ t('schemes.type.baiduAi') }}</option>
-            <option value="baiduWeb">{{ t('schemes.type.baiduWeb') }}</option>
             <option value="bing">{{ t('schemes.type.bing') }}</option>
-            <option value="tencent">{{ t('schemes.type.tencent') }}</option>
-            <option value="youdao">{{ t('schemes.type.youdao') }}</option>
             <option value="mymemory">{{ t('schemes.type.mymemory') }}</option>
             <option value="yandex">{{ t('schemes.type.yandex') }}</option>
             <option value="reverso">{{ t('schemes.type.reverso') }}</option>
@@ -196,10 +190,7 @@ async function save(): Promise<void> {
             </select>
           </label>
         </template>
-        <p v-else-if="draft.type === 'baiduWeb'" class="field-hint wide">{{ t('editor.hint.baiduWeb') }}</p>
         <p v-else-if="draft.type === 'bing'" class="field-hint wide">{{ t('editor.hint.bing') }}</p>
-        <p v-else-if="draft.type === 'tencent'" class="field-hint wide">{{ t('editor.hint.tencent') }}</p>
-        <p v-else-if="draft.type === 'youdao'" class="field-hint wide">{{ t('editor.hint.youdao') }}</p>
         <p v-else-if="draft.type === 'mymemory'" class="field-hint wide">{{ t('editor.hint.mymemory') }}</p>
         <p v-else-if="draft.type === 'yandex'" class="field-hint wide">{{ t('editor.hint.yandex') }}</p>
         <p v-else-if="draft.type === 'reverso'" class="field-hint wide">{{ t('editor.hint.reverso') }}</p>

@@ -107,8 +107,8 @@ describe('browser settings storage', () => {
     expect(next.hoverDelayMs).toBe(200)
     expect(next.targetLanguage).toBe('English')
     expect(next.word.accent).toBe('uk')
-    // 默认链含 8 个免密方案，追加的 ai 方案保留在末尾
-    expect(next.schemes).toHaveLength(9)
+    // 默认链含 5 个免密方案，追加的 ai 方案保留在末尾
+    expect(next.schemes).toHaveLength(6)
     expect(next.schemes.find((scheme) => scheme.type === 'ai')).toMatchObject({ type: 'ai', label: '我的智谱' })
     // 重置结果已写回双区
     const syncRaw = (await browser.storage.sync.get(KEY))[KEY]

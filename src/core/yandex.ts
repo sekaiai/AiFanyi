@@ -6,10 +6,10 @@ const YANDEX_API_BASE = 'https://browser.translate.yandex.net/api/v1/tr.json'
 const YANDEX_SRV = 'browser_video_translation'
 const YANDEX_TIMEOUT_MS = 10000
 
-// Yandex 目标码与 Google 基本一致，但不支持繁體中文（接口对 zh-TW 返回 501），本地拦截由方案链顺延。
+// Yandex 目标码与 Google 基本一致，但简体中文是 zh（zh-CN 会返回 501 方向不支持），且不支持繁體中文，本地拦截由方案链顺延。
 function yandexTargetCode(targetLanguage: string): string {
   if (targetLanguage === '繁體中文') throw new Error('Yandex 翻译不支持目标语言「繁體中文」，请换用其他翻译方案')
-  const code = GOOGLE_TARGET_CODES[targetLanguage]
+  const code = targetLanguage === '简体中文' ? 'zh' : GOOGLE_TARGET_CODES[targetLanguage]
   if (!code) throw new Error(`Yandex 翻译不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
   return code
 }

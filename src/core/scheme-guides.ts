@@ -23,17 +23,8 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
     'https://api.fanyi.baidu.com/product/133',
     'https://fanyi-api.baidu.com/manage/developer',
   ],
-  baiduWeb: [
-    'https://fanyi.baidu.com/',
-  ],
   bing: [
     'https://cn.bing.com/translator',
-  ],
-  tencent: [
-    'https://fanyi.qq.com/',
-  ],
-  youdao: [
-    'https://fanyi.youdao.com/',
   ],
   mymemory: [
     'https://mymemory.translated.net/',

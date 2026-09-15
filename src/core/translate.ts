@@ -1,6 +1,5 @@
 import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
-import { translateWithBaiduWeb } from './baidu-web'
 import { translateWithBing } from './bing'
 import { createCooldownTracker, withoutCoolingDown } from './cooldown'
 import { translateWithMyMemory } from './mymemory'
@@ -8,10 +7,8 @@ import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
 import { translateWithReverso } from './reverso'
-import { translateWithTencent } from './tencent'
 import { extractSingleWord, normalizeSourceText } from './text'
 import { translateWithYandex } from './yandex'
-import { translateWithYoudao } from './youdao'
 import { GOOGLE_TARGET_CODES, lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
@@ -116,13 +113,7 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
       return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
     case 'baiduAi':
       return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
-    case 'baiduWeb':
-      return null
     case 'bing':
-      return null
-    case 'tencent':
-      return null
-    case 'youdao':
       return null
     case 'mymemory':
       return null
@@ -182,14 +173,8 @@ async function dispatchScheme(
       return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
     case 'baiduAi':
       return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
-    case 'baiduWeb':
-      return { kind: 'text', text: await translateWithBaiduWeb(source, targetLanguage, signal) }
     case 'bing':
       return { kind: 'text', text: await translateWithBing(source, targetLanguage, signal) }
-    case 'tencent':
-      return { kind: 'text', text: await translateWithTencent(source, targetLanguage, signal) }
-    case 'youdao':
-      return { kind: 'text', text: await translateWithYoudao(source, targetLanguage, signal) }
     case 'mymemory':
       return { kind: 'text', text: await translateWithMyMemory(source, targetLanguage, signal) }
     case 'yandex':

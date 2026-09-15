@@ -216,7 +216,7 @@ describe('useSettingsModel', () => {
     expect(
       (wrapper.find('input[name="targetLanguage"]').element as HTMLInputElement).value,
     ).toBe('English')
-    expect(wrapper.get('[data-testid="schemes-count"]').text()).toBe('9')
+    expect(wrapper.get('[data-testid="schemes-count"]').text()).toBe('6')
   })
 
   it('keeps defaults and reports a load failure', async () => {
