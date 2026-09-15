@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { browser } from 'wxt/browser'
-import { onMounted, onUnmounted, shallowRef, watchEffect } from 'vue'
+import { onMounted, onUnmounted, ref, shallowRef, watchEffect } from 'vue'
 import { useSettingsModel } from '../composables/useSettingsModel'
 import type { ExtensionResponse, WordSourcesResponse } from '../core/messages'
 import type { SchemeSettings } from '../core/types'
@@ -28,6 +28,7 @@ let usageUnwatch: (() => void) | null = null
 
 const wordProbe = shallowRef<WordProbeState | null>(null)
 const probingWords = shallowRef(false)
+const schemesSection = ref<InstanceType<typeof SchemesSection> | null>(null)
 
 onMounted(async () => {
   try {
@@ -75,6 +76,12 @@ async function probeWords(): Promise<void> {
   }
 }
 
+// 单词「检测连通性」联动句子面板：并发测试全部翻译方案（挂载时的自动补测不触发）
+function probeAll(): void {
+  void probeWords()
+  void schemesSection.value?.testAllSchemes()
+}
+
 async function testScheme(scheme: SchemeSettings): Promise<string> {
   const response = await browser.runtime.sendMessage({
     type: 'settings.testScheme',
@@ -115,9 +122,10 @@ async function requestDemo(
         v-model="settings"
         :word-probe="wordProbe"
         :probing="probingWords"
-        @probe-words="probeWords"
+        @probe-words="probeAll"
       />
       <SchemesSection
+        ref="schemesSection"
         v-model="settings.schemes"
         :usage="usage"
         :test-scheme="testScheme"

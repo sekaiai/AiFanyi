@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, shallowRef, toRaw } from 'vue'
+import { onUnmounted, ref, toRaw } from 'vue'
 import { useUiLocale } from '../composables/useUiLocale'
 import type { SchemeSettings } from '../core/types'
 import { isBuiltInSchemeType } from '../core/settings'
@@ -27,7 +27,7 @@ function isBuiltInScheme(scheme: SchemeSettings): boolean {
   return isBuiltInSchemeType(scheme.type)
 }
 
-const testingSchemeId = shallowRef('')
+const testingSchemeIds = ref<Record<string, boolean>>({})
 const editorVisible = ref(false)
 const editorDraft = ref<SchemeSettings | null>(null)
 
@@ -109,11 +109,12 @@ function moveScheme(id: string, offset: -1 | 1): void {
 
 async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   if (!props.testScheme) return
+  if (testingSchemeIds.value[scheme.id]) return
   if (!hasRequiredConfig(scheme)) {
     schemeTestStatus.value[scheme.id] = { text: t('schemes.testIncomplete'), tone: 'error' }
     return
   }
-  testingSchemeId.value = scheme.id
+  testingSchemeIds.value[scheme.id] = true
   schemeTestStatus.value[scheme.id] = { text: t('schemes.testing'), tone: 'idle' }
   const startedAt = performance.now()
   try {
@@ -123,9 +124,16 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
   } catch (error) {
     schemeTestStatus.value[scheme.id] = { text: error instanceof Error ? error.message : t('schemes.testFail'), tone: 'error' }
   } finally {
-    testingSchemeId.value = ''
+    delete testingSchemeIds.value[scheme.id]
   }
 }
+
+/** 批量连通性检测：全部方案（含停用）并发测试，逐卡独立显示结果。 */
+async function testAllSchemes(): Promise<void> {
+  await Promise.all(schemes.value.map((scheme) => handleTestScheme(scheme)))
+}
+
+defineExpose({ testAllSchemes })
 </script>
 
 <template>
@@ -143,7 +151,7 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
         <span v-if="isBuiltInScheme(scheme)" class="scheme-badge">{{ t('schemes.webBadge') }}</span>
         <span v-if="usage" class="scheme-usage" :data-testid="`scheme-usage-${scheme.id}`">{{ formatUsageCounter(usage.sentence[scheme.id], locale) }}</span>
         <span class="settings-status scheme-status" :class="schemeTestStatus[scheme.id]?.tone" :title="schemeTestStatus[scheme.id]?.text ?? ''">{{ schemeTestStatus[scheme.id]?.text ?? '' }}</span>
-        <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">{{ t('schemes.test') }}</button>
+        <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeIds[scheme.id] || !testScheme" @click="handleTestScheme(scheme)">{{ t('schemes.test') }}</button>
         <div class="scheme-actions">
           <button class="icon-button" type="button" :title="t('schemes.moveUp')" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
           <button class="icon-button" type="button" :title="t('schemes.moveDown')" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>

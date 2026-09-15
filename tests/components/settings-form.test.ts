@@ -6,6 +6,7 @@ import SchemesSection from '../../src/components/SchemesSection.vue'
 import SettingsForm from '../../src/components/SettingsForm.vue'
 import ColorField from '../../src/components/ColorField.vue'
 import { cloneDefaultSettings, COLOR_PRESETS } from '../../src/core/settings'
+import type { SchemeSettings } from '../../src/core/types'
 import type { UsageStats } from '../../src/core/usage'
 
 // 模拟 @simonwep/pickr：真实 pickr 的 setColor 即使 silent 也会同步点击表示法按钮，
@@ -461,5 +462,91 @@ describe('SettingsForm', () => {
     const wrapper = mount(EnSettingsHarness)
 
     expect(wrapper.get('.settings-title').text()).toBe('Settings')
+  })
+})
+
+const BatchTestHarness = defineComponent({
+  components: { SchemesSection },
+  setup() {
+    const settings = ref(cloneDefaultSettings())
+    const calls = ref<string[]>([])
+    const failures = ref<Record<string, string>>({})
+    const release: Array<() => void> = []
+    const testScheme = async (scheme: SchemeSettings) => {
+      calls.value.push(scheme.id)
+      if (failures.value[scheme.id]) throw new Error(failures.value[scheme.id])
+      // 门闩：全部方案的测试并发挂起，由测试手动放行，用于断言并发进行中的 UI 状态
+      await new Promise<void>((resolve) => release.push(resolve))
+      return '方案配置可用'
+    }
+    return { settings, testScheme, calls, failures, release }
+  },
+  template: `<SchemesSection v-model="settings.schemes" :test-scheme="testScheme" />`,
+})
+
+const BATCH_TYPES = ['bing', 'google', 'mymemory', 'yandex', 'reverso'] as const
+
+const runBatchTest = (wrapper: ReturnType<typeof mount>): Promise<void> => {
+  const section = wrapper.findComponent(SchemesSection).vm as unknown as { testAllSchemes: () => Promise<void> }
+  return section.testAllSchemes()
+}
+
+describe('SchemesSection batch testing', () => {
+  it('tests every scheme concurrently, including disabled ones', async () => {
+    const wrapper = mount(BatchTestHarness)
+    wrapper.vm.settings.schemes[0]!.enabled = false
+    await flushPromises()
+
+    const running = runBatchTest(wrapper)
+    await flushPromises()
+
+    // 恰好各测一次（含停用的 bing），且并发进行中逐卡显示「正在测试」并禁用测试按钮
+    expect(wrapper.vm.calls).toEqual(['default-bing', 'default-google', 'default-mymemory', 'default-yandex', 'default-reverso'])
+    for (const type of BATCH_TYPES) {
+      const card = wrapper.get(`[data-testid="scheme-card-${type}"]`)
+      expect(card.get('.settings-status').text()).toBe('正在测试...')
+      expect(card.get(`[data-testid="scheme-test-${type}"]`).attributes('disabled')).toBeDefined()
+    }
+
+    wrapper.vm.release.forEach((release) => release())
+    await running
+    await flushPromises()
+
+    for (const type of BATCH_TYPES) {
+      const card = wrapper.get(`[data-testid="scheme-card-${type}"]`)
+      expect(card.get('.settings-status').text()).toMatch(/^成功 · \d+ ms$/)
+      expect(card.get(`[data-testid="scheme-test-${type}"]`).attributes('disabled')).toBeUndefined()
+    }
+  })
+
+  it('ignores re-entrant batch tests while one is already running', async () => {
+    const wrapper = mount(BatchTestHarness)
+
+    const first = runBatchTest(wrapper)
+    await flushPromises()
+    const second = runBatchTest(wrapper)
+    await flushPromises()
+
+    // 重入不追加调用：仍只有第一轮的 5 次
+    expect(wrapper.vm.calls).toHaveLength(5)
+
+    wrapper.vm.release.forEach((release) => release())
+    await Promise.all([first, second])
+  })
+
+  it('keeps other cards succeeding when one scheme test fails', async () => {
+    const wrapper = mount(BatchTestHarness)
+    wrapper.vm.failures = { 'default-mymemory': 'HTTP 401' }
+
+    const running = runBatchTest(wrapper)
+    await flushPromises()
+    wrapper.vm.release.forEach((release) => release())
+    await running
+    await flushPromises()
+
+    const failed = wrapper.get('[data-testid="scheme-card-mymemory"] .settings-status')
+    expect(failed.text()).toBe('HTTP 401')
+    expect(failed.classes()).toContain('error')
+    expect(wrapper.get('[data-testid="scheme-card-bing"] .settings-status').text()).toMatch(/^成功 · \d+ ms$/)
   })
 })
