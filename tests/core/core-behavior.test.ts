@@ -57,6 +57,16 @@ describe('text classification', () => {
     ['U.S.A.', 'ai', 'U.S.A.'],
     ['two words', 'ai', 'two words'],
     ['   ', 'empty', ''],
+    // 纯数字/符号不含文字字符，无翻译意义：不触发（划词 ai 分支的历史缺口）
+    ['9.9', 'empty', ''],
+    ['9,000', 'empty', ''],
+    ['9+9', 'empty', ''],
+    ['9=9', 'empty', ''],
+    ['!!!', 'empty', ''],
+    ['9 9', 'empty', ''],
+    // 含任一文字字符（字母/汉字）照常分类
+    ['9.9元', 'ai', '9.9元'],
+    ['第9章', 'ai', '第9章'],
   ] as const)('classifies %j as %s', (input, type, text) => {
     expect(classifySelection(input)).toEqual({ type, text })
   })

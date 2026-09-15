@@ -22,9 +22,12 @@ function isShortCjkWord(word: string): boolean {
 
 type TextAction = { type: 'dictionary' | 'ai'; text: string } | { type: 'empty'; text: '' }
 
+// 纯数字/符号/空白不含任何文字字符，翻译无意义（与 isWordCandidate 的取词意图一致，补齐划词 ai 分支缺口）。
+const TRANSLATABLE_RE = /\p{L}/u
+
 export function classifySelection(text: string): TextAction {
   const normalized = normalizeSourceText(text)
-  if (!normalized) return { type: 'empty', text: '' }
+  if (!normalized || !TRANSLATABLE_RE.test(normalized)) return { type: 'empty', text: '' }
   const word = extractSingleWord(text)
   return word ? { type: 'dictionary', text: word } : { type: 'ai', text: normalized }
 }

@@ -227,6 +227,33 @@ test.describe('AiFanyi extension', () => {
     await context.close()
   })
 
+  test('skips translation when the selection contains no letters', async () => {
+    const { context, page, worker } = await launchExtension()
+    await page.route('https://fixture.test/**', async (route) => {
+      await route.fulfill({
+        path: path.resolve('e2e/fixtures/translation-page.html'),
+        contentType: 'text/html',
+      })
+    })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0 })
+
+    await page.goto('https://fixture.test/')
+    await page.locator('#numeric-target').evaluate((node) => {
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    // 纯数字与符号（9.99、千分位逗号、加减等号）无文字字符：不触发翻译
+    await page.waitForTimeout(400)
+    await expect(page.locator('.aifanyi-bubble, .bubble').first()).toBeHidden()
+
+    await context.close()
+  })
+
   test('does not translate when the current host is blacklisted', async () => {
     const { context, page, worker } = await launchExtension()
     await page.route('https://fixture.test/**', async (route) => {
