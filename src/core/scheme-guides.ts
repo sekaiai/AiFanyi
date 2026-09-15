@@ -23,6 +23,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
     'https://api.fanyi.baidu.com/product/133',
     'https://fanyi-api.baidu.com/manage/developer',
   ],
+  baiduWeb: [
+    'https://fanyi.baidu.com/',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',

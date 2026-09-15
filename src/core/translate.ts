@@ -1,5 +1,6 @@
 import { requestAiTranslation } from './ai'
 import { requestBaiduTranslation } from './baidu'
+import { translateWithBaiduWeb } from './baidu-web'
 import { createCooldownTracker, withoutCoolingDown } from './cooldown'
 import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
@@ -109,6 +110,8 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
       return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
     case 'baiduAi':
       return scheme.appId.trim() && scheme.secretKey.trim() ? null : '请填写 AppID 与密钥'
+    case 'baiduWeb':
+      return null
     case 'volcengine':
       return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
         ? null
@@ -161,6 +164,8 @@ async function dispatchScheme(
       return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
     case 'baiduAi':
       return { kind: 'text', text: await requestBaiduTranslation(source, scheme, targetLanguage, signal) }
+    case 'baiduWeb':
+      return { kind: 'text', text: await translateWithBaiduWeb(source, targetLanguage, signal) }
     case 'volcengine':
       return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':

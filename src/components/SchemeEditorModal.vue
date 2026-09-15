@@ -21,6 +21,9 @@ const emit = defineEmits<{
 
 const { t } = useUiLocale()
 
+// 免密方案在指南徽标中显示「无需密钥」，其余方案显示「配置随账号同步」。
+const KEYLESS_TYPES: SchemeType[] = ['google', 'baiduWeb']
+
 const draft = ref<SchemeSettings>(createScheme('ai'))
 const guideExpanded = ref(true)
 const saving = ref(false)
@@ -64,6 +67,7 @@ function createScheme(type: SchemeType, id = uid(), enabled = true): SchemeSetti
   if (type === 'googleCloud') return { id, type, enabled, apiKey: '' }
   if (type === 'baidu') return { id, type, enabled, appId: '', secretKey: '' }
   if (type === 'baiduAi') return { id, type, enabled, appId: '', secretKey: '', modelType: 'nmt' }
+  if (type === 'baiduWeb') return { id, type, enabled }
   if (type === 'volcengine') return { id, type, enabled, accessKeyId: '', secretAccessKey: '', region: 'cn-north-1' }
   return { id, type, enabled, label: '', apiUrl: 'https://api.siliconflow.cn/v1/chat/completions', apiKey: '', model: 'tencent/Hunyuan-MT-7B', timeoutMs: 20000 }
 }
@@ -131,6 +135,7 @@ async function save(): Promise<void> {
           <select :value="draft.type" data-testid="scheme-editor-type" :disabled="draft.type === 'google'" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
             <option value="baidu">{{ t('schemes.type.baidu') }}</option>
             <option value="baiduAi">{{ t('schemes.type.baiduAi') }}</option>
+            <option value="baiduWeb">{{ t('schemes.type.baiduWeb') }}</option>
             <option value="volcengine">{{ t('schemes.type.volcengine') }}</option>
             <option value="ai">{{ t('schemes.type.ai') }}</option>
             <option value="deepl">{{ t('schemes.type.deepl') }}</option>
@@ -179,6 +184,7 @@ async function save(): Promise<void> {
             </select>
           </label>
         </template>
+        <p v-else-if="draft.type === 'baiduWeb'" class="field-hint wide">{{ t('editor.hint.baiduWeb') }}</p>
         <template v-else-if="draft.type === 'volcengine'">
           <p class="field-hint wide">{{ t('editor.hint.volcengine') }}</p>
           <label class="field"><span class="field-label">{{ t('editor.volcAkLabel') }}</span><input v-model="draft.accessKeyId" autocomplete="off" :placeholder="t('editor.placeholder.volcAk')" /></label>
@@ -214,7 +220,7 @@ async function save(): Promise<void> {
         >
           <span class="guide-toggle-label">{{ t('guide.header') }}</span>
           <span class="guide-toggle-title">{{ guide.title }}</span>
-          <span class="guide-badge">{{ draft.type === 'google' ? t('guide.badge.keyless') : t('guide.badge.synced') }}</span>
+          <span class="guide-badge">{{ KEYLESS_TYPES.includes(draft.type) ? t('guide.badge.keyless') : t('guide.badge.synced') }}</span>
           <span class="guide-chevron" aria-hidden="true"></span>
         </button>
         <div v-show="guideExpanded" id="scheme-guide-body" class="guide-body" data-testid="scheme-guide-body">

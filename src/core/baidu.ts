@@ -7,7 +7,7 @@ const BAIDU_TRANSLATE_ENDPOINT = 'https://fanyi-api.baidu.com/api/trans/vip/tran
 const BAIDU_AI_ENDPOINT = 'https://fanyi-api.baidu.com/ait/api/aiTextTranslate'
 const BAIDU_TIMEOUT_MS = 15000
 
-const BAIDU_TARGET_CODES: Record<string, string> = {
+export const BAIDU_TARGET_CODES: Record<string, string> = {
   '简体中文': 'zh',
   '繁體中文': 'cht',
   'English': 'en',
