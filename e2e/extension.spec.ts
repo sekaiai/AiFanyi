@@ -81,18 +81,22 @@ test.describe('AiFanyi extension', () => {
     })
 
     await setSettings(worker, {
-          version: 1,
-          enabled: true,
-          hoverEnabled: true,
-          selectionEnabled: true,
-          hoverDelayMs: 0,
-          ai: {
-            apiUrl: 'https://api.example.com/v1/chat/completions',
-            apiKey: 'sk-e2e',
-            model: 'gpt-4o-mini',
-            prompt: 'Translate into Simplified Chinese: {text}',
-            timeoutMs: 5000,
-          },
+      version: 2,
+      enabled: true,
+      hoverEnabled: true,
+      selectionEnabled: true,
+      hoverDelayMs: 0,
+      schemeOrder: 'sequential',
+      bubble: { showOriginal: true },
+      // 显式占位禁用内置免密方案：阻止存档迁移按默认链补回，保证链上仅剩 mock 的 AI 方案
+      schemes: [
+        { id: 'e2e-ai', type: 'ai', enabled: true, apiUrl: 'https://api.example.com/v1/chat/completions', apiKey: 'sk-e2e', model: 'gpt-4o-mini', timeoutMs: 5000 },
+        { id: 'e2e-no-bing', type: 'bing', enabled: false },
+        { id: 'e2e-no-google', type: 'google', enabled: false },
+        { id: 'e2e-no-mymemory', type: 'mymemory', enabled: false },
+        { id: 'e2e-no-yandex', type: 'yandex', enabled: false },
+        { id: 'e2e-no-reverso', type: 'reverso', enabled: false },
+      ],
     })
 
     await page.goto('https://fixture.test/')
@@ -135,18 +139,22 @@ test.describe('AiFanyi extension', () => {
     })
 
     await setSettings(worker, {
-      version: 1,
+      version: 2,
       enabled: true,
       hoverEnabled: true,
       selectionEnabled: true,
       hoverDelayMs: 0,
-      ai: {
-        apiUrl: 'https://api.example.com/v1/chat/completions',
-        apiKey: 'sk-e2e',
-        model: 'gpt-4o-mini',
-        prompt: 'Translate into Simplified Chinese: {text}',
-        timeoutMs: 5000,
-      },
+      schemeOrder: 'sequential',
+      bubble: { showOriginal: true },
+      // 同上：禁用内置免密方案占位，避免迁移补回真实网络方案抢先于 AI mock 命中
+      schemes: [
+        { id: 'e2e-ai', type: 'ai', enabled: true, apiUrl: 'https://api.example.com/v1/chat/completions', apiKey: 'sk-e2e', model: 'gpt-4o-mini', timeoutMs: 5000 },
+        { id: 'e2e-no-bing', type: 'bing', enabled: false },
+        { id: 'e2e-no-google', type: 'google', enabled: false },
+        { id: 'e2e-no-mymemory', type: 'mymemory', enabled: false },
+        { id: 'e2e-no-yandex', type: 'yandex', enabled: false },
+        { id: 'e2e-no-reverso', type: 'reverso', enabled: false },
+      ],
     })
 
     await page.goto('https://fixture.test/')
