@@ -221,13 +221,12 @@ const zh = {
   'guide.volcengine.link.3': '密钥管理页面（拿 AK/SK）',
 
   'guide.ai.title': '兼容 OpenAI 的 AI 接口',
-  'guide.ai.tagline': '能按提示词调语气，整句和段落更灵活 · 费用取决于服务商',
-  'guide.ai.step.1': '选一个兼容 OpenAI Chat Completions 的服务商，创建 API Key。',
-  'guide.ai.step.2': '回到这里填完整接口地址、模型名和 API 密钥。',
+  'guide.ai.tagline': '任意兼容 OpenAI 的服务商均可，推荐硅基流动（提供免费翻译模型 tencent/Hunyuan-MT-7B）',
+  'guide.ai.step.1': '注册硅基流动并完成实名认证（注册入口见下方「官方入口」）。',
+  'guide.ai.step.2': '新建 API 密钥，复制后填入方案编辑器的「API 密钥」输入框。',
   'guide.ai.step.3': '点「测试」；失败先核对地址末尾路径、模型名和余额。',
-  'guide.ai.step.4': '推荐使用硅基流动提供的免费翻译模型 tencent/Hunyuan-MT-7B',
   'guide.ai.link.1': 'OpenAI API 密钥',
-  'guide.ai.link.2': '硅基流动',
+  'guide.ai.link.2': '硅基流动注册',
 
   'words.unavailable': '不可用',
   'words.probeTime': '上次检测：{time} · {count}/{total} 可用',
@@ -469,13 +468,12 @@ const en: Record<MessageKey, string> = {
   'guide.volcengine.link.3': 'Key management page (get AK/SK)',
 
   'guide.ai.title': 'OpenAI-compatible AI endpoint',
-  'guide.ai.tagline': 'Tune the tone with prompts; more flexible for sentences and paragraphs · cost depends on the provider',
-  'guide.ai.step.1': 'Pick a provider compatible with OpenAI Chat Completions and create an API Key.',
-  'guide.ai.step.2': 'Fill in the full endpoint URL, model name and API key here.',
+  'guide.ai.tagline': 'Any OpenAI-compatible provider works — SiliconFlow recommended (offers the free translation model tencent/Hunyuan-MT-7B)',
+  'guide.ai.step.1': 'Sign up for SiliconFlow and complete identity verification (sign-up link under "Official links" below).',
+  'guide.ai.step.2': 'Create an API key, then paste it into the "API key" field in the scheme editor.',
   'guide.ai.step.3': 'Click "Test"; if it fails, check the endpoint path, model name and balance first.',
-  'guide.ai.step.4': 'Recommended: the free translation model tencent/Hunyuan-MT-7B from SiliconFlow',
   'guide.ai.link.1': 'OpenAI API keys',
-  'guide.ai.link.2': 'SiliconFlow',
+  'guide.ai.link.2': 'Sign up for SiliconFlow',
 
   'words.unavailable': 'Unavailable',
   'words.probeTime': 'Last checked: {time} · {count}/{total} available',
@@ -540,5 +538,5 @@ export const GUIDE_KEYS: Record<SchemeType, SchemeGuideKeys> = {
   baidu: guideKeys('baidu', 4, 2),
   baiduAi: guideKeys('baiduAi', 4, 2),
   volcengine: guideKeys('volcengine', 4, 3),
-  ai: guideKeys('ai', 4, 2),
+  ai: guideKeys('ai', 3, 2),
 }
