@@ -41,6 +41,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   yandex: [
     'https://translate.yandex.com/',
   ],
+  reverso: [
+    'https://www.reverso.net/text-translation',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',

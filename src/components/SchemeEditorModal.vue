@@ -22,7 +22,7 @@ const emit = defineEmits<{
 const { t } = useUiLocale()
 
 // 免密方案在指南徽标中显示「无需密钥」，其余方案显示「配置随账号同步」。
-const KEYLESS_TYPES: SchemeType[] = ['google', 'baiduWeb', 'bing', 'tencent', 'youdao', 'mymemory', 'yandex']
+const KEYLESS_TYPES: SchemeType[] = ['google', 'baiduWeb', 'bing', 'tencent', 'youdao', 'mymemory', 'yandex', 'reverso']
 
 const draft = ref<SchemeSettings>(createScheme('ai'))
 const guideExpanded = ref(true)
@@ -73,6 +73,7 @@ function createScheme(type: SchemeType, id = uid(), enabled = true): SchemeSetti
   if (type === 'youdao') return { id, type, enabled }
   if (type === 'mymemory') return { id, type, enabled }
   if (type === 'yandex') return { id, type, enabled }
+  if (type === 'reverso') return { id, type, enabled }
   if (type === 'volcengine') return { id, type, enabled, accessKeyId: '', secretAccessKey: '', region: 'cn-north-1' }
   return { id, type, enabled, label: '', apiUrl: 'https://api.siliconflow.cn/v1/chat/completions', apiKey: '', model: 'tencent/Hunyuan-MT-7B', timeoutMs: 20000 }
 }
@@ -146,6 +147,7 @@ async function save(): Promise<void> {
             <option value="youdao">{{ t('schemes.type.youdao') }}</option>
             <option value="mymemory">{{ t('schemes.type.mymemory') }}</option>
             <option value="yandex">{{ t('schemes.type.yandex') }}</option>
+            <option value="reverso">{{ t('schemes.type.reverso') }}</option>
             <option value="volcengine">{{ t('schemes.type.volcengine') }}</option>
             <option value="ai">{{ t('schemes.type.ai') }}</option>
             <option value="deepl">{{ t('schemes.type.deepl') }}</option>
@@ -200,6 +202,7 @@ async function save(): Promise<void> {
         <p v-else-if="draft.type === 'youdao'" class="field-hint wide">{{ t('editor.hint.youdao') }}</p>
         <p v-else-if="draft.type === 'mymemory'" class="field-hint wide">{{ t('editor.hint.mymemory') }}</p>
         <p v-else-if="draft.type === 'yandex'" class="field-hint wide">{{ t('editor.hint.yandex') }}</p>
+        <p v-else-if="draft.type === 'reverso'" class="field-hint wide">{{ t('editor.hint.reverso') }}</p>
         <template v-else-if="draft.type === 'volcengine'">
           <p class="field-hint wide">{{ t('editor.hint.volcengine') }}</p>
           <label class="field"><span class="field-label">{{ t('editor.volcAkLabel') }}</span><input v-model="draft.accessKeyId" autocomplete="off" :placeholder="t('editor.placeholder.volcAk')" /></label>

@@ -176,6 +176,7 @@ describe('settings', () => {
         { id: 'w4', type: 'youdao', enabled: true, junk: 'x' },
         { id: 'w5', type: 'mymemory', enabled: true, junk: 'x' },
         { id: 'w6', type: 'yandex', enabled: true, junk: 'x' },
+        { id: 'w7', type: 'reverso', enabled: true, junk: 'x' },
       ],
     })
     expect(migrated.schemes).toEqual([
@@ -185,6 +186,7 @@ describe('settings', () => {
       { id: 'w4', type: 'youdao', enabled: true },
       { id: 'w5', type: 'mymemory', enabled: true },
       { id: 'w6', type: 'yandex', enabled: true },
+      { id: 'w7', type: 'reverso', enabled: true },
     ])
   })
 

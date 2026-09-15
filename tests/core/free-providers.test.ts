@@ -3,6 +3,7 @@ import { createBaiduWebSign, parseBaiduWebPage, translateWithBaiduWeb } from '..
 import { translateWithBing } from '../../src/core/bing'
 import { md5Hex } from '../../src/core/md5'
 import { parseMyMemoryTranslation, translateWithMyMemory } from '../../src/core/mymemory'
+import { parseReversoTranslation, translateWithReverso } from '../../src/core/reverso'
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { parseTencentTranslation, parseTencentWebPage, translateWithTencent } from '../../src/core/tencent'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
@@ -18,6 +19,7 @@ const tencentScheme: SchemeSettings = { id: 'tencent-1', type: 'tencent', enable
 const youdaoScheme: SchemeSettings = { id: 'youdao-1', type: 'youdao', enabled: true }
 const myMemoryScheme: SchemeSettings = { id: 'mymemory-1', type: 'mymemory', enabled: true }
 const yandexScheme: SchemeSettings = { id: 'yandex-1', type: 'yandex', enabled: true }
+const reversoScheme: SchemeSettings = { id: 'reverso-1', type: 'reverso', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -426,6 +428,69 @@ describe('translateWithYandex', () => {
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(translateWithYandex('hello', '繁體中文')).rejects.toThrow('Yandex 翻译不支持目标语言「繁體中文」')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('reverso scheme config', () => {
+  it('is a zero-config scheme', () => {
+    expect(hasRequiredConfig(reversoScheme)).toBe(true)
+    expect(describeMissingConfig(reversoScheme)).toBeNull()
+  })
+
+  it('survives a settings round-trip', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [reversoScheme]
+    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
+    expect(migrated.schemes).toEqual([reversoScheme])
+  })
+})
+
+describe('parseReversoTranslation', () => {
+  it('joins translation segments and rejects empties', () => {
+    expect(parseReversoTranslation({ translation: ['你好世界'] })).toBe('你好世界')
+    expect(parseReversoTranslation({ translation: ['你好', '世界'] })).toBe('你好世界')
+    expect(() => parseReversoTranslation({ translation: [] })).toThrow('Reverso 返回内容为空。')
+    expect(() => parseReversoTranslation({})).toThrow('Reverso 返回内容为空。')
+  })
+})
+
+describe('translateWithReverso', () => {
+  it('posts a reversomobile payload with a script-based source code', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ translation: ['Hello world'], languageDetection: { detectedLanguage: 'chi', isDirectionChanged: false }, engines: ['Lingvanex'] }))
+
+    const result = await translateWithReverso('你好世界', 'English')
+
+    expect(result).toBe('Hello world')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.reverso.net/translate/v1/translation')
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(init.method).toBe('POST')
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+    expect(JSON.parse(init.body as string)).toEqual({
+      format: 'text',
+      from: 'chi',
+      to: 'eng',
+      input: '你好世界',
+      options: { contextResults: false, languageDetection: true, sentenceSplitter: false, origin: 'reversomobile' },
+    })
+  })
+
+  it('prefers kana over cjk ideographs when detecting the source', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ translation: ['今天天气很好。'] }))
+
+    const result = await translateWithReverso('今日はとても良い天気ですね。', '简体中文')
+
+    expect(result).toBe('今天天气很好。')
+    expect(JSON.parse((fetchMock.mock.calls[0]?.[1] as RequestInit).body as string).from).toBe('jpn')
+  })
+
+  it('returns the original text for same-direction pairs without any request', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await translateWithReverso('hello world', 'English')).toBe('hello world')
+    await expect(translateWithReverso('hello', '繁體中文')).rejects.toThrow('Reverso 翻译不支持目标语言「繁體中文」')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -7,6 +7,7 @@ import { translateWithMyMemory } from './mymemory'
 import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
+import { translateWithReverso } from './reverso'
 import { translateWithTencent } from './tencent'
 import { extractSingleWord, normalizeSourceText } from './text'
 import { translateWithYandex } from './yandex'
@@ -127,6 +128,8 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
       return null
     case 'yandex':
       return null
+    case 'reverso':
+      return null
     case 'volcengine':
       return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
         ? null
@@ -191,6 +194,8 @@ async function dispatchScheme(
       return { kind: 'text', text: await translateWithMyMemory(source, targetLanguage, signal) }
     case 'yandex':
       return { kind: 'text', text: await translateWithYandex(source, targetLanguage, signal) }
+    case 'reverso':
+      return { kind: 'text', text: await translateWithReverso(source, targetLanguage, signal) }
     case 'volcengine':
       return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':

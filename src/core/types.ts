@@ -30,7 +30,7 @@ export interface BubbleSettings {
   textAlign: BubbleTextAlign
 }
 
-export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'baiduAi' | 'volcengine' | 'ai' | 'baiduWeb' | 'bing' | 'tencent' | 'youdao' | 'mymemory' | 'yandex'
+export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'baiduAi' | 'volcengine' | 'ai' | 'baiduWeb' | 'bing' | 'tencent' | 'youdao' | 'mymemory' | 'yandex' | 'reverso'
 
 interface SchemeBase {
   id: string
@@ -90,6 +90,10 @@ export interface YandexSchemeSettings extends SchemeBase {
   type: 'yandex'
 }
 
+export interface ReversoSchemeSettings extends SchemeBase {
+  type: 'reverso'
+}
+
 export interface VolcengineSchemeSettings extends SchemeBase {
   type: 'volcengine'
   accessKeyId: string
@@ -107,7 +111,7 @@ export interface AiSchemeSettings extends SchemeBase {
   timeoutMs: number
 }
 
-export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | BaiduAiSchemeSettings | BaiduWebSchemeSettings | BingSchemeSettings | TencentSchemeSettings | YoudaoSchemeSettings | MyMemorySchemeSettings | YandexSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
+export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | BaiduAiSchemeSettings | BaiduWebSchemeSettings | BingSchemeSettings | TencentSchemeSettings | YoudaoSchemeSettings | MyMemorySchemeSettings | YandexSchemeSettings | ReversoSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
 
 export type WordSourceId = 'youdao' | 'bing' | 'google' | 'freedictionaryapi'
 export type WordAccent = 'us' | 'uk'
