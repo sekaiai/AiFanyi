@@ -30,7 +30,7 @@ export interface BubbleSettings {
   textAlign: BubbleTextAlign
 }
 
-export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'baiduAi' | 'volcengine' | 'ai' | 'baiduWeb' | 'bing'
+export type SchemeType = 'deepl' | 'google' | 'googleCloud' | 'baidu' | 'baiduAi' | 'volcengine' | 'ai' | 'baiduWeb' | 'bing' | 'tencent'
 
 interface SchemeBase {
   id: string
@@ -74,6 +74,10 @@ export interface BingSchemeSettings extends SchemeBase {
   type: 'bing'
 }
 
+export interface TencentSchemeSettings extends SchemeBase {
+  type: 'tencent'
+}
+
 export interface VolcengineSchemeSettings extends SchemeBase {
   type: 'volcengine'
   accessKeyId: string
@@ -91,7 +95,7 @@ export interface AiSchemeSettings extends SchemeBase {
   timeoutMs: number
 }
 
-export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | BaiduAiSchemeSettings | BaiduWebSchemeSettings | BingSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
+export type SchemeSettings = DeeplSchemeSettings | GoogleSchemeSettings | GoogleCloudSchemeSettings | BaiduSchemeSettings | BaiduAiSchemeSettings | BaiduWebSchemeSettings | BingSchemeSettings | TencentSchemeSettings | VolcengineSchemeSettings | AiSchemeSettings
 
 export type WordSourceId = 'youdao' | 'bing' | 'google' | 'freedictionaryapi'
 export type WordAccent = 'us' | 'uk'

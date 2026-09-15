@@ -6,6 +6,7 @@ import { createCooldownTracker, withoutCoolingDown } from './cooldown'
 import { requestJson } from './request'
 import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
+import { translateWithTencent } from './tencent'
 import { extractSingleWord, normalizeSourceText } from './text'
 import { GOOGLE_TARGET_CODES, lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
@@ -115,6 +116,8 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
       return null
     case 'bing':
       return null
+    case 'tencent':
+      return null
     case 'volcengine':
       return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
         ? null
@@ -171,6 +174,8 @@ async function dispatchScheme(
       return { kind: 'text', text: await translateWithBaiduWeb(source, targetLanguage, signal) }
     case 'bing':
       return { kind: 'text', text: await translateWithBing(source, targetLanguage, signal) }
+    case 'tencent':
+      return { kind: 'text', text: await translateWithTencent(source, targetLanguage, signal) }
     case 'volcengine':
       return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':

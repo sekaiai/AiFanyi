@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBaiduWebSign, parseBaiduWebPage, translateWithBaiduWeb } from '../../src/core/baidu-web'
 import { translateWithBing } from '../../src/core/bing'
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
+import { parseTencentTranslation, parseTencentWebPage, translateWithTencent } from '../../src/core/tencent'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
 import type { SchemeSettings } from '../../src/core/types'
 
@@ -9,6 +10,7 @@ const fetchMock = vi.fn()
 
 const baiduWebScheme: SchemeSettings = { id: 'baidu-web-1', type: 'baiduWeb', enabled: true }
 const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
+const tencentScheme: SchemeSettings = { id: 'tencent-1', type: 'tencent', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -159,6 +161,74 @@ describe('translateWithBing', () => {
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(translateWithBing('hello', 'Klingon')).rejects.toThrow('必应翻译不支持目标语言「Klingon」')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('tencent scheme config', () => {
+  it('is a zero-config scheme', () => {
+    expect(hasRequiredConfig(tencentScheme)).toBe(true)
+    expect(describeMissingConfig(tencentScheme)).toBeNull()
+  })
+
+  it('survives a settings round-trip', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [tencentScheme]
+    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
+    expect(migrated.schemes).toEqual([tencentScheme])
+  })
+})
+
+describe('parseTencentWebPage', () => {
+  it('extracts qtv and qtk from the page html', () => {
+    const html = '<script>var qtv = "v-1";</script><script>var qtk = "k-1";</script>'
+    expect(parseTencentWebPage(html)).toEqual({ qtv: 'v-1', qtk: 'k-1' })
+  })
+
+  it('throws when either param is missing', () => {
+    expect(() => parseTencentWebPage('<script>var qtk = "k-1";</script>')).toThrow('腾讯翻译参数获取失败')
+  })
+})
+
+describe('parseTencentTranslation', () => {
+  it('joins machineTranslation across records', () => {
+    expect(parseTencentTranslation({ translate: { records: [{ machineTranslation: '你' }, { machineTranslation: '好' }] } })).toBe('你好')
+  })
+
+  it('throws when the payload has no translation', () => {
+    expect(() => parseTencentTranslation({ translate: { records: [] } })).toThrow('腾讯翻译返回内容为空。')
+  })
+})
+
+describe('translateWithTencent', () => {
+  it('fetches the page with credentials then posts the JSON body', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock
+      .mockResolvedValueOnce(new Response('<script>var qtv = "v-1";var qtk = "k-1";</script>', { status: 200 }))
+      .mockResolvedValueOnce(jsonResponse({ translate: { records: [{ machineTranslation: '你好' }] } }))
+
+    const result = await translateWithTencent('hello', '简体中文')
+
+    expect(result).toBe('你好')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://fanyi.qq.com/')
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit).credentials).toBe('include')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://fanyi.qq.com/api/translate')
+    const postInit = fetchMock.mock.calls[1]?.[1] as RequestInit
+    expect(postInit.method).toBe('POST')
+    expect(postInit.credentials).toBe('include')
+    const body = JSON.parse(postInit.body as string) as Record<string, unknown>
+    expect(body.source).toBe('auto')
+    expect(body.target).toBe('zh')
+    expect(body.sourceText).toBe('hello')
+    expect(body.qtv).toBe('v-1')
+    expect(body.qtk).toBe('k-1')
+    expect(String(body.sessionUuid)).toMatch(/^translate_uuid\d+$/)
+  })
+
+  it('throws locally for unsupported targets without any request', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(translateWithTencent('hello', 'Türkçe')).rejects.toThrow('腾讯交互翻译不支持目标语言「Türkçe」')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

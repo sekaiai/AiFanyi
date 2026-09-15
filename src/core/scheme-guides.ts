@@ -29,6 +29,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   bing: [
     'https://cn.bing.com/translator',
   ],
+  tencent: [
+    'https://fanyi.qq.com/',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',
