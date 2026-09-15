@@ -2,6 +2,8 @@
 
 AiFanyi 是一个基于 WXT、TypeScript 和 Vue 3 的浏览器划词翻译扩展。扩展面向 Chrome、Edge 和 Firefox MV3；设置页与线上演示使用 Vue，网页内气泡由内容脚本通过 Shadow DOM 渲染。
 
+**在线演示**：<https://sekaiai.github.io/AiFanyi/>
+
 ## 开发
 
 项目使用 pnpm 和 Node.js 22+，建议使用 Node.js 24。
