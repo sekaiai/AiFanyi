@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBaiduWebSign, parseBaiduWebPage, translateWithBaiduWeb } from '../../src/core/baidu-web'
 import { translateWithBing } from '../../src/core/bing'
-import { parseCaiyunTranslation, translateWithCaiyun } from '../../src/core/caiyun'
 import { md5Hex } from '../../src/core/md5'
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { parseTencentTranslation, parseTencentWebPage, translateWithTencent } from '../../src/core/tencent'
@@ -15,7 +14,6 @@ const baiduWebScheme: SchemeSettings = { id: 'baidu-web-1', type: 'baiduWeb', en
 const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
 const tencentScheme: SchemeSettings = { id: 'tencent-1', type: 'tencent', enabled: true }
 const youdaoScheme: SchemeSettings = { id: 'youdao-1', type: 'youdao', enabled: true }
-const caiyunScheme: SchemeSettings = { id: 'caiyun-1', type: 'caiyun', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -306,51 +304,6 @@ describe('translateWithYoudao', () => {
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(translateWithYoudao('hello', 'Türkçe')).rejects.toThrow('有道翻译不支持目标语言「Türkçe」')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-})
-
-describe('caiyun scheme config', () => {
-  it('is a zero-config scheme', () => {
-    expect(hasRequiredConfig(caiyunScheme)).toBe(true)
-    expect(describeMissingConfig(caiyunScheme)).toBeNull()
-  })
-
-  it('survives a settings round-trip', () => {
-    const settings = cloneDefaultSettings()
-    settings.schemes = [caiyunScheme]
-    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
-    expect(migrated.schemes).toEqual([caiyunScheme])
-  })
-})
-
-describe('parseCaiyunTranslation', () => {
-  it('reads the first target entry and rejects empty payloads', () => {
-    expect(parseCaiyunTranslation({ rc: 0, target: ['你好'], trans_type: 'auto2zh' })).toBe('你好')
-    expect(() => parseCaiyunTranslation({ target: [] })).toThrow('彩云小译返回内容为空。')
-  })
-})
-
-describe('translateWithCaiyun', () => {
-  it('posts the auto2zh payload with the public token header', async () => {
-    vi.stubGlobal('fetch', fetchMock)
-    fetchMock.mockResolvedValueOnce(jsonResponse({ rc: 0, target: ['你好'], trans_type: 'auto2zh' }))
-
-    const result = await translateWithCaiyun('hello', '简体中文')
-
-    expect(result).toBe('你好')
-    expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://api.interpreter.caiyunai.com/v1/translator')
-    const postInit = fetchMock.mock.calls[0]?.[1] as RequestInit
-    expect(postInit.method).toBe('POST')
-    expect((postInit.headers as Record<string, string>)['X-Authorization']).toBe('3975l6lr5pcbvidl6jl2')
-    const body = JSON.parse(postInit.body as string) as Record<string, unknown>
-    expect(body).toEqual({ source: ['hello'], trans_type: 'auto2zh', request_id: 'aifanyi', detect: true })
-  })
-
-  it('throws locally for non-Chinese targets without any request', async () => {
-    vi.stubGlobal('fetch', fetchMock)
-    await expect(translateWithCaiyun('hello', 'English')).rejects.toThrow('彩云小译仅支持译为简体中文')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

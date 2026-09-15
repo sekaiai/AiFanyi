@@ -348,7 +348,7 @@ function sanitizeScheme(value: unknown): SchemeSettings | null {
 }
 
 function readSchemeType(value: unknown): SchemeType | null {
-  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'baidu' || value === 'baiduAi' || value === 'baiduWeb' || value === 'bing' || value === 'tencent' || value === 'youdao' || value === 'caiyun' || value === 'volcengine' || value === 'ai' ? value : null
+  return value === 'deepl' || value === 'google' || value === 'googleCloud' || value === 'baidu' || value === 'baiduAi' || value === 'baiduWeb' || value === 'bing' || value === 'tencent' || value === 'youdao' || value === 'volcengine' || value === 'ai' ? value : null
 }
 
 export function validateAiUrl(url: string): string {
