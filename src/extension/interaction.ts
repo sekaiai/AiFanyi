@@ -108,10 +108,13 @@ export function createInteraction(host: InteractionHost) {
     listenerScope.abort()
   }
 
-  /** 设置更新：应用气泡样式；全局停用时关闭气泡，否则按新设置重定位。 */
+  /** 设置更新：旧请求和旧译文不应跨目标语言或翻译方案复用。 */
   function updateSettings(next: TranslationSettings): void {
+    const hadPending = pending !== null
+    abortPending()
+    cache.clear()
     host.renderer.applySettings(next.bubble)
-    if (!host.isActive(next)) close()
+    if (!host.isActive(next) || hadPending) close()
     else if (currentRange && host.renderer.isVisible()) position(currentRange)
   }
 
