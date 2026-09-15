@@ -2,6 +2,7 @@
 import { onUnmounted, ref, shallowRef, toRaw } from 'vue'
 import { useUiLocale } from '../composables/useUiLocale'
 import type { SchemeSettings } from '../core/types'
+import { isBuiltInSchemeType } from '../core/settings'
 import { hasRequiredConfig } from '../core/translate'
 import { formatUsageCounter, type UsageStats } from '../core/usage'
 import SchemeEditorModal from './SchemeEditorModal.vue'
@@ -19,6 +20,11 @@ const { t, locale } = useUiLocale()
 /** 方案显示名：自定义 AI 优先使用用户填写的标题，留空回退为类型默认名。 */
 function schemeName(scheme: SchemeSettings): string {
   return scheme.type === 'ai' && scheme.label.trim() ? scheme.label.trim() : t(`schemes.type.${scheme.type}`)
+}
+
+/** 内置免密方案：不可编辑与删除，仅保留启停、排序与测试。 */
+function isBuiltInScheme(scheme: SchemeSettings): boolean {
+  return isBuiltInSchemeType(scheme.type)
 }
 
 const testingSchemeId = shallowRef('')
@@ -134,20 +140,20 @@ async function handleTestScheme(scheme: SchemeSettings): Promise<void> {
           <input v-model="scheme.enabled" type="checkbox" class="checkbox" :data-testid="`scheme-toggle-${scheme.id}`" />
           <span class="scheme-name">{{ schemeName(scheme) }}</span>
         </label>
-        <span v-if="scheme.type === 'google'" class="scheme-badge">{{ t('schemes.default') }}</span>
+        <span v-if="isBuiltInScheme(scheme)" class="scheme-badge">{{ t('schemes.webBadge') }}</span>
         <span v-if="usage" class="scheme-usage" :data-testid="`scheme-usage-${scheme.id}`">{{ formatUsageCounter(usage.sentence[scheme.id], locale) }}</span>
         <span class="settings-status scheme-status" :class="schemeTestStatus[scheme.id]?.tone" :title="schemeTestStatus[scheme.id]?.text ?? ''">{{ schemeTestStatus[scheme.id]?.text ?? '' }}</span>
         <button class="button button-primary" type="button" :data-testid="`scheme-test-${scheme.type}`" :disabled="testingSchemeId === scheme.id || !testScheme" @click="handleTestScheme(scheme)">{{ t('schemes.test') }}</button>
         <div class="scheme-actions">
           <button class="icon-button" type="button" :title="t('schemes.moveUp')" :disabled="index === 0" @click="moveScheme(scheme.id, -1)">↑</button>
           <button class="icon-button" type="button" :title="t('schemes.moveDown')" :disabled="index === schemes.length - 1" @click="moveScheme(scheme.id, 1)">↓</button>
-          <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" :title="t('schemes.edit')" @click="openEditScheme(scheme)">✎</button>
+          <button class="icon-button" type="button" :data-testid="`scheme-edit-${scheme.id}`" :title="isBuiltInScheme(scheme) ? t('schemes.builtIn') : t('schemes.edit')" :disabled="isBuiltInScheme(scheme)" @click="openEditScheme(scheme)">✎</button>
           <button
             class="icon-button"
             type="button"
             :class="{ 'icon-button-danger': pendingDeleteId === scheme.id }"
-            :title="scheme.type === 'google' ? t('schemes.defaultScheme') : pendingDeleteId === scheme.id ? t('schemes.confirmDelete') : t('schemes.delete')"
-            :disabled="scheme.type === 'google'"
+            :title="isBuiltInScheme(scheme) ? t('schemes.defaultScheme') : pendingDeleteId === scheme.id ? t('schemes.confirmDelete') : t('schemes.delete')"
+            :disabled="isBuiltInScheme(scheme)"
             @click="requestRemoveScheme(scheme.id)"
           >{{ pendingDeleteId === scheme.id ? t('schemes.confirm') : '✕' }}</button>
         </div>

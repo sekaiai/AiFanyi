@@ -94,6 +94,13 @@ export const DEFAULT_MYMEMORY_SCHEME: MyMemorySchemeSettings = { id: 'default-my
 export const DEFAULT_YANDEX_SCHEME: YandexSchemeSettings = { id: 'default-yandex', type: 'yandex', enabled: true }
 export const DEFAULT_REVERSO_SCHEME: ReversoSchemeSettings = { id: 'default-reverso', type: 'reverso', enabled: true }
 
+/** 内置免密方案：默认链的固定成员，UI 上不可编辑/删除，添加下拉也不再提供。 */
+export const BUILTIN_FREE_TYPES: readonly SchemeType[] = ['bing', 'google', 'mymemory', 'yandex', 'reverso']
+
+export function isBuiltInSchemeType(type: SchemeType): boolean {
+  return BUILTIN_FREE_TYPES.includes(type)
+}
+
 export const DEFAULT_SETTINGS: TranslationSettings = {
   version: 2,
   uiLocale: 'zh',
@@ -253,6 +260,15 @@ function readWordSettings(value: unknown, fallback: WordQuerySettings): WordQuer
 }
 
 function readSchemes(input: Record<string, unknown>, fallback: SchemeSettings[]): SchemeSettings[] {
+  const schemes = readSchemeList(input, fallback)
+  // 内置免密方案是默认链的固定成员：旧存档缺失（含 v1 仅 AI）时按默认顺序补回，保证默认列表始终完整。
+  for (const builtin of fallback) {
+    if (!schemes.some((scheme) => scheme.type === builtin.type)) schemes.push(structuredClone(builtin))
+  }
+  return schemes
+}
+
+function readSchemeList(input: Record<string, unknown>, fallback: SchemeSettings[]): SchemeSettings[] {
   if (Array.isArray(input.schemes)) {
     return input.schemes
       .map((item) => sanitizeScheme(item))

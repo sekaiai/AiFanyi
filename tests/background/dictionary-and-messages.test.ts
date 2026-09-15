@@ -80,6 +80,8 @@ describe('handleMessage same-text merge', () => {
     vi.clearAllMocks()
     vi.stubGlobal('fetch', fetchMock)
     const settings = cloneDefaultSettings()
+    // 内置补回后默认链含 5 个免密方案：固定顺序确保夹具的 deepl 恒定优先被选中
+    settings.schemeOrder = 'sequential'
     settings.schemes = [deeplScheme]
     await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: settings })
   })

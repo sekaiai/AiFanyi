@@ -411,26 +411,26 @@ describe('SettingsForm', () => {
     expect(wrapper.vm.settings.schemes).toHaveLength(1)
   })
 
-  it('keeps the built-in Google default undeletable but toggleable', async () => {
+  it('keeps built-in schemes toggleable but locked against editing and deletion', async () => {
     const wrapper = mount(TestHarness)
 
     const card = wrapper.get('[data-testid="scheme-card-google"]')
-    expect(card.text()).toContain('默认')
+    expect(card.text()).toContain('网页版')
     expect(card.get('button[title="默认方案，不可删除"]').attributes('disabled')).toBeDefined()
+    expect(card.get('button[title="内置方案，无需配置"]').attributes('disabled')).toBeDefined()
 
     await card.get('input[type="checkbox"]').setValue(false)
     expect(wrapper.vm.settings.schemes[0]).toMatchObject({ type: 'google', enabled: false })
+  })
 
-    await card.get('button[title="编辑"]').trigger('click')
-    const typeSelect = wrapper.get('[data-testid="scheme-editor-type"]')
-    expect(typeSelect.attributes('disabled')).toBeDefined()
-    expect(typeSelect.findAll('option').some((option) => option.attributes('value') === 'google')).toBe(true)
-    await wrapper.get('button[title="关闭"]').trigger('click')
+  it('hides built-in scheme types from the add-scheme dropdown', async () => {
+    const wrapper = mount(TestHarness)
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     const addSelect = wrapper.get('[data-testid="scheme-editor-type"]')
     expect(addSelect.attributes('disabled')).toBeUndefined()
-    expect(addSelect.findAll('option').some((option) => option.attributes('value') === 'google')).toBe(false)
+    expect(addSelect.findAll('option').map((option) => option.attributes('value')))
+      .toEqual(['baidu', 'baiduAi', 'volcengine', 'ai', 'deepl', 'googleCloud'])
   })
 
   it('drops the configured badge from scheme cards', async () => {

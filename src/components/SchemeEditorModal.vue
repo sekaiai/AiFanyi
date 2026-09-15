@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, toRaw, watch } from 'vue'
 import { useUiLocale } from '../composables/useUiLocale'
 import { GUIDE_KEYS } from '../core/i18n'
-import { uid } from '../core/settings'
+import { isBuiltInSchemeType, uid } from '../core/settings'
 import { SCHEME_GUIDES } from '../core/scheme-guides'
 import { describeMissingConfig } from '../core/translate'
 import type { SchemeSettings, SchemeType } from '../core/types'
@@ -135,13 +135,13 @@ async function save(): Promise<void> {
       <div class="modal-body">
         <label class="field wide">
           <span class="field-label">{{ t('editor.typeLabel') }}</span>
-          <select :value="draft.type" data-testid="scheme-editor-type" :disabled="draft.type === 'google'" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
+          <select :value="draft.type" data-testid="scheme-editor-type" :disabled="isBuiltInSchemeType(draft.type)" @change="handleTypeChange(($event.target as HTMLSelectElement).value as SchemeType)">
             <option value="baidu">{{ t('schemes.type.baidu') }}</option>
             <option value="baiduAi">{{ t('schemes.type.baiduAi') }}</option>
-            <option value="bing">{{ t('schemes.type.bing') }}</option>
-            <option value="mymemory">{{ t('schemes.type.mymemory') }}</option>
-            <option value="yandex">{{ t('schemes.type.yandex') }}</option>
-            <option value="reverso">{{ t('schemes.type.reverso') }}</option>
+            <option v-if="draft.type === 'bing'" value="bing">{{ t('schemes.type.bing') }}</option>
+            <option v-if="draft.type === 'mymemory'" value="mymemory">{{ t('schemes.type.mymemory') }}</option>
+            <option v-if="draft.type === 'yandex'" value="yandex">{{ t('schemes.type.yandex') }}</option>
+            <option v-if="draft.type === 'reverso'" value="reverso">{{ t('schemes.type.reverso') }}</option>
             <option value="volcengine">{{ t('schemes.type.volcengine') }}</option>
             <option value="ai">{{ t('schemes.type.ai') }}</option>
             <option value="deepl">{{ t('schemes.type.deepl') }}</option>

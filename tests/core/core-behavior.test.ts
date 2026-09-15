@@ -146,7 +146,7 @@ describe('settings', () => {
     const migrated = migrateSettings({
       ai: { apiUrl: 'https://api.example.com/v1/chat/completions', apiKey: 'sk-x', model: 'm', timeoutMs: 8000 },
     })
-    expect(migrated.schemes).toHaveLength(1)
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['ai', 'bing', 'google', 'mymemory', 'yandex', 'reverso'])
     expect(migrated.schemes[0]).toMatchObject({
       type: 'ai',
       enabled: true,
@@ -168,7 +168,7 @@ describe('settings', () => {
     expect(schemes.map((scheme) => scheme.type)).toEqual(['bing', 'google', 'mymemory', 'yandex', 'reverso'])
   })
 
-  it('keeps the new keyless schemes and strips removed types and unknown fields during migration', () => {
+  it('strips removed types and unknown fields, then re-adds missing built-in schemes', () => {
     const migrated = migrateSettings({
       schemes: [
         { id: 'w1', type: 'baiduWeb', enabled: true, junk: 'x' },
@@ -183,6 +183,7 @@ describe('settings', () => {
       { id: 'w5', type: 'mymemory', enabled: true },
       { id: 'w6', type: 'yandex', enabled: true },
       { id: 'w7', type: 'reverso', enabled: true },
+      { id: 'default-google', type: 'google', enabled: true },
     ])
   })
 
@@ -194,7 +195,7 @@ describe('settings', () => {
     current.bubble.fontSize = 20
     current.targetLanguage = 'English'
     current.schemeOrder = 'sequential'
-    current.schemes = [{
+    current.schemes.push({
       id: 'ai-x',
       type: 'ai',
       enabled: true,
@@ -203,7 +204,7 @@ describe('settings', () => {
       apiKey: 'sk-x',
       model: 'm',
       timeoutMs: 8000,
-    }]
+    })
     current.word = { showOriginal: false, speakEnabled: false, accent: 'uk', sources: { youdao: false, bing: true, google: true, freedictionaryapi: true } }
 
     const next = resetToDefaults(current)
@@ -241,7 +242,7 @@ describe('settings', () => {
         { id: 'bad', type: 'nope' },
       ],
     })
-    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['deepl', 'google'])
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['deepl', 'google', 'bing', 'mymemory', 'yandex', 'reverso'])
     expect(migrated.schemes[0]?.id).toBeTruthy()
     expect(migrated.schemes[1]?.id).toBe('g1')
   })
@@ -250,14 +251,14 @@ describe('settings', () => {
     const migrated = migrateSettings({
       schemes: [{ id: 'b1', type: 'baidu', enabled: true, appId: 'app', secretKey: 'key' }],
     })
-    expect(migrated.schemes).toEqual([{ id: 'b1', type: 'baidu', enabled: true, appId: 'app', secretKey: 'key' }])
+    expect(migrated.schemes[0]).toEqual({ id: 'b1', type: 'baidu', enabled: true, appId: 'app', secretKey: 'key' })
   })
 
   it('keeps Baidu AI scheme credentials and clamps the model type during migration', () => {
     const migrated = migrateSettings({
       schemes: [{ id: 'ba1', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'llm' }],
     })
-    expect(migrated.schemes).toEqual([{ id: 'ba1', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'llm' }])
+    expect(migrated.schemes[0]).toEqual({ id: 'ba1', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'llm' })
 
     const fallback = migrateSettings({
       schemes: [{ id: 'ba2', type: 'baiduAi', enabled: true, appId: 'app', secretKey: 'key', modelType: 'nope' }],
@@ -269,7 +270,7 @@ describe('settings', () => {
     const migrated = migrateSettings({
       schemes: [{ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' }],
     })
-    expect(migrated.schemes).toEqual([{ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' }])
+    expect(migrated.schemes[0]).toEqual({ id: 'v1', type: 'volcengine', enabled: true, accessKeyId: 'ak', secretAccessKey: 'sk', region: 'cn-beijing' })
   })
 
   it('sanitizes custom AI scheme labels with trimming and a 50-char cap', () => {

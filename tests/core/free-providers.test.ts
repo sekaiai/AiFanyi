@@ -32,11 +32,12 @@ describe('bing scheme config', () => {
     expect(describeMissingConfig(bingScheme)).toBeNull()
   })
 
-  it('survives a settings round-trip', () => {
+  it('survives a settings round-trip and re-adds missing built-in schemes', () => {
     const settings = cloneDefaultSettings()
     settings.schemes = [bingScheme]
     const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
-    expect(migrated.schemes).toEqual([bingScheme])
+    expect(migrated.schemes[0]).toEqual(bingScheme)
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['bing', 'google', 'mymemory', 'yandex', 'reverso'])
   })
 })
 
@@ -82,11 +83,12 @@ describe('mymemory scheme config', () => {
     expect(describeMissingConfig(myMemoryScheme)).toBeNull()
   })
 
-  it('survives a settings round-trip', () => {
+  it('survives a settings round-trip and re-adds missing built-in schemes', () => {
     const settings = cloneDefaultSettings()
     settings.schemes = [myMemoryScheme]
     const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
-    expect(migrated.schemes).toEqual([myMemoryScheme])
+    expect(migrated.schemes[0]).toEqual(myMemoryScheme)
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['mymemory', 'bing', 'google', 'yandex', 'reverso'])
   })
 })
 
@@ -138,11 +140,12 @@ describe('yandex scheme config', () => {
     expect(describeMissingConfig(yandexScheme)).toBeNull()
   })
 
-  it('survives a settings round-trip', () => {
+  it('survives a settings round-trip and re-adds missing built-in schemes', () => {
     const settings = cloneDefaultSettings()
     settings.schemes = [yandexScheme]
     const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
-    expect(migrated.schemes).toEqual([yandexScheme])
+    expect(migrated.schemes[0]).toEqual(yandexScheme)
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['yandex', 'bing', 'google', 'mymemory', 'reverso'])
   })
 })
 
@@ -200,11 +203,12 @@ describe('reverso scheme config', () => {
     expect(describeMissingConfig(reversoScheme)).toBeNull()
   })
 
-  it('survives a settings round-trip', () => {
+  it('survives a settings round-trip and re-adds missing built-in schemes', () => {
     const settings = cloneDefaultSettings()
     settings.schemes = [reversoScheme]
     const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
-    expect(migrated.schemes).toEqual([reversoScheme])
+    expect(migrated.schemes[0]).toEqual(reversoScheme)
+    expect(migrated.schemes.map((scheme) => scheme.type)).toEqual(['reverso', 'bing', 'google', 'mymemory', 'yandex'])
   })
 })
 
