@@ -8,6 +8,7 @@ import { requestVolcengineTranslation } from './volcengine'
 import { readArray, readRecord, readText } from './read'
 import { translateWithTencent } from './tencent'
 import { extractSingleWord, normalizeSourceText } from './text'
+import { translateWithYoudao } from './youdao'
 import { GOOGLE_TARGET_CODES, lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
@@ -118,6 +119,8 @@ export function describeMissingConfig(scheme: SchemeSettings): string | null {
       return null
     case 'tencent':
       return null
+    case 'youdao':
+      return null
     case 'volcengine':
       return scheme.accessKeyId.trim() && scheme.secretAccessKey.trim() && scheme.region.trim()
         ? null
@@ -176,6 +179,8 @@ async function dispatchScheme(
       return { kind: 'text', text: await translateWithBing(source, targetLanguage, signal) }
     case 'tencent':
       return { kind: 'text', text: await translateWithTencent(source, targetLanguage, signal) }
+    case 'youdao':
+      return { kind: 'text', text: await translateWithYoudao(source, targetLanguage, signal) }
     case 'volcengine':
       return { kind: 'text', text: await requestVolcengineTranslation(source, scheme, targetLanguage, signal) }
     case 'ai':

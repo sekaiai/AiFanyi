@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBaiduWebSign, parseBaiduWebPage, translateWithBaiduWeb } from '../../src/core/baidu-web'
 import { translateWithBing } from '../../src/core/bing'
+import { md5Hex } from '../../src/core/md5'
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { parseTencentTranslation, parseTencentWebPage, translateWithTencent } from '../../src/core/tencent'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
+import { createYoudaoSign, parseYoudaoTranslation, translateWithYoudao } from '../../src/core/youdao'
 import type { SchemeSettings } from '../../src/core/types'
 
 const fetchMock = vi.fn()
@@ -11,6 +13,7 @@ const fetchMock = vi.fn()
 const baiduWebScheme: SchemeSettings = { id: 'baidu-web-1', type: 'baiduWeb', enabled: true }
 const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
 const tencentScheme: SchemeSettings = { id: 'tencent-1', type: 'tencent', enabled: true }
+const youdaoScheme: SchemeSettings = { id: 'youdao-1', type: 'youdao', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -229,6 +232,78 @@ describe('translateWithTencent', () => {
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(translateWithTencent('hello', 'Türkçe')).rejects.toThrow('腾讯交互翻译不支持目标语言「Türkçe」')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('youdao scheme config', () => {
+  it('is a zero-config scheme', () => {
+    expect(hasRequiredConfig(youdaoScheme)).toBe(true)
+    expect(describeMissingConfig(youdaoScheme)).toBeNull()
+  })
+
+  it('survives a settings round-trip', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [youdaoScheme]
+    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
+    expect(migrated.schemes).toEqual([youdaoScheme])
+  })
+})
+
+describe('createYoudaoSign', () => {
+  it('anchors md5Hex against a known vector', () => {
+    expect(md5Hex('abc')).toBe('900150983cd24fb0d6963f7d28e17f72')
+  })
+
+  it('composes the fanyideskweb signature deterministically', () => {
+    const sign = createYoudaoSign('hello', '1700000000000')
+    expect(sign).toMatch(/^[0-9a-f]{32}$/)
+    expect(sign).toBe(md5Hex(`fanyideskwebhello1700000000000Ygy_4c=r#e#4F^2a2)2`))
+    expect(createYoudaoSign('hello', '1700000000000')).toBe(sign)
+    expect(createYoudaoSign('hello', '1700000000001')).not.toBe(sign)
+  })
+})
+
+describe('parseYoudaoTranslation', () => {
+  it('extracts tgt from the first result', () => {
+    expect(parseYoudaoTranslation({ errorCode: 0, translateResult: [[{ tgt: '你好' }]] })).toBe('你好')
+  })
+
+  it('throws on non-zero errorCode or empty results', () => {
+    expect(() => parseYoudaoTranslation({ errorCode: 50 })).toThrow('有道翻译错误 50')
+    expect(() => parseYoudaoTranslation({ errorCode: 0, translateResult: [] })).toThrow('有道翻译返回内容为空。')
+  })
+})
+
+describe('translateWithYoudao', () => {
+  it('posts the signed form to translate_o', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValueOnce(jsonResponse({ errorCode: 0, translateResult: [[{ tgt: '你好' }]] }))
+
+    const result = await translateWithYoudao('hello', '简体中文')
+
+    expect(result).toBe('你好')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://fanyi.youdao.com/translate_o?client=fanyideskweb&keyfrom=fanyi.web')
+    const postInit = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(postInit.method).toBe('POST')
+    const body = new URLSearchParams(postInit.body as string)
+    expect(body.get('i')).toBe('hello')
+    expect(body.get('from')).toBe('auto')
+    expect(body.get('to')).toBe('zh-CHS')
+    expect(body.get('salt')).toMatch(/^\d{14}$/)
+    expect(body.get('ts')).toMatch(/^\d{13}$/)
+    expect(body.get('mysticTime')).toBe(body.get('ts'))
+    expect(body.get('sign')).toMatch(/^[0-9a-f]{32}$/)
+    expect(body.get('client')).toBe('fanyideskweb')
+    expect(body.get('keyfrom')).toBe('fanyi.web')
+    expect(body.get('version')).toBe('5.0')
+    expect(body.get('action')).toBe('FY_BY_REALTlME')
+  })
+
+  it('throws locally for unsupported targets without any request', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(translateWithYoudao('hello', 'Türkçe')).rejects.toThrow('有道翻译不支持目标语言「Türkçe」')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

@@ -32,6 +32,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   tencent: [
     'https://fanyi.qq.com/',
   ],
+  youdao: [
+    'https://fanyi.youdao.com/',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',
