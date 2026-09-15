@@ -130,13 +130,19 @@ describe('recordWord', () => {
 
 describe('formatUsageCounter', () => {
   it('formats zero usage', () => {
-    expect(formatUsageCounter()).toBe('本月 0 次 · 0 / 共 0 次 · 0')
+    expect(formatUsageCounter()).toBe('月 0 次 · 0 / 共 0 次 · 0')
   })
 
   it('groups thousands and switches to 万 above ten thousand chars', () => {
     expect(formatUsageCounter({ month: 1234, monthChars: 9999, total: 12345, totalChars: 123456 }))
-      .toBe('本月 1,234 次 · 9,999 / 共 12,345 次 · 12.3万')
+      .toBe('月 1,234 次 · 9,999 / 共 12,345 次 · 12.3万')
     expect(formatUsageCounter({ month: 0, monthChars: 10000, total: 0, totalChars: 10000 }))
-      .toBe('本月 0 次 · 1万 / 共 0 次 · 1万')
+      .toBe('月 0 次 · 1万 / 共 0 次 · 1万')
+  })
+
+  it('formats the compact en counter with k-scaled chars', () => {
+    expect(formatUsageCounter(undefined, 'en')).toBe('0/0 · 0/0')
+    expect(formatUsageCounter({ month: 1234, monthChars: 9999, total: 12345, totalChars: 123456 }, 'en'))
+      .toBe('1,234/10k · 12,345/123.5k')
   })
 })

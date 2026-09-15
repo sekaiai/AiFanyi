@@ -118,7 +118,7 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     offsetX: 0,
     offsetY: 0,
     showArrow: false,
-    showOriginal: true,
+    showOriginal: false,
     colorPreset: 'paper',
     ...COLOR_PRESETS.paper,
     borderWidth: 1,

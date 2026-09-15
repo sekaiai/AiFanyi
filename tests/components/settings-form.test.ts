@@ -171,12 +171,12 @@ describe('SettingsForm', () => {
     const wrapper = mount(SettingsHarness)
 
     const toggle = wrapper.get('[data-testid="show-original"]')
-    expect((toggle.element as HTMLInputElement).checked).toBe(true)
+    expect((toggle.element as HTMLInputElement).checked).toBe(false)
     expect(toggle.element.closest('label')?.textContent).toContain('句子显示原文')
 
-    await toggle.setValue(false)
+    await toggle.setValue(true)
 
-    expect(wrapper.vm.settings.bubble.showOriginal).toBe(false)
+    expect(wrapper.vm.settings.bubble.showOriginal).toBe(true)
   })
 
   it('binds the word show-original checkbox to the word settings', async () => {
@@ -415,7 +415,7 @@ describe('SettingsForm', () => {
     const wrapper = mount(TestHarness)
 
     const card = wrapper.get('[data-testid="scheme-card-google"]')
-    expect(card.text()).toContain('网页版')
+    expect(card.text()).toContain('Web')
     expect(card.get('button[title="默认方案，不可删除"]').attributes('disabled')).toBeDefined()
     expect(card.get('button[title="内置方案，无需配置"]').attributes('disabled')).toBeDefined()
 
@@ -454,7 +454,7 @@ describe('SettingsForm', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="scheme-usage-default-google"]').text())
-      .toBe('本月 2 次 · 25 / 共 8 次 · 120')
+      .toBe('月 2 次 · 25 / 共 8 次 · 120')
   })
 
   it('translates the form through the provided UI locale context', () => {

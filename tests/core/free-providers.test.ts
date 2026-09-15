@@ -190,9 +190,23 @@ describe('translateWithYandex', () => {
     expect(translateBody.get('lang')).toBe('en-zh')
   })
 
+  it('falls back from traditional to simplified Chinese for the target code', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ code: 200, lang: 'en' }))
+      .mockResolvedValueOnce(jsonResponse({ code: 200, lang: 'en-zh', text: ['你好'] }))
+
+    const result = await translateWithYandex('hello', '繁體中文')
+
+    expect(result).toBe('你好')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const translateBody = new URLSearchParams((fetchMock.mock.calls[1]?.[1] as RequestInit).body as string)
+    expect(translateBody.get('lang')).toBe('en-zh')
+  })
+
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
-    await expect(translateWithYandex('hello', '繁體中文')).rejects.toThrow('Yandex 翻译不支持目标语言「繁體中文」')
+    await expect(translateWithYandex('hello', 'Klingon')).rejects.toThrow('Yandex 翻译不支持目标语言「Klingon」')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
