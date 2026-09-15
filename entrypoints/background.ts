@@ -136,7 +136,12 @@ export async function handleMessage(message: ExtensionMessage, senderUrl?: strin
     }
   }
 
-  // ponytail: 并发同文本请求合并为一组共享一次上游调用；启用/黑名单检查仅组长执行，组长 senderUrl 代表整组
+  const settings = await storage.load()
+  if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
+    return blockedResponse(settings, message.requestId)
+  }
+
+  // 同文本的已允许请求可共享上游调用；每个请求先完成站点策略检查，避免黑名单借用组长结果。
   const textKey = message.text.trim().toLowerCase()
   let group = findInflightGroup(textKey)
   if (!group) {
@@ -148,10 +153,6 @@ export async function handleMessage(message: ExtensionMessage, senderUrl?: strin
       participants: new Set(),
       promise: (async () => {
         try {
-          const settings = await storage.load()
-          if (!settings.enabled || (senderUrl && isSiteBlocked(senderUrl, settings.siteBlacklist))) {
-            return blockedResponse(settings, leader.requestId)
-          }
           const outcome = await runTranslation(leader.text, settings, controller.signal, { probe: await loadProbeState() }, {
             onSentence: (schemeId, chars) => void usage.recordSentence(schemeId, chars),
             onWord: (chars) => void usage.recordWord(chars),

@@ -149,6 +149,33 @@ describe('handleMessage same-text merge', () => {
     expect(first.ok).toBe(true)
     expect(second.ok).toBe(true)
   })
+
+  it('does not share an allowed request with a blacklisted site', async () => {
+    let release!: () => void
+    fetchMock.mockImplementationOnce(() => new Promise<Response>((resolve) => {
+      release = () => resolve(jsonResponse())
+    }))
+    const settings = cloneDefaultSettings()
+    settings.schemeOrder = 'sequential'
+    settings.schemes = [deeplScheme]
+    settings.siteBlacklist = ['blocked.test']
+    await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: settings })
+    await browser.storage.sync.set({ [SETTINGS_STORAGE_KEY]: settings })
+
+    const allowed = handleMessage(
+      { type: 'translation.request', requestId: 'allowed', text: 'same text' },
+      'https://allowed.test/page',
+    )
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    const blocked = handleMessage(
+      { type: 'translation.request', requestId: 'blocked', text: 'same text' },
+      'https://blocked.test/page',
+    )
+    release()
+
+    await expect(allowed).resolves.toMatchObject({ ok: true, requestId: 'allowed' })
+    await expect(blocked).resolves.toMatchObject({ ok: false, requestId: 'blocked' })
+  })
 })
 
 describe('broadcastSettingsUpdate', () => {
