@@ -62,8 +62,8 @@ const SettingsHarness = defineComponent({
   components: { SettingsForm, SchemesSection },
   setup() {
     const settings = ref(cloneDefaultSettings())
-    // 默认链含多个免密方案；组件测试聚焦单方案卡片行为，收敛为 [google]
-    settings.value.schemes = settings.value.schemes.slice(0, 1)
+    // 默认链含多个免密方案；组件测试聚焦 Google 卡片行为（内置默认不可删除），收敛为 [google]
+    settings.value.schemes = settings.value.schemes.filter((scheme) => scheme.type === 'google')
     return { settings }
   },
   template: `<SettingsForm v-model="settings" status="已加载" />
@@ -85,8 +85,8 @@ const TestHarness = defineComponent({
   components: { SchemesSection },
   setup() {
     const settings = ref(cloneDefaultSettings())
-    // 默认链含多个免密方案；本测试只验证方案卡片行为，收敛为单方案链
-    settings.value.schemes = settings.value.schemes.slice(0, 1)
+    // 默认链含多个免密方案；本测试只验证 Google 卡片行为，收敛为单方案链
+    settings.value.schemes = settings.value.schemes.filter((scheme) => scheme.type === 'google')
     const failure = ref('')
     const calls = ref(0)
     const usage = shallowRef<UsageStats | null>(null)

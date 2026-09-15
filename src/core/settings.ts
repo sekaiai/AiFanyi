@@ -9,6 +9,8 @@ import type {
   DeeplSchemeSettings,
   GoogleCloudSchemeSettings,
   GoogleSchemeSettings,
+  MyMemorySchemeSettings,
+  ReversoSchemeSettings,
   SchemeOrder,
   SchemeSettings,
   SchemeType,
@@ -18,6 +20,8 @@ import type {
   VolcengineSchemeSettings,
   WordAccent,
   WordQuerySettings,
+  YandexSchemeSettings,
+  YoudaoSchemeSettings,
 } from './types'
 import { WORD_SOURCE_IDS } from './word-sources'
 
@@ -91,6 +95,10 @@ export const DEFAULT_GOOGLE_SCHEME: GoogleSchemeSettings = { id: 'default-google
 export const DEFAULT_BAIDU_WEB_SCHEME: BaiduWebSchemeSettings = { id: 'default-baidu-web', type: 'baiduWeb', enabled: true }
 export const DEFAULT_BING_SCHEME: BingSchemeSettings = { id: 'default-bing', type: 'bing', enabled: true }
 export const DEFAULT_TENCENT_SCHEME: TencentSchemeSettings = { id: 'default-tencent', type: 'tencent', enabled: true }
+export const DEFAULT_YOUDAO_SCHEME: YoudaoSchemeSettings = { id: 'default-youdao', type: 'youdao', enabled: true }
+export const DEFAULT_MYMEMORY_SCHEME: MyMemorySchemeSettings = { id: 'default-mymemory', type: 'mymemory', enabled: true }
+export const DEFAULT_YANDEX_SCHEME: YandexSchemeSettings = { id: 'default-yandex', type: 'yandex', enabled: true }
+export const DEFAULT_REVERSO_SCHEME: ReversoSchemeSettings = { id: 'default-reverso', type: 'reverso', enabled: true }
 
 export const DEFAULT_SETTINGS: TranslationSettings = {
   version: 2,
@@ -122,7 +130,8 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     lineHeight: 1.55,
     textAlign: 'left',
   },
-  schemes: [DEFAULT_GOOGLE_SCHEME, DEFAULT_BAIDU_WEB_SCHEME, DEFAULT_BING_SCHEME, DEFAULT_TENCENT_SCHEME],
+  // 新装默认链：必应优先，国内三甲（百度网页版/腾讯/有道）随后，再依次是 Google 与三个免密海外方案。
+  schemes: [DEFAULT_BING_SCHEME, DEFAULT_BAIDU_WEB_SCHEME, DEFAULT_TENCENT_SCHEME, DEFAULT_YOUDAO_SCHEME, DEFAULT_GOOGLE_SCHEME, DEFAULT_MYMEMORY_SCHEME, DEFAULT_YANDEX_SCHEME, DEFAULT_REVERSO_SCHEME],
   word: {
     showOriginal: true,
     speakEnabled: true,
