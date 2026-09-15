@@ -26,6 +26,9 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   baiduWeb: [
     'https://fanyi.baidu.com/',
   ],
+  bing: [
+    'https://cn.bing.com/translator',
+  ],
   volcengine: [
     'https://console.volcengine.com/translate',
     'https://www.volcengine.com/product/machine-translation',

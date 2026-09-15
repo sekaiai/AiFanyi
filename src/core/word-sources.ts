@@ -43,8 +43,8 @@ const BING_DICT_TIMEOUT_MS = 6000
 
 const YOUDAO_DICT_ENDPOINT = 'https://dict.youdao.com/jsonapi?q='
 const YOUDAO_AUDIO_ENDPOINT = 'https://dict.youdao.com/dictvoice?audio='
-const BING_TRANSLATOR_PAGE = 'https://cn.bing.com/translator'
-const BING_TRANSLATE_ENDPOINT = 'https://cn.bing.com/ttranslatev3'
+export const BING_TRANSLATOR_PAGE = 'https://cn.bing.com/translator'
+export const BING_TRANSLATE_ENDPOINT = 'https://cn.bing.com/ttranslatev3'
 const BING_DICT_PAGE = 'https://cn.bing.com/dict/search?q='
 const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t'
 
@@ -81,7 +81,7 @@ export const GOOGLE_TARGET_CODES: Record<string, string> = {
   'Українська': 'uk',
   'हिन्दी': 'hi',
 }
-const BING_TARGET_CODES: Record<string, string> = { ...GOOGLE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
+export const BING_TARGET_CODES: Record<string, string> = { ...GOOGLE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
 
 function googleTargetCode(targetLanguage: string): string {
   const code = GOOGLE_TARGET_CODES[targetLanguage]

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBaiduWebSign, parseBaiduWebPage, translateWithBaiduWeb } from '../../src/core/baidu-web'
+import { translateWithBing } from '../../src/core/bing'
 import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
 import type { SchemeSettings } from '../../src/core/types'
@@ -7,6 +8,7 @@ import type { SchemeSettings } from '../../src/core/types'
 const fetchMock = vi.fn()
 
 const baiduWebScheme: SchemeSettings = { id: 'baidu-web-1', type: 'baiduWeb', enabled: true }
+const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
@@ -107,6 +109,56 @@ describe('translateWithBaiduWeb', () => {
   it('throws locally for unsupported targets without any request', async () => {
     vi.stubGlobal('fetch', fetchMock)
     await expect(translateWithBaiduWeb('hello', 'Türkçe')).rejects.toThrow('百度网页翻译不支持目标语言「Türkçe」')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('bing scheme config', () => {
+  it('is a zero-config scheme', () => {
+    expect(hasRequiredConfig(bingScheme)).toBe(true)
+    expect(describeMissingConfig(bingScheme)).toBeNull()
+  })
+
+  it('survives a settings round-trip', () => {
+    const settings = cloneDefaultSettings()
+    settings.schemes = [bingScheme]
+    const migrated = migrateSettings(JSON.parse(JSON.stringify(settings)))
+    expect(migrated.schemes).toEqual([bingScheme])
+  })
+})
+
+describe('translateWithBing', () => {
+  it('fetches the translator page then posts to ttranslatev3 with IG params', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock
+      .mockResolvedValueOnce(new Response('IG:"ABC123";params_AbusePreventionHelper = [123, "tok=="]', { status: 200 }))
+      .mockResolvedValueOnce(jsonResponse([{ translations: [{ text: '你好', to: 'zh-Hans' }] }]))
+
+    const result = await translateWithBing('hello', '简体中文')
+
+    expect(result).toBe('你好')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('https://cn.bing.com/translator')
+    expect(fetchMock.mock.calls[1]?.[0]).toBe('https://cn.bing.com/ttranslatev3?isVertical=1&&IG=ABC123&IID=translator.5028')
+    const postInit = fetchMock.mock.calls[1]?.[1] as RequestInit
+    expect(postInit.method).toBe('POST')
+    const body = new URLSearchParams(postInit.body as string)
+    expect(body.get('fromLang')).toBe('auto-detect')
+    expect(body.get('to')).toBe('zh-Hans')
+    expect(body.get('text')).toBe('hello')
+    expect(body.get('token')).toBe('tok==')
+    expect(body.get('key')).toBe('123')
+  })
+
+  it('surfaces a non-ok page as an HTTP error', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValueOnce(new Response('blocked', { status: 429 }))
+    await expect(translateWithBing('hello', '简体中文')).rejects.toThrow('HTTP 429')
+  })
+
+  it('throws locally for unsupported targets without any request', async () => {
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(translateWithBing('hello', 'Klingon')).rejects.toThrow('必应翻译不支持目标语言「Klingon」')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
