@@ -3,7 +3,10 @@ import { getBubblePlacement, getBubbleSizing } from '../../src/core/bubble'
 import { isTargetLanguageText } from '../../src/core/lang'
 import {
   COLOR_PRESETS,
+  DEFAULT_BAIDU_WEB_SCHEME,
+  DEFAULT_BING_SCHEME,
   DEFAULT_GOOGLE_SCHEME,
+  DEFAULT_TENCENT_SCHEME,
   MAX_TRANSLATION_TEXT_LENGTH,
   cloneDefaultSettings,
   isSiteBlocked,
@@ -106,7 +109,7 @@ describe('settings', () => {
     expect(migrated.hoverDelayMs).toBe(5000)
     expect(migrated.bubble.side).toBe('top')
     expect(migrated.bubble.gap).toBe(0)
-    expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
+    expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME, DEFAULT_BAIDU_WEB_SCHEME, DEFAULT_BING_SCHEME, DEFAULT_TENCENT_SCHEME])
   })
 
   it('strips unknown bubble keys instead of carrying them into the migrated settings', () => {
@@ -155,11 +158,32 @@ describe('settings', () => {
 
   it('does not create a scheme when v1 AI settings are empty', () => {
     const migrated = migrateSettings({ ai: { apiUrl: '', apiKey: '', model: '', timeoutMs: 20000 } })
-    expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
+    expect(migrated.schemes).toEqual([DEFAULT_GOOGLE_SCHEME, DEFAULT_BAIDU_WEB_SCHEME, DEFAULT_BING_SCHEME, DEFAULT_TENCENT_SCHEME])
   })
 
-  it('seeds a default Google scheme for fresh installs', () => {
-    expect(cloneDefaultSettings().schemes).toEqual([DEFAULT_GOOGLE_SCHEME])
+  it('seeds the free default scheme chain for fresh installs', () => {
+    const schemes = cloneDefaultSettings().schemes
+    expect(schemes).toHaveLength(4)
+    expect(schemes.map((scheme) => scheme.type)).toEqual(['google', 'baiduWeb', 'bing', 'tencent'])
+  })
+
+  it('keeps the new keyless schemes and strips unknown fields during migration', () => {
+    const migrated = migrateSettings({
+      schemes: [
+        { id: 'w1', type: 'baiduWeb', enabled: true, junk: 'x' },
+        { id: 'w2', type: 'bing', enabled: true, junk: 'x' },
+        { id: 'w3', type: 'tencent', enabled: true, junk: 'x' },
+        { id: 'w4', type: 'youdao', enabled: true, junk: 'x' },
+        { id: 'w5', type: 'caiyun', enabled: true, junk: 'x' },
+      ],
+    })
+    expect(migrated.schemes).toEqual([
+      { id: 'w1', type: 'baiduWeb', enabled: true },
+      { id: 'w2', type: 'bing', enabled: true },
+      { id: 'w3', type: 'tencent', enabled: true },
+      { id: 'w4', type: 'youdao', enabled: true },
+      { id: 'w5', type: 'caiyun', enabled: true },
+    ])
   })
 
   it('resetToDefaults 只重置表单项，保留句子翻译与单词翻译卡片', () => {

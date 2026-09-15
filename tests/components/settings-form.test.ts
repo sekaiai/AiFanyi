@@ -62,6 +62,8 @@ const SettingsHarness = defineComponent({
   components: { SettingsForm, SchemesSection },
   setup() {
     const settings = ref(cloneDefaultSettings())
+    // 默认链含多个免密方案；组件测试聚焦单方案卡片行为，收敛为 [google]
+    settings.value.schemes = settings.value.schemes.slice(0, 1)
     return { settings }
   },
   template: `<SettingsForm v-model="settings" status="已加载" />
@@ -83,6 +85,8 @@ const TestHarness = defineComponent({
   components: { SchemesSection },
   setup() {
     const settings = ref(cloneDefaultSettings())
+    // 默认链含多个免密方案；本测试只验证方案卡片行为，收敛为单方案链
+    settings.value.schemes = settings.value.schemes.slice(0, 1)
     const failure = ref('')
     const calls = ref(0)
     const usage = shallowRef<UsageStats | null>(null)
@@ -326,6 +330,8 @@ describe('SettingsForm', () => {
 
   it('reorders, toggles and removes scheme cards', async () => {
     const wrapper = mount(SettingsHarness)
+    // 默认链含多个免密方案；本测试只验证 deepl 卡片的重排与删除，收敛为单方案链
+    wrapper.vm.settings.schemes = wrapper.vm.settings.schemes.slice(0, 1)
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('deepl')
@@ -366,6 +372,8 @@ describe('SettingsForm', () => {
 
   it('keeps the editor open and shows the reason when the pre-save test fails', async () => {
     const wrapper = mount(TestHarness)
+    // 默认链含多个免密方案；本测试只验证 deepl 保存失败的行为，收敛为单方案链
+    wrapper.vm.settings.schemes = wrapper.vm.settings.schemes.slice(0, 1)
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('deepl')
@@ -390,6 +398,8 @@ describe('SettingsForm', () => {
 
   it('reports missing fields before calling the test endpoint', async () => {
     const wrapper = mount(TestHarness)
+    // 默认链含多个免密方案；本测试只验证 deepl 缺字段的拦截，收敛为单方案链
+    wrapper.vm.settings.schemes = wrapper.vm.settings.schemes.slice(0, 1)
 
     await wrapper.get('[data-testid="add-scheme"]').trigger('click')
     await wrapper.get('[data-testid="scheme-editor-type"]').setValue('deepl')

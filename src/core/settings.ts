@@ -2,6 +2,8 @@ import type {
   AiSchemeSettings,
   BaiduAiSchemeSettings,
   BaiduSchemeSettings,
+  BaiduWebSchemeSettings,
+  BingSchemeSettings,
   BubbleColorPreset,
   BubbleSettings,
   DeeplSchemeSettings,
@@ -10,6 +12,7 @@ import type {
   SchemeOrder,
   SchemeSettings,
   SchemeType,
+  TencentSchemeSettings,
   TranslationSettings,
   UiLocale,
   VolcengineSchemeSettings,
@@ -85,6 +88,9 @@ export function wordLookupDelay(hoverDelayMs: number): number {
 }
 
 export const DEFAULT_GOOGLE_SCHEME: GoogleSchemeSettings = { id: 'default-google', type: 'google', enabled: true }
+export const DEFAULT_BAIDU_WEB_SCHEME: BaiduWebSchemeSettings = { id: 'default-baidu-web', type: 'baiduWeb', enabled: true }
+export const DEFAULT_BING_SCHEME: BingSchemeSettings = { id: 'default-bing', type: 'bing', enabled: true }
+export const DEFAULT_TENCENT_SCHEME: TencentSchemeSettings = { id: 'default-tencent', type: 'tencent', enabled: true }
 
 export const DEFAULT_SETTINGS: TranslationSettings = {
   version: 2,
@@ -116,7 +122,7 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     lineHeight: 1.55,
     textAlign: 'left',
   },
-  schemes: [DEFAULT_GOOGLE_SCHEME],
+  schemes: [DEFAULT_GOOGLE_SCHEME, DEFAULT_BAIDU_WEB_SCHEME, DEFAULT_BING_SCHEME, DEFAULT_TENCENT_SCHEME],
   word: {
     showOriginal: true,
     speakEnabled: true,
