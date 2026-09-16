@@ -3,8 +3,8 @@ import { defineConfig } from 'wxt'
 export default defineConfig({
   modules: ['@wxt-dev/module-vue'],
   manifest: {
-    name: 'AiFanyi',
-    description: '轻量、可定制的网页划词翻译工具。',
+    name: 'AiFanyi - 网页翻译',
+    description: '网页划词、取词翻译：悬停单词或选中文本，气泡显示翻译。',
     permissions: ['storage'],
     host_permissions: ['<all_urls>'],
     action: {
