@@ -193,10 +193,15 @@ function blockedResponse(settings: TranslationSettings, requestId: RequestId): E
 }
 
 function restrictStorageToTrustedContexts(): void {
-  const localStorage = browser.storage.local as typeof browser.storage.local & {
+  const areas = [browser.storage.local, browser.storage.sync] as const
+  for (const area of areas) restrictAreaToTrustedContexts(area)
+}
+
+function restrictAreaToTrustedContexts(area: typeof browser.storage.local | typeof browser.storage.sync): void {
+  const storageArea = area as unknown as {
     setAccessLevel?: (options: { accessLevel: 'TRUSTED_CONTEXTS' | 'TRUSTED_AND_UNTRUSTED_CONTEXTS' }) => Promise<void>
   }
-  void Promise.resolve(localStorage.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' })).catch(() => undefined)
+  void Promise.resolve(storageArea.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' })).catch(() => undefined)
 }
 
 function outcomeToResponse(outcome: TranslateOutcome, requestId: RequestId): ExtensionResponse {

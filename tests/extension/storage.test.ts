@@ -3,8 +3,21 @@ import { browser } from 'wxt/browser'
 import { createBrowserSettingsStorage } from '../../src/extension/storage'
 import { SETTINGS_STORAGE_KEY, cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import type { TranslationSettings } from '../../src/core/types'
+import { byteSize, encodeSyncSettings, splitSyncPayload } from '../../src/extension/sync-codec'
 
 const KEY = SETTINGS_STORAGE_KEY
+
+async function setRemoteSettings(settings: TranslationSettings, revision: string, uploadedAt = 1): Promise<void> {
+  const payload = encodeSyncSettings(settings)
+  const checksum = await sha256(payload)
+  const chunks = splitSyncPayload(payload)
+  const values: Record<string, unknown> = {
+    'af:s:m': [1, revision, chunks.length, byteSize(payload), checksum],
+    'af:s:i': [revision, uploadedAt],
+  }
+  for (const [index, chunk] of chunks.entries()) values[`af:s:c:${index}`] = chunk
+  await browser.storage.sync.set(values)
+}
 
 describe('browser settings storage', () => {
   beforeEach(async () => {
@@ -13,187 +26,93 @@ describe('browser settings storage', () => {
     await browser.storage.sync.clear()
   })
 
-  it('reads settings from sync first even when local has data', async () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('loads local settings even when browser sync has different data', async () => {
     await browser.storage.local.set({ [KEY]: { hoverDelayMs: 111 } })
     await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 222 } })
-
-    const loaded = await createBrowserSettingsStorage().load()
-
-    expect(loaded.hoverDelayMs).toBe(222)
+    expect((await createBrowserSettingsStorage().load()).hoverDelayMs).toBe(111)
   })
 
-  it('migrates local-only settings into sync once when sync is empty', async () => {
-    await browser.storage.local.set({ [KEY]: { hoverDelayMs: 333, targetLanguage: 'English' } })
-
-    const loaded = await createBrowserSettingsStorage().load()
-    expect(loaded.hoverDelayMs).toBe(333)
-
-    await vi.waitFor(async () => {
-      const synced = (await browser.storage.sync.get(KEY))[KEY]
-      expect(synced).toBeDefined()
-      expect(migrateSettings(synced).hoverDelayMs).toBe(333)
-    })
-  })
-
-  it('falls back to defaults when both areas are empty', async () => {
-    // 新装会按浏览器语言覆写 uiLocale，这里固定中文环境以对齐默认值
-    vi.stubGlobal('navigator', { language: 'zh-CN' })
-
-    const loaded = await createBrowserSettingsStorage().load()
-
-    expect(loaded).toEqual(cloneDefaultSettings())
-  })
-
-  it('writes settings to both local and sync', async () => {
+  it('saves settings locally without an automatic sync upload', async () => {
     const value = cloneDefaultSettings()
     value.hoverDelayMs = 123
-
     await createBrowserSettingsStorage().save(value)
-
-    const localRaw = (await browser.storage.local.get(KEY))[KEY]
-    const syncRaw = (await browser.storage.sync.get(KEY))[KEY]
-    expect(migrateSettings(localRaw).hoverDelayMs).toBe(123)
-    expect(migrateSettings(syncRaw).hoverDelayMs).toBe(123)
-  })
-
-  it('keeps the local mirror when the sync write fails and surfaces the error', async () => {
-    const setSpy = vi.spyOn(browser.storage.sync, 'set').mockRejectedValueOnce(new Error('QUOTA_BYTES exceeded'))
-    const value = cloneDefaultSettings()
-    value.hoverDelayMs = 456
-
-    await expect(createBrowserSettingsStorage().save(value)).rejects.toThrow('QUOTA_BYTES exceeded')
-
-    expect(setSpy).toHaveBeenCalledOnce()
-    const localRaw = (await browser.storage.local.get(KEY))[KEY]
-    expect(migrateSettings(localRaw).hoverDelayMs).toBe(456)
-  })
-
-  it('notifies subscribers for settings writes in both sync and local areas', async () => {
-    const seen: TranslationSettings[] = []
-    const unsubscribe = createBrowserSettingsStorage().subscribe((settings) => seen.push(settings))
-
-    await browser.storage.local.set({ [KEY]: { hoverDelayMs: 700 } })
-    await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 900 } })
-    // 同区但不同 key 的写入不触发
-    await browser.storage.local.set({ unrelated: true })
-    // 监听器是异步的（sync 区要先读取同步开关），等一个宏任务让回调跑完
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    unsubscribe()
-
-    expect(seen).toHaveLength(2)
-    expect(seen[0]?.hoverDelayMs).toBe(700)
-    expect(seen[1]?.hoverDelayMs).toBe(900)
-  })
-
-  it('reset keeps schemes, target language and word settings while restoring form defaults', async () => {
-    const initial = cloneDefaultSettings()
-    initial.targetLanguage = 'English'
-    initial.word.accent = 'uk'
-    initial.schemes.push({
-      id: 'ai-x',
-      type: 'ai',
-      enabled: true,
-      label: '我的智谱',
-      apiUrl: 'https://api.example.com/v1/chat/completions',
-      apiKey: 'k',
-      model: 'm',
-      timeoutMs: 8000,
-    })
-    await browser.storage.sync.set({ [KEY]: initial })
-
-    const next = await createBrowserSettingsStorage().reset()
-
-    expect(next.hoverDelayMs).toBe(200)
-    expect(next.targetLanguage).toBe('English')
-    expect(next.word.accent).toBe('uk')
-    // 默认链含 5 个免密方案，追加的 ai 方案保留在末尾
-    expect(next.schemes).toHaveLength(6)
-    expect(next.schemes.find((scheme) => scheme.type === 'ai')).toMatchObject({ type: 'ai', label: '我的智谱' })
-    // 重置结果已写回双区
-    const syncRaw = (await browser.storage.sync.get(KEY))[KEY]
-    expect(migrateSettings(syncRaw).targetLanguage).toBe('English')
-    const localRaw = (await browser.storage.local.get(KEY))[KEY]
-    expect(migrateSettings(localRaw).targetLanguage).toBe('English')
-  })
-
-  it('treats the sync switch as enabled when it has never been set', async () => {
-    await expect(createBrowserSettingsStorage().loadSyncEnabled()).resolves.toBe(true)
-  })
-
-  it('reads local settings and skips the sync migration while the switch is off', async () => {
-    await browser.storage.local.set({ [KEY]: { hoverDelayMs: 111 } })
-    await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 222 } })
-    const storage = createBrowserSettingsStorage()
-    await storage.saveSyncEnabled(false)
-
-    const loaded = await storage.load()
-
-    expect(loaded.hoverDelayMs).toBe(111)
-    // 关闭同步时不再向 sync 区推送迁移
-    const synced = (await browser.storage.sync.get(KEY))[KEY]
-    expect(migrateSettings(synced).hoverDelayMs).toBe(222)
-  })
-
-  it('writes settings to local only while the switch is off', async () => {
-    const value = cloneDefaultSettings()
-    value.hoverDelayMs = 123
-    const storage = createBrowserSettingsStorage()
-    await storage.saveSyncEnabled(false)
-
-    await storage.save(value)
-
-    const localRaw = (await browser.storage.local.get(KEY))[KEY]
-    expect(migrateSettings(localRaw).hoverDelayMs).toBe(123)
+    expect(migrateSettings((await browser.storage.local.get(KEY))[KEY]).hoverDelayMs).toBe(123)
     expect((await browser.storage.sync.get(KEY))[KEY]).toBeUndefined()
   })
 
-  it('ignores sync-area changes but reacts to local writes while the switch is off', async () => {
+  it('uploads compact settings and downloads the same configuration', async () => {
+    const value = cloneDefaultSettings()
+    value.hoverDelayMs = 456
+    value.schemes.push({ id: 'd3c7b5d8-1cb1-4af3-af20-f00f00f00f00', type: 'ai', enabled: true, label: '测试', apiUrl: 'https://api.example.com/v1', apiKey: 'sk-secret', model: 'gpt', timeoutMs: 9000 })
     const storage = createBrowserSettingsStorage()
-    await storage.saveSyncEnabled(false)
+    await storage.upload(value)
+    expect((await browser.storage.sync.get('af:s:m'))['af:s:m']).toBeDefined()
+    expect((await storage.download()).settings).toEqual(value)
+    expect((await storage.inspectSyncState(value)).kind).toBe('upToDate')
+    expect((await browser.storage.sync.get('af:s:i'))['af:s:i']).toEqual(expect.arrayContaining([expect.any(String), expect.any(Number)]))
+  })
+
+  it('reads legacy sync settings for a one-time manual migration', async () => {
+    await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 333, targetLanguage: 'English' } })
+    const remote = await createBrowserSettingsStorage().download()
+    expect(remote.settings.hoverDelayMs).toBe(333)
+    expect(remote.settings.targetLanguage).toBe('English')
+    expect((await createBrowserSettingsStorage().inspectSyncState(remote.settings)).kind).toBe('legacy')
+  })
+
+  it('notifies subscribers only for local writes', async () => {
     const seen: TranslationSettings[] = []
-    const unsubscribe = storage.subscribe((settings) => seen.push(settings))
-
-    await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 900 } })
+    const unsubscribe = createBrowserSettingsStorage().subscribe((settings) => seen.push(settings))
     await browser.storage.local.set({ [KEY]: { hoverDelayMs: 700 } })
-    // 监听器是异步的（sync 区要先读取同步开关），等一个宏任务让回调跑完
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
+    await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 900 } })
     unsubscribe()
-
     expect(seen).toHaveLength(1)
     expect(seen[0]?.hoverDelayMs).toBe(700)
   })
 
-  afterEach(() => {
-    vi.unstubAllGlobals()
+  it('resets local settings without changing the uploaded configuration', async () => {
+    const uploaded = cloneDefaultSettings()
+    uploaded.hoverDelayMs = 800
+    const storage = createBrowserSettingsStorage()
+    await storage.upload(uploaded)
+    await storage.save({ ...cloneDefaultSettings(), hoverDelayMs: 600 })
+    const next = await storage.reset()
+    expect(next.hoverDelayMs).toBe(200)
+    expect((await storage.download()).settings.hoverDelayMs).toBe(800)
   })
 
-  it('overrides the fresh-install UI locale from the browser language', async () => {
-    vi.stubGlobal('navigator', { language: 'zh-CN' })
-    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('zh')
+  it('distinguishes local changes, remote updates, conflicts, and unknown differences', async () => {
+    const storage = createBrowserSettingsStorage()
+    const shared = cloneDefaultSettings()
+    await storage.upload(shared)
 
-    vi.stubGlobal('navigator', { language: 'en-US' })
-    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('en')
+    const local = { ...shared, hoverDelayMs: 500 }
+    expect((await storage.inspectSyncState(local)).kind).toBe('localChanges')
 
-    vi.stubGlobal('navigator', { language: 'ja' })
-    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('en')
+    const remote = { ...shared, hoverDelayMs: 700 }
+    await setRemoteSettings(remote, 'remote-update', 123)
+    expect((await storage.inspectSyncState(shared)).kind).toBe('remoteChanges')
+    expect((await storage.inspectSyncState(local)).kind).toBe('conflict')
+
+    await browser.storage.local.remove('af:s:b')
+    expect((await storage.inspectSyncState(local)).kind).toBe('different')
   })
 
-  it('keeps a stored UI locale and falls back on invalid values', async () => {
-    await browser.storage.sync.set({ [KEY]: { uiLocale: 'en' } })
-    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('en')
-
-    await browser.storage.sync.set({ [KEY]: { uiLocale: 'fr' } })
-    expect((await createBrowserSettingsStorage().load()).uiLocale).toBe('zh')
-  })
-
-  it('re-detects the UI locale from the browser language on reset', async () => {
-    await browser.storage.sync.set({ [KEY]: { uiLocale: 'en' } })
-    vi.stubGlobal('navigator', { language: 'zh-CN' })
-
-    const next = await createBrowserSettingsStorage().reset()
-
-    expect(next.uiLocale).toBe('zh')
+  it('reports an empty sync area and watches remote metadata changes', async () => {
+    const storage = createBrowserSettingsStorage()
+    expect((await storage.inspectSyncState(cloneDefaultSettings())).kind).toBe('notUploaded')
+    const callback = vi.fn()
+    const unwatch = storage.subscribeSyncState(callback)
+    await browser.storage.local.set({ unrelated: true })
+    await browser.storage.sync.set({ 'af:s:i': ['revision', 1] })
+    unwatch()
+    expect(callback).toHaveBeenCalledOnce()
   })
 })
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}

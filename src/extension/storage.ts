@@ -1,81 +1,154 @@
 import { browser } from 'wxt/browser'
 import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, detectUiLocale, migrateSettings, resetToDefaults, type TranslationSettings } from '../core/settings'
 import { isPublicSettingsUpdate, type PublicSettingsResponse } from '../core/messages'
+import { SYNC_TOTAL_MAX_BYTES, byteSize, decodeSyncSettings, encodeSyncSettings, splitSyncPayload } from './sync-codec'
 
-/** 本机同步开关的存储键：保存在 local（每台设备独立），不进同步的设置数据本身。 */
-const SYNC_ENABLED_STORAGE_KEY = 'aifanyi.settingsSyncEnabled.v1'
+const SYNC_MANIFEST_KEY = 'af:s:m'
+const SYNC_CHUNK_KEY = 'af:s:c:'
+const SYNC_INFO_KEY = 'af:s:i'
+const SYNC_BASELINE_KEY = 'af:s:b'
+const SYNC_FORMAT_VERSION = 1
 
-/** 本机是否参与设置同步；未设置时默认开启。 */
-async function loadSyncEnabled(): Promise<boolean> {
-  try {
-    const record = await browser.storage.local.get(SYNC_ENABLED_STORAGE_KEY)
-    return record[SYNC_ENABLED_STORAGE_KEY] !== false
-  } catch {
-    return true
-  }
+type SyncManifest = readonly [version: number, revision: string, chunks: number, bytes: number, checksum: string]
+type SyncInfo = readonly [revision: string, uploadedAt: number]
+type SyncBaseline = readonly [revision: string, checksum: string]
+
+export type SyncStateKind = 'checking' | 'unavailable' | 'notUploaded' | 'legacy' | 'upToDate' | 'localChanges' | 'remoteChanges' | 'conflict' | 'different'
+
+export interface SyncState {
+  kind: SyncStateKind
+  uploadedAt: number | null
 }
 
-async function saveSyncEnabled(enabled: boolean): Promise<void> {
-  await browser.storage.local.set({ [SYNC_ENABLED_STORAGE_KEY]: enabled })
+export interface SyncSnapshot {
+  revision: string
+  checksum: string
+  uploadedAt: number | null
 }
 
-async function readSettingsFrom(area: 'sync' | 'local'): Promise<TranslationSettings | null> {
-  try {
-    const record = await browser.storage[area].get(SETTINGS_STORAGE_KEY)
-    const raw = record[SETTINGS_STORAGE_KEY]
-    return raw === undefined ? null : migrateSettings(raw)
-  } catch {
-    return null
-  }
+export interface DownloadedSyncSettings {
+  settings: TranslationSettings
+  snapshot: SyncSnapshot | null
 }
 
-/** 浏览器界面语言；取不到时按英文兜底。 */
 function getBrowserLanguage(): string {
   return navigator.language || 'en'
 }
 
 async function loadSettings(): Promise<TranslationSettings> {
-  const syncEnabled = await loadSyncEnabled()
-  if (syncEnabled) {
-    const fromSync = await readSettingsFrom('sync')
-    if (fromSync) return fromSync
-  }
-  const fromLocal = await readSettingsFrom('local')
-  if (fromLocal) {
-    // 一次性迁移：同步区为空而本机有旧数据时推送到 sync（失败静默，下次保存再试）；关闭同步的设备不推送
-    if (syncEnabled) void browser.storage.sync.set({ [SETTINGS_STORAGE_KEY]: fromLocal }).catch(() => undefined)
-    return fromLocal
-  }
-  // 全新安装：界面语言跟随浏览器，非中英文一律英文
+  const record = await browser.storage.local.get(SETTINGS_STORAGE_KEY)
+  const raw = record[SETTINGS_STORAGE_KEY]
+  if (raw !== undefined) return migrateSettings(raw)
   const fresh = migrateSettings(undefined)
   fresh.uiLocale = detectUiLocale(getBrowserLanguage())
   return fresh
 }
 
-async function saveSettings(settings: TranslationSettings): Promise<void> {
-  const value = migrateSettings(settings)
-  // 本地镜像兜底（无配额限制）；关闭同步的设备只写本机
-  await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: value })
-  if (await loadSyncEnabled()) {
-    // sync 写失败向上抛，由状态栏提示
-    await browser.storage.sync.set({ [SETTINGS_STORAGE_KEY]: value })
-  }
+async function saveSettings(settings: TranslationSettings, baseline?: SyncSnapshot | null): Promise<void> {
+  const values: Record<string, unknown> = { [SETTINGS_STORAGE_KEY]: migrateSettings(settings) }
+  if (baseline !== undefined) values[SYNC_BASELINE_KEY] = baseline ? [baseline.revision, baseline.checksum] : null
+  await browser.storage.local.set(values)
 }
 
 async function resetSettings(): Promise<TranslationSettings> {
   const next = resetToDefaults(await loadSettings())
-  // 恢复默认时界面语言重新跟随浏览器判定
   next.uiLocale = detectUiLocale(getBrowserLanguage())
   await saveSettings(next)
   return next
 }
 
 function watchSettings(callback: (settings: TranslationSettings) => void): () => void {
-  const listener = async (changes: Record<string, { newValue?: unknown; oldValue?: unknown }>, areaName: string) => {
-    if ((areaName !== 'sync' && areaName !== 'local') || !changes[SETTINGS_STORAGE_KEY]) return
-    // 关闭同步的设备忽略 sync 区变更（来自其他设备的写入），只响应本机 local 写入
-    if (areaName === 'sync' && !(await loadSyncEnabled())) return
+  const listener = (changes: Record<string, { newValue?: unknown }>, areaName: string) => {
+    if (areaName !== 'local' || !changes[SETTINGS_STORAGE_KEY]) return
     callback(migrateSettings(changes[SETTINGS_STORAGE_KEY].newValue))
+  }
+  browser.storage.onChanged.addListener(listener)
+  return () => browser.storage.onChanged.removeListener(listener)
+}
+
+export async function uploadSettingsToSync(settings: TranslationSettings): Promise<void> {
+  const payload = encodeSyncSettings(settings)
+  const chunks = splitSyncPayload(payload)
+  const checksum = await sha256(payload)
+  const revision = crypto.randomUUID()
+  const manifest: SyncManifest = [SYNC_FORMAT_VERSION, revision, chunks.length, byteSize(payload), checksum]
+  const uploadedAt = Date.now()
+  const snapshot: SyncSnapshot = { revision, checksum, uploadedAt }
+  const values: Record<string, unknown> = {
+    [SYNC_MANIFEST_KEY]: manifest,
+    [SYNC_INFO_KEY]: [snapshot.revision, uploadedAt] satisfies SyncInfo,
+  }
+  for (const [index, chunk] of chunks.entries()) values[`${SYNC_CHUNK_KEY}${index}`] = chunk
+
+  const storageBytes = Object.entries(values).reduce((total, [key, value]) => total + byteSize(key) + byteSize(JSON.stringify(value)), 0)
+  if (storageBytes > SYNC_TOTAL_MAX_BYTES) throw new Error('同步配置超过浏览器可用容量')
+
+  const existing = await browser.storage.sync.get(SYNC_MANIFEST_KEY)
+  const oldManifest = parseManifest(existing[SYNC_MANIFEST_KEY])
+  await browser.storage.sync.set(values)
+
+  const obsolete = oldManifest
+    ? Array.from({ length: Math.max(0, oldManifest[2] - chunks.length) }, (_, index) => `${SYNC_CHUNK_KEY}${chunks.length + index}`)
+    : []
+  // 旧格式仅在新格式成功写入后才移除，避免迁移失败导致远端无数据。
+  if (obsolete.length || !oldManifest) {
+    await browser.storage.sync.remove([...obsolete, ...(oldManifest ? [] : [SETTINGS_STORAGE_KEY])]).catch(() => undefined)
+  }
+  await saveSyncBaseline(snapshot)
+}
+
+export async function downloadSettingsFromSync(): Promise<DownloadedSyncSettings> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const manifestRecord = await browser.storage.sync.get([SYNC_MANIFEST_KEY, SYNC_INFO_KEY, SETTINGS_STORAGE_KEY])
+    const manifest = parseManifest(manifestRecord[SYNC_MANIFEST_KEY])
+    if (!manifest) {
+      if (manifestRecord[SETTINGS_STORAGE_KEY] === undefined) throw new Error('浏览器同步区没有可下载的配置')
+      return { settings: migrateSettings(manifestRecord[SETTINGS_STORAGE_KEY]), snapshot: null }
+    }
+
+    const keys = Array.from({ length: manifest[2] }, (_, index) => `${SYNC_CHUNK_KEY}${index}`)
+    const chunkRecord = await browser.storage.sync.get(keys)
+    const chunks = keys.map((key) => chunkRecord[key])
+    if (chunks.every((chunk): chunk is string => typeof chunk === 'string')) {
+      const payload = chunks.join('')
+      if (byteSize(payload) === manifest[3] && await sha256(payload) === manifest[4]) {
+        const info = parseSyncInfo(manifestRecord[SYNC_INFO_KEY])
+        return {
+          settings: decodeSyncSettings(payload),
+          snapshot: { revision: manifest[1], checksum: manifest[4], uploadedAt: info?.[0] === manifest[1] ? info[1] : null },
+        }
+      }
+    }
+    if (attempt < 2) await delay((attempt + 1) * 100)
+  }
+  throw new Error('同步配置尚未完整到达，请稍后重试')
+}
+
+export async function inspectSyncState(settings: TranslationSettings): Promise<SyncState> {
+  const remote = await browser.storage.sync.get([SYNC_MANIFEST_KEY, SYNC_INFO_KEY, SETTINGS_STORAGE_KEY])
+  const manifest = parseManifest(remote[SYNC_MANIFEST_KEY])
+  if (!manifest) return { kind: remote[SETTINGS_STORAGE_KEY] === undefined ? 'notUploaded' : 'legacy', uploadedAt: null }
+
+  const info = parseSyncInfo(remote[SYNC_INFO_KEY])
+  const snapshot: SyncSnapshot = { revision: manifest[1], checksum: manifest[4], uploadedAt: info?.[0] === manifest[1] ? info[1] : null }
+  const checksum = await sha256(encodeSyncSettings(settings))
+  if (checksum === snapshot.checksum) {
+    await saveSyncBaseline(snapshot)
+    return { kind: 'upToDate', uploadedAt: snapshot.uploadedAt }
+  }
+
+  const local = await browser.storage.local.get(SYNC_BASELINE_KEY)
+  const baseline = parseSyncBaseline(local[SYNC_BASELINE_KEY])
+  if (!baseline) return { kind: 'different', uploadedAt: snapshot.uploadedAt }
+  const localChanged = checksum !== baseline[1]
+  const remoteChanged = snapshot.revision !== baseline[0] || snapshot.checksum !== baseline[1]
+  if (!remoteChanged) return { kind: 'localChanges', uploadedAt: snapshot.uploadedAt }
+  return { kind: localChanged ? 'conflict' : 'remoteChanges', uploadedAt: snapshot.uploadedAt }
+}
+
+export function watchSyncState(callback: () => void): () => void {
+  const listener = (changes: Record<string, unknown>, areaName: string) => {
+    if (areaName === 'sync' && (changes[SYNC_MANIFEST_KEY] || changes[SYNC_INFO_KEY] || changes[SETTINGS_STORAGE_KEY])) callback()
   }
   browser.storage.onChanged.addListener(listener)
   return () => browser.storage.onChanged.removeListener(listener)
@@ -87,8 +160,10 @@ export function createBrowserSettingsStorage() {
     save: saveSettings,
     reset: resetSettings,
     subscribe: watchSettings,
-    loadSyncEnabled,
-    saveSyncEnabled,
+    upload: uploadSettingsToSync,
+    download: downloadSettingsFromSync,
+    inspectSyncState,
+    subscribeSyncState: watchSyncState,
   }
 }
 
@@ -118,4 +193,32 @@ export function toContentSettings(settings: TranslationSettings): TranslationSet
   const snapshot = structuredClone(settings)
   snapshot.schemes = []
   return snapshot
+}
+
+function parseManifest(value: unknown): SyncManifest | null {
+  if (!Array.isArray(value) || value.length !== 5 || value[0] !== SYNC_FORMAT_VERSION || typeof value[1] !== 'string' || !Number.isInteger(value[2]) || value[2] < 1 || !Number.isInteger(value[3]) || value[3] < 1 || typeof value[4] !== 'string') return null
+  return value as unknown as SyncManifest
+}
+
+function parseSyncInfo(value: unknown): SyncInfo | null {
+  if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== 'string' || !Number.isSafeInteger(value[1]) || value[1] < 0) return null
+  return value as unknown as SyncInfo
+}
+
+function parseSyncBaseline(value: unknown): SyncBaseline | null {
+  if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== 'string' || typeof value[1] !== 'string') return null
+  return value as unknown as SyncBaseline
+}
+
+async function saveSyncBaseline(snapshot: SyncSnapshot): Promise<void> {
+  await browser.storage.local.set({ [SYNC_BASELINE_KEY]: [snapshot.revision, snapshot.checksum] satisfies SyncBaseline })
+}
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
