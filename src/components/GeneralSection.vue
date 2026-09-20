@@ -8,17 +8,6 @@ const uiLocale = defineModel<UiLocale>('uiLocale', { required: true })
 const targetLanguage = defineModel<string>('targetLanguage', { required: true })
 const schemeOrder = defineModel<SchemeOrder>('schemeOrder', { required: true })
 
-defineProps<{
-  /** 是否渲染本机同步开关（演示模式不传则不渲染）。 */
-  showSync?: boolean
-  /** 本机是否参与设置同步；仅 showSync 为 true 时有意义。 */
-  syncEnabled?: boolean
-}>()
-
-const emit = defineEmits<{
-  toggleSync: [enabled: boolean]
-}>()
-
 const { t } = useUiLocale()
 
 const orderHint = computed(() => schemeOrder.value === 'random'
@@ -49,16 +38,6 @@ const orderHint = computed(() => schemeOrder.value === 'random'
           <option value="random">{{ t('schemes.orderRandom') }}</option>
           <option value="sequential">{{ t('schemes.orderSequential') }}</option>
         </select>
-      </label>
-      <label v-if="showSync" class="target-field sync-field af-chip" :title="t('schemes.syncTitle')">
-        <input
-          type="checkbox"
-          class="checkbox"
-          :checked="syncEnabled"
-          data-testid="sync-toggle"
-          @change="emit('toggleSync', ($event.target as HTMLInputElement).checked)"
-        />
-        <span>{{ t('schemes.syncLabel') }}</span>
       </label>
     </div>
     <p class="section-hint">{{ orderHint }}</p>
@@ -95,7 +74,4 @@ const orderHint = computed(() => schemeOrder.value === 'random'
   font-size: 14px;
 }
 
-.sync-field {
-  white-space: nowrap;
-}
 </style>

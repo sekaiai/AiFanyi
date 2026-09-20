@@ -1,7 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { browser } from 'wxt/browser'
 import OptionsApp from '../../src/components/OptionsApp.vue'
+import { SETTINGS_STORAGE_KEY } from '../../src/core/settings'
 
 // pickr 在 happy-dom 下无法真实初始化，ColorField 挂载依赖它，这里给最小桩
 vi.mock('@simonwep/pickr', () => ({
@@ -45,6 +46,8 @@ describe('OptionsApp probe-words linkage', () => {
     })
   })
 
+  afterEach(() => vi.unstubAllGlobals())
+
   it('runs word probe and sentence scheme tests together from the probe button', async () => {
     const wrapper = mount(OptionsApp)
     await flushPromises()
@@ -64,5 +67,18 @@ describe('OptionsApp probe-words linkage', () => {
     // 句子面板逐卡显示成功状态
     expect(wrapper.get('[data-testid="scheme-card-bing"] .settings-status').text()).toMatch(/^成功 · \d+ ms$/)
     expect(wrapper.get('[data-testid="scheme-card-reverso"] .settings-status').text()).toMatch(/^成功 · \d+ ms$/)
+  })
+
+  it('does not download or overwrite local settings when the confirmation is cancelled', async () => {
+    await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: { hoverDelayMs: 321 } })
+    const confirm = vi.fn(() => false)
+    vi.stubGlobal('confirm', confirm)
+    const wrapper = mount(OptionsApp)
+    await flushPromises()
+
+    await wrapper.get('[data-testid="sync-download"]').trigger('click')
+
+    expect(confirm).toHaveBeenCalledOnce()
+    expect((await browser.storage.local.get(SETTINGS_STORAGE_KEY))[SETTINGS_STORAGE_KEY]).toMatchObject({ hoverDelayMs: 321 })
   })
 })

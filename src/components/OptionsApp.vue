@@ -13,9 +13,10 @@ import DemoApp from '../demo/DemoApp.vue'
 import GeneralSection from './GeneralSection.vue'
 import SchemesSection from './SchemesSection.vue'
 import SettingsForm from './SettingsForm.vue'
+import SyncControls from './SyncControls.vue'
 import WordSourcesCard from './WordSourcesCard.vue'
 
-const { settings, stateLabel, reset, syncEnabled, toggleSync, t } = useSettingsModel(createBrowserSettingsStorage())
+const { settings, stateLabel, reset, upload, download, syncBusy, syncStatus, syncState, t } = useSettingsModel(createBrowserSettingsStorage())
 
 watchEffect(() => {
   document.title = t('app.docTitle')
@@ -92,6 +93,10 @@ async function testScheme(scheme: SchemeSettings): Promise<string> {
   return t('status.schemeReady')
 }
 
+function downloadSyncSettings(): void {
+  if (window.confirm(t('schemes.syncConfirmDownload'))) void download()
+}
+
 async function requestDemo(
   text: string,
   requestId: number,
@@ -114,9 +119,13 @@ async function requestDemo(
         v-model:ui-locale="settings.uiLocale"
         v-model:target-language="settings.targetLanguage"
         v-model:scheme-order="settings.schemeOrder"
-        show-sync
-        :sync-enabled="syncEnabled"
-        @toggle-sync="toggleSync"
+      />
+      <SyncControls
+        :busy="syncBusy"
+        :status="syncStatus"
+        :state="syncState"
+        @upload="upload"
+        @download="downloadSyncSettings"
       />
       <WordSourcesCard
         v-model="settings"

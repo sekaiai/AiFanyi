@@ -21,7 +21,7 @@ const emit = defineEmits<{
 
 const { t } = useUiLocale()
 
-// 免密方案在指南徽标中显示「无需密钥」，其余方案显示「配置随账号同步」。
+// 免密方案在指南徽标中显示「无需密钥」，其余方案显示「可手动同步」。
 const KEYLESS_TYPES: SchemeType[] = ['google', 'bing', 'mymemory', 'yandex', 'reverso']
 
 const draft = ref<SchemeSettings>(createScheme('ai'))

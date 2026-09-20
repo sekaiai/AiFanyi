@@ -14,24 +14,6 @@ const GeneralHarness = defineComponent({
   template: `<GeneralSection v-model:ui-locale="settings.uiLocale" v-model:target-language="settings.targetLanguage" v-model:scheme-order="settings.schemeOrder" />`,
 })
 
-const GeneralSyncHarness = defineComponent({
-  components: { GeneralSection },
-  setup() {
-    const defaults = cloneDefaultSettings()
-    const uiLocale = ref(defaults.uiLocale)
-    const targetLanguage = ref(defaults.targetLanguage)
-    const schemeOrder = ref(defaults.schemeOrder)
-    const syncEnabled = ref(true)
-    const toggles: boolean[] = []
-    const toggleSync = (enabled: boolean) => {
-      syncEnabled.value = enabled
-      toggles.push(enabled)
-    }
-    return { uiLocale, targetLanguage, schemeOrder, syncEnabled, toggleSync, toggles }
-  },
-  template: `<GeneralSection v-model:ui-locale="uiLocale" v-model:target-language="targetLanguage" v-model:scheme-order="schemeOrder" show-sync :sync-enabled="syncEnabled" @toggle-sync="toggleSync" />`,
-})
-
 const EnGeneralHarness = defineComponent({
   components: { GeneralSection },
   setup() {
@@ -73,28 +55,6 @@ describe('GeneralSection', () => {
 
     await wrapper.get('[data-testid="scheme-order"]').setValue('sequential')
     expect(wrapper.get('.section-hint').text()).toContain('按顺序依次尝试')
-  })
-
-  it('shows the sync toggle with a title and emits its state changes', async () => {
-    const wrapper = mount(GeneralSyncHarness)
-
-    const toggle = () => wrapper.get('[data-testid="sync-toggle"]')
-    expect((toggle().element as HTMLInputElement).checked).toBe(true)
-    expect(wrapper.get('.sync-field').text()).toContain('所有设置同步到浏览器账号')
-    expect(wrapper.get('.sync-field').attributes('title')).toContain('取消勾选后设置仅保存在本机')
-
-    await toggle().setValue(false)
-    expect(wrapper.vm.toggles).toEqual([false])
-    expect((toggle().element as HTMLInputElement).checked).toBe(false)
-
-    await toggle().setValue(true)
-    expect(wrapper.vm.toggles).toEqual([false, true])
-  })
-
-  it('hides the sync toggle when the sync state is not provided', () => {
-    const wrapper = mount(GeneralHarness)
-
-    expect(wrapper.find('[data-testid="sync-toggle"]').exists()).toBe(false)
   })
 
   it('translates through the provided UI locale context', () => {

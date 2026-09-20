@@ -1,15 +1,18 @@
 import { computed, nextTick, onUnmounted, reactive, shallowRef, watch } from 'vue'
 import { cloneDefaultSettings, migrateSettings } from '../core/settings'
 import type { TranslationSettings } from '../core/settings'
+import type { DownloadedSyncSettings, SyncSnapshot, SyncState } from '../extension/storage'
 import { provideUiLocale } from './useUiLocale'
 
 export function useSettingsModel(storage: {
   load(): Promise<TranslationSettings>
-  save(settings: TranslationSettings): Promise<void>
+  save(settings: TranslationSettings, baseline?: SyncSnapshot | null): Promise<void>
   reset(): Promise<TranslationSettings>
   subscribe(callback: (settings: TranslationSettings) => void): () => void
-  loadSyncEnabled(): Promise<boolean>
-  saveSyncEnabled(enabled: boolean): Promise<void>
+  upload(settings: TranslationSettings): Promise<void>
+  download(): Promise<DownloadedSyncSettings>
+  inspectSyncState(settings: TranslationSettings): Promise<SyncState>
+  subscribeSyncState(callback: () => void): () => void
 }) {
   const settings = reactive<TranslationSettings>(cloneDefaultSettings())
   const { t } = provideUiLocale(computed(() => settings.uiLocale))
@@ -17,11 +20,13 @@ export function useSettingsModel(storage: {
   const saving = shallowRef(false)
   const status = shallowRef(t('status.loading'))
   const syncing = shallowRef(false)
-  const syncEnabled = shallowRef(true)
+  const syncBusy = shallowRef(false)
+  const syncStatus = shallowRef('')
+  const syncState = shallowRef<SyncState>({ kind: 'checking', uploadedAt: null })
   let latestSave = 0
+  let latestSyncState = 0
   let saveQueue = Promise.resolve()
   let active = true
-  // chrome.storage.sync 有每分钟 120 次写入的配额，连续编辑需合并为一次尾部防抖写入
   const SAVE_DEBOUNCE_MS = 800
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -33,18 +38,14 @@ export function useSettingsModel(storage: {
       status.value = t('status.loaded')
       void nextTick(() => {
         syncing.value = false
+        void refreshSyncState()
       })
     })
     .catch(() => {
       loading.value = false
       status.value = t('status.loadFailed')
+      void refreshSyncState()
     })
-
-  void storage.loadSyncEnabled()
-    .then((enabled) => {
-      syncEnabled.value = enabled
-    })
-    .catch(() => undefined)
 
   const unsubscribe = storage.subscribe((next) => {
     if (saving.value) return
@@ -54,9 +55,14 @@ export function useSettingsModel(storage: {
       syncing.value = false
     })
   })
+  const unsubscribeSyncState = storage.subscribeSyncState(() => {
+    syncStatus.value = ''
+    void refreshSyncState()
+  })
   onUnmounted(() => {
     active = false
     unsubscribe()
+    unsubscribeSyncState()
     // 卸载兜底：还有未落盘的防抖写入时立即保存一次，避免最后一笔编辑丢失
     if (saveTimer !== undefined) {
       clearTimeout(saveTimer)
@@ -67,6 +73,7 @@ export function useSettingsModel(storage: {
 
   watch(settings, (value) => {
     if (loading.value || syncing.value) return
+    syncStatus.value = ''
     const snapshot = migrateSettings(value)
     if (saveTimer !== undefined) clearTimeout(saveTimer)
     const saveId = ++latestSave
@@ -80,6 +87,7 @@ export function useSettingsModel(storage: {
           if (!active || saveId !== latestSave) return
           saving.value = false
           status.value = t('status.autoSaved')
+          void refreshSyncState()
         })
         .catch(() => {
           if (!active || saveId !== latestSave) return
@@ -92,6 +100,7 @@ export function useSettingsModel(storage: {
   async function reset() {
     loading.value = true
     syncing.value = true
+    syncStatus.value = ''
     try {
       Object.assign(settings, await storage.reset())
       status.value = t('status.resetDone')
@@ -101,36 +110,67 @@ export function useSettingsModel(storage: {
       loading.value = false
       await nextTick()
       syncing.value = false
+      void refreshSyncState()
     }
   }
 
   const stateLabel = computed(() => saving.value ? t('status.saving') : status.value)
 
-  /** 切换本机是否参与设置同步；重新开启时立即推送当前设置，让同步区拿到本机最新状态。 */
-  async function toggleSync(enabled: boolean) {
-    if (syncEnabled.value === enabled) return
-    const previous = syncEnabled.value
-    syncEnabled.value = enabled
-    try {
-      await storage.saveSyncEnabled(enabled)
-    } catch {
-      syncEnabled.value = previous
-      status.value = t('status.syncSaveFailed')
-      return
+  async function saveNow(next: TranslationSettings, baseline?: SyncSnapshot | null): Promise<void> {
+    if (saveTimer !== undefined) {
+      clearTimeout(saveTimer)
+      saveTimer = undefined
     }
-    if (!enabled) {
-      status.value = t('status.syncOff')
-      return
-    }
+    latestSave++
     saving.value = true
-    const saveId = ++latestSave
     try {
-      await storage.save(migrateSettings(settings))
-      if (saveId === latestSave) status.value = t('status.syncOn')
-    } catch {
-      if (saveId === latestSave) status.value = t('status.saveFailed')
+      saveQueue = saveQueue.catch(() => undefined).then(() => storage.save(next, baseline))
+      await saveQueue
     } finally {
-      if (saveId === latestSave) saving.value = false
+      saving.value = false
+    }
+  }
+
+  async function upload(): Promise<void> {
+    syncBusy.value = true
+    const snapshot = migrateSettings(settings)
+    try {
+      await saveNow(snapshot)
+      await storage.upload(snapshot)
+      syncStatus.value = t('status.syncUploaded')
+      await refreshSyncState()
+    } catch (error) {
+      syncStatus.value = syncError(t('status.syncFailed'), error)
+    } finally {
+      syncBusy.value = false
+    }
+  }
+
+  async function download(): Promise<void> {
+    syncBusy.value = true
+    try {
+      const remote = await storage.download()
+      await saveNow(remote.settings, remote.snapshot)
+      syncing.value = true
+      Object.assign(settings, remote.settings)
+      syncStatus.value = t('status.syncDownloaded')
+      await nextTick()
+      syncing.value = false
+      await refreshSyncState()
+    } catch (error) {
+      syncStatus.value = syncError(t('status.syncDownloadFailed'), error)
+    } finally {
+      syncBusy.value = false
+    }
+  }
+
+  async function refreshSyncState(): Promise<void> {
+    const request = ++latestSyncState
+    try {
+      const next = await storage.inspectSyncState(migrateSettings(settings))
+      if (active && request === latestSyncState) syncState.value = next
+    } catch {
+      if (active && request === latestSyncState) syncState.value = { kind: 'unavailable', uploadedAt: null }
     }
   }
 
@@ -138,8 +178,15 @@ export function useSettingsModel(storage: {
     settings,
     stateLabel,
     reset,
-    syncEnabled,
-    toggleSync,
+    upload,
+    download,
+    syncBusy,
+    syncStatus,
+    syncState,
     t,
   }
+}
+
+function syncError(fallback: string, error: unknown): string {
+  return error instanceof Error && error.message ? `${fallback}：${error.message}` : fallback
 }

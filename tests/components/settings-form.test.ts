@@ -296,7 +296,7 @@ describe('SettingsForm', () => {
     const toggle = wrapper.get('[data-testid="scheme-guide-toggle"]')
     expect(toggle.text()).toContain('新手指南')
     expect(toggle.text()).toContain('新手指南 ·兼容 OpenAI 的 AI 接口')
-    expect(toggle.text()).toContain('配置随账号同步')
+    expect(toggle.text()).toContain('可手动同步')
     expect(toggle.attributes('aria-expanded')).toBe('true')
     expect(isGuideCollapsed()).toBe(false)
 
