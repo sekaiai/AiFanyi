@@ -117,7 +117,7 @@ export const DEFAULT_SETTINGS: TranslationSettings = {
     radius: 8,
     shadow: 'soft',
     padding: 10,
-    fontFamily: 'system',
+    fontFamily: 'serif',
     fontSize: 16,
     fontWeight: '400',
     lineHeight: 1.55,
