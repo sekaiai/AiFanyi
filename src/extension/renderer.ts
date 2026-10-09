@@ -162,9 +162,14 @@ export function createBubbleRenderer(settings: BubbleSettings): BubbleRenderer {
   return renderer
 }
 
-export function boundsFromRange(range: Range): RectLike | null {
-  const rects = Array.from(range.getClientRects()).filter((rect) => rect.width && rect.height)
-  const source = rects.length ? rects : [range.getBoundingClientRect()].filter((rect) => rect.width && rect.height)
+/** 选区锚点矩形：文档选区用 Range；输入控件（input/textarea）没有 DOM Range，用元素自身矩形。 */
+export function boundsFromAnchor(anchor: Range | Element): RectLike | null {
+  if (!(anchor instanceof Range)) {
+    const box = anchor.getBoundingClientRect()
+    return box.width && box.height ? { left: box.left, right: box.right, top: box.top, bottom: box.bottom } : null
+  }
+  const rects = Array.from(anchor.getClientRects()).filter((rect) => rect.width && rect.height)
+  const source = rects.length ? rects : [anchor.getBoundingClientRect()].filter((rect) => rect.width && rect.height)
   if (!source.length) return null
   return {
     left: Math.min(...source.map((rect) => rect.left)),
@@ -174,10 +179,14 @@ export function boundsFromRange(range: Range): RectLike | null {
   }
 }
 
-/** 选区所在最近块级容器的宽度；句子翻译气泡以它为宽度上限。测不出时返回 0（调用方回退单词封顶）。 */
-export function selectionContainerWidth(range: Range): number {
-  const node = range.commonAncestorContainer
-  let el = node instanceof Element ? node : node.parentElement
+/** 选区锚点所在最近块级容器的宽度；句子翻译气泡以它为宽度上限。元素锚点（输入控件）直接取自身。
+ *  测不出时返回 0（调用方回退单词封顶）。 */
+export function selectionContainerWidth(anchor: Range | Element): number {
+  let el: Element | null = anchor instanceof Element
+    ? anchor
+    : anchor.commonAncestorContainer instanceof Element
+      ? anchor.commonAncestorContainer
+      : anchor.commonAncestorContainer.parentElement
   while (el) {
     const display = getComputedStyle(el).display
     if (display !== 'inline' && display !== 'contents') break

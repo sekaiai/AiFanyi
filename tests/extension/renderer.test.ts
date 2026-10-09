@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cloneDefaultSettings } from '../../src/core/settings'
-import { createBubbleRenderer, selectionContainerWidth } from '../../src/extension/renderer'
+import { boundsFromAnchor, createBubbleRenderer, selectionContainerWidth } from '../../src/extension/renderer'
 import type { BubbleSettings } from '../../src/core/types'
 
 function bubbleSettings(overrides: Partial<BubbleSettings> = {}): BubbleSettings {
@@ -186,5 +186,27 @@ describe('createBubbleRenderer 原文显示', () => {
     expect(selectionContainerWidth(range)).toBe(640)
 
     div.remove()
+  })
+
+  // boundsFromAnchor：输入控件（input/textarea）没有 DOM Range，用元素自身矩形做锚点。
+  it('boundsFromAnchor 对元素锚点返回元素自身矩形', () => {
+    const input = document.createElement('input')
+    Object.defineProperty(input, 'getBoundingClientRect', {
+      value: () => ({ left: 10, top: 20, right: 310, bottom: 40, width: 300, height: 20 }),
+      configurable: true,
+    })
+    expect(boundsFromAnchor(input)).toEqual({ left: 10, right: 310, top: 20, bottom: 40 })
+  })
+
+  it('boundsFromAnchor 元素零矩形（不可见）时返回 null', () => {
+    expect(boundsFromAnchor(document.createElement('input'))).toBeNull()
+  })
+
+  it('selectionContainerWidth 对元素锚点（输入控件）直接取元素自身宽度', () => {
+    const textarea = document.createElement('textarea')
+    // display 用内联声明，不依赖测试环境对默认 UA 样式表的实现（与上一条用例同一策略）
+    textarea.style.display = 'inline-block'
+    Object.defineProperty(textarea, 'clientWidth', { value: 320, configurable: true })
+    expect(selectionContainerWidth(textarea)).toBe(320)
   })
 })

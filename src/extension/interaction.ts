@@ -2,9 +2,9 @@ import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import { isTargetLanguageText } from '../core/lang'
 import type { ExtensionResponse } from '../core/messages'
 import type { TranslationSettings } from '../core/types'
-import { classifySelection, getCaretFromPoint, getWordAtOffset, hasActiveSelection, isIgnorableElement, isSelectionIgnorableElement } from '../core/text'
+import { classifySelection, getCaretFromPoint, getControlSelection, getWordAtOffset, hasActiveSelection, isIgnorableElement, isSelectionIgnorableElement } from '../core/text'
 import { hideHighlight, showHighlight } from './highlight'
-import { boundsFromRange, selectionContainerWidth, type BubbleRenderer } from './renderer'
+import { boundsFromAnchor, selectionContainerWidth, type BubbleRenderer } from './renderer'
 import { speakWord } from './speech'
 
 /**
@@ -36,7 +36,7 @@ export function createInteraction(host: InteractionHost) {
   const cache = new Map<string, ExtensionResponse>()
   // 所有 listen() 注册的监听共享一个信号；destroy 时一次 abort 全部移除。
   const listenerScope = new AbortController()
-  let currentRange: Range | null = null
+  let currentAnchor: Range | Element | null = null
   let currentText = ''
   let currentKind: 'dictionary' | 'ai' | null = null
   let currentInteraction: 'hover' | 'selection' | null = null
@@ -70,20 +70,21 @@ export function createInteraction(host: InteractionHost) {
       window.clearTimeout(selectionTimer)
       selectionTimer = window.setTimeout(handleSelection, SELECTION_DELAY)
     }, { capture: true })
-    // selectionchange 抖动收敛为 90ms 防抖，拖选期间不触发
+    // selectionchange 抖动收敛为 90ms 防抖，拖选期间不触发；
+    // capture：输入控件（input/textarea）内部选区变化的事件以控件为 target 且不冒泡，冒泡阶段收不到。
     listen(document, 'selectionchange', () => {
       window.clearTimeout(selectionTimer)
       selectionTimer = window.setTimeout(() => {
         if (!pointerDown) handleSelection()
       }, SELECTION_DELAY)
-    })
+    }, { capture: true })
     // 悬停产生的气泡随滚动关闭，划词气泡跟随重定位
     listen(window, 'scroll', () => {
       if (currentInteraction === 'hover') close()
-      else if (currentRange && host.renderer.isVisible()) position(currentRange)
+      else if (currentAnchor && host.renderer.isVisible()) position(currentAnchor)
     }, { capture: true })
     listen(window, 'resize', () => {
-      if (currentRange && host.renderer.isVisible()) position(currentRange)
+      if (currentAnchor && host.renderer.isVisible()) position(currentAnchor)
     })
     listen(document, 'keydown', (event) => {
       if ((event as KeyboardEvent).key === 'Escape') {
@@ -114,7 +115,7 @@ export function createInteraction(host: InteractionHost) {
     cache.clear()
     host.renderer.applySettings(next.bubble)
     if (!host.isActive(next) || hadPending) close()
-    else if (currentRange && host.renderer.isVisible()) position(currentRange)
+    else if (currentAnchor && host.renderer.isVisible()) position(currentAnchor)
   }
 
   function onMouseMove(event: MouseEvent): void {
@@ -175,7 +176,7 @@ export function createInteraction(host: InteractionHost) {
       showHighlight(host.highlight, rect, settings.bubble.highlightColor)
       currentInteraction = 'hover'
       currentKind = 'dictionary'
-      currentRange = range
+      currentAnchor = range
       currentText = word.word
       void submit('dictionary', word.word, range)
     }, settings.hoverDelayMs)
@@ -186,16 +187,29 @@ export function createInteraction(host: InteractionHost) {
     if (!host.isActive(settings) || !settings.selectionEnabled) return
     // 本次按下发生在气泡内：不关闭气泡，也不对气泡内容发起新翻译
     if (pointerDownInBubble) return
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      if (currentInteraction === 'selection') close()
-      return
+    // 输入控件（input/textarea）的选区在控件内部（selectionStart/End），document 选区拿不到，优先单独读取
+    const control = getControlSelection()
+    let anchor: Range | Element
+    let target: Element | null
+    let text: string
+    if (control) {
+      anchor = control.element
+      target = control.element
+      text = control.text
+    } else {
+      const selection = window.getSelection()
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        if (currentInteraction === 'selection') close()
+        return
+      }
+      const range = selection.getRangeAt(0).cloneRange()
+      anchor = range
+      target = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement
+      text = selection.toString()
     }
-    const range = selection.getRangeAt(0).cloneRange()
-    const target = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement
     // 显式划词比悬停宽松：pre/code 也允许翻译（悬停仍忽略代码区）
     if (isSelectionIgnorableElement(target) || !host.acceptSelectTarget(target)) return
-    const action = classifySelection(selection.toString())
+    const action = classifySelection(text)
     if (action.type === 'empty') return
     // 已是目标语言的文本不触发翻译（如中文目标选中中文句）
     if (isTargetLanguageText(action.text, settings.targetLanguage)) return
@@ -204,25 +218,25 @@ export function createInteraction(host: InteractionHost) {
     hideHighlight(host.highlight)
     currentInteraction = 'selection'
     currentKind = action.type
-    currentRange = range
+    currentAnchor = anchor
     currentText = action.text
     // 划词查单词与悬停同一套「静止满延迟才触发」约束：遵守悬停延迟设置且最低 300ms，
     // 延迟期内鼠标移动会重新计时（见 onMouseMove）；句子 / 段落翻译保持即时（划词是主动操作）。
     if (action.type === 'dictionary') {
       submitTimer = window.setTimeout(() => {
         submitTimer = 0
-        void submit('dictionary', action.text, range)
+        void submit('dictionary', action.text, anchor)
       }, settings.hoverDelayMs)
     } else {
-      void submit(action.type, action.text, range)
+      void submit(action.type, action.text, anchor)
     }
   }
 
-  async function submit(kind: 'dictionary' | 'ai', text: string, range: Range): Promise<void> {
+  async function submit(kind: 'dictionary' | 'ai', text: string, anchor: Range | Element): Promise<void> {
     const cacheKey = `${kind}:${text.toLowerCase()}`
     // 同文本同类型请求在途时直接复用，不重复发起
     if (inflightKey === cacheKey) {
-      position(range)
+      position(anchor)
       return
     }
     abortPending()
@@ -230,7 +244,7 @@ export function createInteraction(host: InteractionHost) {
     activeRequest = requestId
     const cached = cache.get(cacheKey)
     if (cached) {
-      renderResponse(cached, text, range)
+      renderResponse(cached, text, anchor)
       return
     }
     const controller = new AbortController()
@@ -243,7 +257,7 @@ export function createInteraction(host: InteractionHost) {
       text,
       kind === 'dictionary' ? settings.word.showOriginal : settings.bubble.showOriginal,
     )
-    position(range)
+    position(anchor)
     try {
       const response = await host.send(text, requestId, controller.signal)
       if (requestId !== activeRequest || text !== currentText) return
@@ -252,7 +266,7 @@ export function createInteraction(host: InteractionHost) {
         cache.set(cacheKey, response)
         while (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!)
       }
-      renderResponse(response, text, range)
+      renderResponse(response, text, anchor)
     } finally {
       if (pending?.requestId === requestId) {
         pending = null
@@ -261,11 +275,11 @@ export function createInteraction(host: InteractionHost) {
     }
   }
 
-  function renderResponse(response: ExtensionResponse, text: string, range: Range): void {
+  function renderResponse(response: ExtensionResponse, text: string, anchor: Range | Element): void {
     const settings = host.getSettings()
     if (!response.ok) {
       const kind = currentKind
-      host.renderer.showError(response.error.message, response.error.retryable && kind ? () => void submit(kind, text, range) : undefined)
+      host.renderer.showError(response.error.message, response.error.retryable && kind ? () => void submit(kind, text, anchor) : undefined)
     } else if (response.kind === 'dictionary') {
       const speakable = settings.word.speakEnabled
       host.renderer.showDictionary(text, response.result, {
@@ -275,15 +289,15 @@ export function createInteraction(host: InteractionHost) {
     } else if (response.kind === 'text') {
       host.renderer.showText(response.result, text)
     }
-    position(range)
+    position(anchor)
   }
 
-  function position(range: Range): void {
+  function position(anchor: Range | Element): void {
     const settings = host.getSettings()
-    const bounds = boundsFromRange(range)
+    const bounds = boundsFromAnchor(anchor)
     if (!bounds) return
     // 句子翻译以选区所在块级容器宽度为上限；单词翻译维持 290px 封顶
-    const sentenceContainerWidth = currentKind === 'ai' ? selectionContainerWidth(range) : 0
+    const sentenceContainerWidth = currentKind === 'ai' ? selectionContainerWidth(anchor) : 0
     const sizing = getBubbleSizing(bounds.right - bounds.left, window.innerWidth, settings.bubble.side, { sentenceContainerWidth })
     host.renderer.prepareForMeasure(sizing.minWidth, sizing.maxWidth)
     const rect = host.renderer.root.getBoundingClientRect()
@@ -312,7 +326,7 @@ export function createInteraction(host: InteractionHost) {
     window.clearTimeout(hoverTimer)
     window.clearTimeout(submitTimer)
     window.clearTimeout(closeTimer)
-    currentRange = null
+    currentAnchor = null
     currentText = ''
     currentKind = null
     currentInteraction = null

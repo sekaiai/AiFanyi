@@ -76,23 +76,54 @@ export function getWordAtOffset(text: string, offset: number): WordMatch | null 
   return null
 }
 
-// 交互排除的基础集合：脚本/样式/输入控件/按钮/插件自身节点（悬停与划词都排除）。
-const IGNORED_BASE_SELECTOR = 'script, style, textarea, input, select, option, button, [contenteditable], #aifanyi-shadow-host, #aifanyi-word-highlight'
+// 划词（显式触发）排除：只排除脚本/样式与插件自身节点；按钮/输入控件/可编辑区都允许划词
+// （button 的 UA 默认 user-select: none 由扩展注入样式恢复，见 extension/selectable.ts）。
+const SELECTION_IGNORED_SELECTOR = 'script, style, #aifanyi-shadow-host, #aifanyi-word-highlight'
 
-/** 悬停（隐式触发）额外排除代码区：扫过代码时不该连环弹泡。 */
+// 悬停额外排除：代码区，以及没有 DOM 文本层、按坐标取不到字符的原生控件。
+const HOVER_EXTRA_SELECTOR = 'pre, code, textarea, input, select, option'
+
+/** 悬停（隐式触发）排除：代码区与原生输入控件（扫过代码不该连环弹泡；控件内取不到字符）。 */
 export function isIgnorableElement(element: Element | null): boolean {
-  return Boolean(element?.closest(`${IGNORED_BASE_SELECTOR}, pre, code`))
+  return Boolean(element?.closest(`${SELECTION_IGNORED_SELECTOR}, ${HOVER_EXTRA_SELECTOR}`))
 }
 
-/** 显式划词比悬停宽松：代码区（pre/code）也允许翻译。 */
+/** 划词（显式触发）比悬停宽松：代码区（pre/code）也允许翻译。 */
 export function isSelectionIgnorableElement(element: Element | null): boolean {
-  return Boolean(element?.closest(IGNORED_BASE_SELECTOR))
+  return Boolean(element?.closest(SELECTION_IGNORED_SELECTOR))
 }
 
-/** 当前是否存在非折叠的选区文本（有选区时悬停让位给划词）。 */
+type ControlSelection = { element: HTMLInputElement | HTMLTextAreaElement; text: string }
+
+/** 穿透 shadow DOM 取最内层活跃元素（部分站点输入框在 shadow root 内，document.activeElement 只能拿到宿主）。 */
+function deepActiveElement(): Element | null {
+  let active: Element | null = document.activeElement
+  while (active) {
+    const inner = active.shadowRoot?.activeElement
+    if (!inner) break
+    active = inner
+  }
+  return active
+}
+
+/** 输入控件（input/textarea）的选区在控件内部（selectionStart/End），不属于 document 选区。
+ *  password 与不支持选区 API 的类型（email/number 等 getter 返回 null）跳过。 */
+export function getControlSelection(): ControlSelection | null {
+  const active = deepActiveElement()
+  if (!(active instanceof HTMLInputElement) && !(active instanceof HTMLTextAreaElement)) return null
+  if (active.type === 'password') return null
+  const start = active.selectionStart
+  const end = active.selectionEnd
+  if (start === null || end === null || start === end) return null
+  // 反向拖选时 selectionStart 可能大于 selectionEnd
+  return { element: active, text: active.value.slice(Math.min(start, end), Math.max(start, end)) }
+}
+
+/** 当前是否存在非折叠的选区文本（有选区时悬停让位给划词）；输入控件内部选区同样算。 */
 export function hasActiveSelection(): boolean {
   const selection = window.getSelection()
-  return Boolean(selection && !selection.isCollapsed && selection.toString().trim())
+  if (selection && !selection.isCollapsed && selection.toString().trim()) return true
+  return Boolean(getControlSelection()?.text.trim())
 }
 
 export function getCaretFromPoint(x: number, y: number): { node: Node; offset: number } | null {

@@ -272,7 +272,8 @@ test.describe('AiFanyi extension', () => {
     })
 
     await page.goto('https://fixture.test/')
-    await page.getByText('Beautiful').hover()
+    // fixture 里 '#button-target' 也含 Beautiful，这里收窄到目标段落避免严格模式命中多个元素
+    await page.locator('#dictionary-target').hover()
 
     await expect(page.locator('.aifanyi-bubble, .bubble').first()).toBeHidden()
 
@@ -369,6 +370,48 @@ test.describe('AiFanyi extension', () => {
       document.dispatchEvent(new Event('selectionchange'))
     })
     await expect(page.locator('#aifanyi-shadow-host .bubble')).toContainText('某人')
+
+    await context.close()
+  })
+
+  test('translates selections on a button and inside an input', async () => {
+    const { context, page, worker } = await launchExtension()
+    await context.route('https://freedictionaryapi.com/**', async (route) => {
+      await route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ entries: [{ partOfSpeech: 'adj.', senses: [{ translations: [{ language: 'zh', word: '美丽的；漂亮的' }] }] }] }),
+      })
+    })
+    await page.route('https://fixture.test/**', async (route) => {
+      await route.fulfill({ path: path.resolve('e2e/fixtures/translation-page.html'), contentType: 'text/html' })
+    })
+    await setSettings(worker, { version: 1, enabled: true, hoverEnabled: true, selectionEnabled: true, hoverDelayMs: 0, word: { sources: { youdao: true, bing: true, google: true, freedictionaryapi: true } } })
+    await page.goto('https://fixture.test/')
+
+    // 注入样式应覆盖浏览器对 button 的 UA 默认 user-select: none
+    expect(await page.locator('#button-target').evaluate((element) => getComputedStyle(element).userSelect)).toBe('text')
+
+    // 按钮文字拖选后被当作划词翻译
+    const buttonText = await page.locator('#button-target').evaluate((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const rect = range.getBoundingClientRect()
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    })
+    await page.mouse.move(buttonText.x + 2, buttonText.y + buttonText.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(buttonText.x + buttonText.width - 2, buttonText.y + buttonText.height / 2, { steps: 8 })
+    await page.mouse.up()
+
+    const bubble = page.locator('#aifanyi-shadow-host .bubble')
+    await expect(bubble).toContainText(/美丽的|Beautiful/)
+
+    // 输入框内部选区走控件选区路径：点击后键盘全选（selectionchange 不冒泡，靠 capture 监听）
+    await page.locator('#input-target').click()
+    await expect(bubble).toBeHidden()
+    await page.keyboard.press('Home')
+    await page.keyboard.press('Shift+End')
+    await expect(bubble).toContainText(/美丽的|beautiful/)
 
     await context.close()
   })

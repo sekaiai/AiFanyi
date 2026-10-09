@@ -15,7 +15,7 @@ import {
   resetToDefaults,
   validateAiUrl,
 } from '../../src/core/settings'
-import { classifySelection, extractSingleWord, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
+import { classifySelection, extractSingleWord, getControlSelection, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
 import { toContentSettings } from '../../src/extension/storage'
 
 describe('language detection', () => {
@@ -105,8 +105,10 @@ describe('text classification', () => {
     expect(normalizeSourceText('x'.repeat(MAX_TRANSLATION_TEXT_LENGTH + 10))).toHaveLength(MAX_TRANSLATION_TEXT_LENGTH)
   })
 
-  // 悬停与划词共用基础排除（脚本/控件/编辑器等），差异只在 pre/code：
-  // 悬停忽略代码区避免阅读代码时被打断，划词保持可用以便显式翻译。
+  // 悬停与划词排除集合的差异：
+  //  - pre/code：悬停忽略避免扫代码连环弹泡，划词保持可用以便显式翻译；
+  //  - 原生输入控件：悬停取不到字符（文字不在 DOM 文本层）保持排除，划词放开（走控件内部选区）；
+  //  - 按钮 / 可编辑区：两边都放开（按钮由注入样式恢复 user-select）。
   it('lets explicit selection opt into code blocks that hover ignores', () => {
     const code = document.createElement('code')
     expect(isIgnorableElement(code)).toBe(true)
@@ -115,11 +117,66 @@ describe('text classification', () => {
     expect(isSelectionIgnorableElement(document.createElement('p'))).toBe(false)
   })
 
-  it('ignores controls and editable regions for both hover and selection', () => {
-    expect(isIgnorableElement(document.createElement('button'))).toBe(true)
-    expect(isSelectionIgnorableElement(document.createElement('button'))).toBe(true)
-    expect(isIgnorableElement(document.createElement('input'))).toBe(true)
-    expect(isSelectionIgnorableElement(document.createElement('input'))).toBe(true)
+  it('keeps native controls hover-only exclusions and allows selection for buttons and editable regions', () => {
+    for (const tag of ['input', 'textarea', 'select'] as const) {
+      const control = document.createElement(tag)
+      expect(isIgnorableElement(control)).toBe(true)
+      expect(isSelectionIgnorableElement(control)).toBe(false)
+    }
+    const button = document.createElement('button')
+    expect(isIgnorableElement(button)).toBe(false)
+    expect(isSelectionIgnorableElement(button)).toBe(false)
+    const editable = document.createElement('div')
+    editable.setAttribute('contenteditable', '')
+    expect(isIgnorableElement(editable)).toBe(false)
+    expect(isSelectionIgnorableElement(editable)).toBe(false)
+  })
+
+  it('still excludes scripts and the extension own nodes from selection', () => {
+    expect(isSelectionIgnorableElement(document.createElement('script'))).toBe(true)
+    const host = document.createElement('div')
+    host.id = 'aifanyi-shadow-host'
+    expect(isSelectionIgnorableElement(host)).toBe(true)
+  })
+
+  it('reads selections inside text controls (incl. backward) and skips passwords', () => {
+    const input = document.createElement('input')
+    document.body.append(input)
+    input.value = 'beautiful'
+    input.focus()
+    input.setSelectionRange(0, 9)
+    expect(getControlSelection()).toEqual({ element: input, text: 'beautiful' })
+
+    // 反向选区：selectionStart 可能大于 selectionEnd。happy-dom 不保证方向语义，直接改实例属性模拟。
+    Object.defineProperty(input, 'selectionStart', { value: 9, configurable: true })
+    Object.defineProperty(input, 'selectionEnd', { value: 0, configurable: true })
+    expect(getControlSelection()?.text).toBe('beautiful')
+
+    const password = document.createElement('input')
+    password.type = 'password'
+    document.body.append(password)
+    password.value = 'secretword'
+    password.focus()
+    password.setSelectionRange(0, 6)
+    expect(getControlSelection()).toBeNull()
+
+    input.remove()
+    password.remove()
+  })
+
+  it('穿透 shadow root 读取输入框选区（焦点在 shadow 内时 document.activeElement 只是宿主）', () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const shadow = host.attachShadow({ mode: 'open' })
+    const input = document.createElement('input')
+    input.value = 'beautiful'
+    shadow.append(input)
+    input.focus()
+    input.setSelectionRange(0, 9)
+
+    expect(getControlSelection()).toEqual({ element: input, text: 'beautiful' })
+
+    host.remove()
   })
 })
 
