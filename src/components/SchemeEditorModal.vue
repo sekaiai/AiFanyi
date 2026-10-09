@@ -168,7 +168,6 @@ async function save(): Promise<void> {
           </label>
         </template>
         <template v-else-if="draft.type === 'baidu'">
-          <p class="field-hint wide">{{ t('editor.hint.baidu') }}</p>
           <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" :placeholder="t('editor.placeholder.baiduAppId')" /></label>
           <label class="field">
             <span class="field-label">{{ t('editor.secretKey') }}</span>
@@ -176,7 +175,6 @@ async function save(): Promise<void> {
           </label>
         </template>
         <template v-else-if="draft.type === 'baiduAi'">
-          <p class="field-hint wide">{{ t('editor.hint.baiduAi') }}</p>
           <label class="field"><span class="field-label">AppID</span><input v-model="draft.appId" autocomplete="off" :placeholder="t('editor.placeholder.baiduAppId')" /></label>
           <label class="field">
             <span class="field-label">{{ t('editor.secretKey') }}</span>
@@ -195,7 +193,6 @@ async function save(): Promise<void> {
         <p v-else-if="draft.type === 'yandex'" class="field-hint wide">{{ t('editor.hint.yandex') }}</p>
         <p v-else-if="draft.type === 'reverso'" class="field-hint wide">{{ t('editor.hint.reverso') }}</p>
         <template v-else-if="draft.type === 'volcengine'">
-          <p class="field-hint wide">{{ t('editor.hint.volcengine') }}</p>
           <label class="field"><span class="field-label">{{ t('editor.volcAkLabel') }}</span><input v-model="draft.accessKeyId" autocomplete="off" :placeholder="t('editor.placeholder.volcAk')" /></label>
           <label class="field">
             <span class="field-label">{{ t('editor.volcSkLabel') }}</span>

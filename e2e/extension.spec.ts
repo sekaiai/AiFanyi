@@ -24,7 +24,8 @@ async function launchExtension() {
 
 async function setSettings(worker: Awaited<ReturnType<typeof launchExtension>>['worker'], value: object) {
   await worker.evaluate(async ({ key, settings }) => {
-    await (globalThis as typeof globalThis & { chrome: typeof chrome }).chrome.storage.sync.set({ [key]: settings })
+    // 运行时只读 browser.storage.local（本地优先），写入 local 后 watchSettings 会向内容脚本广播新配置
+    await (globalThis as typeof globalThis & { chrome: typeof chrome }).chrome.storage.local.set({ [key]: settings })
   }, { key: settingsKey, settings: value })
 }
 

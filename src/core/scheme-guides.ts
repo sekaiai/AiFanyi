@@ -43,5 +43,6 @@ export const SCHEME_GUIDES: Record<SchemeType, string[]> = {
   ai: [
     'https://platform.openai.com/api-keys',
     'https://cloud.siliconflow.cn/i/0gApJ55Y',
+    'https://api-docs.deepseek.com/zh-cn/',
   ],
 }

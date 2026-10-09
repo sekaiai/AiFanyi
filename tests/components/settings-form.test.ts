@@ -301,8 +301,9 @@ describe('SettingsForm', () => {
     expect(isGuideCollapsed()).toBe(false)
 
     const guideText = wrapper.get('[data-testid="scheme-guide-body"]').text()
-    expect(guideText).toContain('任意兼容 OpenAI 的服务商均可，推荐硅基流动')
+    expect(guideText).toContain('任意兼容 OpenAI 的服务商均可，比如DeepSeek')
     expect(guideText).toContain('tencent/Hunyuan-MT-7B')
+    expect(guideText).toContain('DeepSeek API 文档')
     expect(guideText).toContain('怎么用')
     expect(guideText).toContain('官方入口')
     expect(guideText.indexOf('怎么用')).toBeLessThan(guideText.indexOf('官方入口'))

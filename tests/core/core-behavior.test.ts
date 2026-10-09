@@ -45,6 +45,16 @@ describe('language detection', () => {
     expect(isTargetLanguageText('hello', 'Nederlands')).toBe(false) // 未收录规则不跳过
     expect(isTargetLanguageText('', '简体中文')).toBe(false)
   })
+
+  it('混合文本按占比判定：目标词占少数仍触发翻译', () => {
+    expect(
+      isTargetLanguageText(
+        'Several terms redirect here. For the present-day Republic of China, see Taiwan. For 中国 in Japan, see Chūgoku region. For other uses, see China (disambiguation) and PRC (disambiguation).',
+        '简体中文',
+      ),
+    ).toBe(false)
+    expect(isTargetLanguageText('这里的 cache 指的是缓存', '简体中文')).toBe(true)
+  })
 })
 
 describe('text classification', () => {
