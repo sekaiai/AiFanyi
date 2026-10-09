@@ -6,6 +6,7 @@ import { cloneDefaultSettings, migrateSettings } from '../../src/core/settings'
 import { describeMissingConfig, hasRequiredConfig } from '../../src/core/translate'
 import { parseYandexDetection, parseYandexTranslation, translateWithYandex } from '../../src/core/yandex'
 import type { SchemeSettings } from '../../src/core/types'
+import { jsonResponse } from './helpers'
 
 const fetchMock = vi.fn()
 
@@ -13,10 +14,6 @@ const bingScheme: SchemeSettings = { id: 'bing-1', type: 'bing', enabled: true }
 const myMemoryScheme: SchemeSettings = { id: 'mymemory-1', type: 'mymemory', enabled: true }
 const yandexScheme: SchemeSettings = { id: 'yandex-1', type: 'yandex', enabled: true }
 const reversoScheme: SchemeSettings = { id: 'reverso-1', type: 'reverso', enabled: true }
-
-function jsonResponse(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
-}
 
 beforeEach(() => {
   fetchMock.mockReset()

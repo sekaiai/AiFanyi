@@ -2,7 +2,7 @@ import { getCurrentInstance, inject, provide, shallowRef, type InjectionKey, typ
 import { translate, type MessageKey } from '../core/i18n'
 import type { UiLocale } from '../core/types'
 
-export interface UiLocaleContext {
+interface UiLocaleContext {
   locale: Ref<UiLocale>
   t: (key: MessageKey, params?: Record<string, string | number>) => string
 }

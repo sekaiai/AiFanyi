@@ -1,4 +1,4 @@
-import { readArray, readRecord, readText } from './read'
+import { readArray, readNumber, readRecord, readText } from './read'
 import { fetchWithTimeout } from './request'
 import { GOOGLE_TARGET_CODES } from './word-sources'
 
@@ -14,16 +14,9 @@ function yandexTargetCode(targetLanguage: string): string {
   return code
 }
 
-// code 在错误时可能是数字或数字字符串，统一读成数字再判断。
-function readCode(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
-  return null
-}
-
 function requireYandexOk(payload: unknown): Record<string, unknown> {
   const record = readRecord(payload)
-  const code = readCode(record.code)
+  const code = readNumber(record.code)
   if (code === null) throw new Error('Yandex 返回异常。')
   if (code !== 200) {
     const message = readText(record.message)

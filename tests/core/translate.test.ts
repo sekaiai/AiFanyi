@@ -6,6 +6,7 @@ import { baiduTargetCode, createBaiduSignature } from '../../src/core/baidu'
 import { md5Hex } from '../../src/core/md5'
 import { createVolcengineAuthorization, sha256Hex, volcengineTargetCode } from '../../src/core/volcengine'
 import type { SchemeSettings, TranslationSettings } from '../../src/core/types'
+import { jsonResponse } from './helpers'
 
 const fetchMock = vi.fn()
 
@@ -44,10 +45,6 @@ function settingsWithSchemes(schemes: SchemeSettings[], options?: { wordPool?: b
     settings.word.sources = { youdao: false, bing: false, google: false, freedictionaryapi: false }
   }
   return settings
-}
-
-function jsonResponse(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
 }
 
 function requestInit(callIndex: number): RequestInit {

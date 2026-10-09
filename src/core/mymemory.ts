@@ -1,4 +1,4 @@
-import { readRecord, readText } from './read'
+import { readNumber, readRecord, readText } from './read'
 import { fetchWithTimeout } from './request'
 import { GOOGLE_TARGET_CODES } from './word-sources'
 
@@ -14,16 +14,9 @@ function myMemoryTargetCode(targetLanguage: string): string {
   return code
 }
 
-// responseStatus 在错误时可能是数字或数字字符串（HTTP 层仍为 200），统一读成数字。
-function readResponseStatus(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
-  return null
-}
-
 export function parseMyMemoryTranslation(payload: unknown): string {
   const record = readRecord(payload)
-  const status = readResponseStatus(record.responseStatus)
+  const status = readNumber(record.responseStatus)
   if (status !== null && status !== 200) {
     const details = readText(record.responseDetails)
     throw new Error(details ? `MyMemory 错误 ${status}：${details}` : `MyMemory 错误 ${status}`)

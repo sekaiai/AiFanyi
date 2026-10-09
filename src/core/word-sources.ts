@@ -99,7 +99,7 @@ function bingTargetCode(targetLanguage: string): string {
 // 有道词典（jsonapi + dictvoice 真人音频）
 // ---------------------------------------------------------------------------
 
-export function parseYoudaoResult(payload: unknown, word: string, accent: 'us' | 'uk'): WordResult {
+export function parseYoudaoResult(payload: unknown): WordResult {
   const entry = readArray(readRecord(readRecord(payload).ec).word).map(readRecord)[0]
   if (!entry) throw new Error('有道词典未收录该词。')
   const phone = readText(entry.usphone) || readText(entry.ukphone)
@@ -139,7 +139,7 @@ function readYoudaoLines(value: unknown): string[] {
   return readArray(value).filter((item): item is string => typeof item === 'string')
 }
 
-export async function lookupYoudao(word: string, accent: 'us' | 'uk', signal?: AbortSignal): Promise<WordResult> {
+export async function lookupYoudao(word: string, signal?: AbortSignal): Promise<WordResult> {
   const response = await fetchWithTimeout(
     `${YOUDAO_DICT_ENDPOINT}${encodeURIComponent(word.toLowerCase())}`,
     { headers: { Accept: 'application/json' } },
@@ -147,7 +147,7 @@ export async function lookupYoudao(word: string, accent: 'us' | 'uk', signal?: A
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  return parseYoudaoResult(await response.json(), word, accent)
+  return parseYoudaoResult(await response.json())
 }
 
 // ---------------------------------------------------------------------------
@@ -185,18 +185,13 @@ export function parseBingPronunciation(html: string, accent: 'us' | 'uk'): strin
   return phone ? `[${phone}]` : ''
 }
 
-export async function lookupBing(word: string, targetLanguage: string, accent: 'us' | 'uk', signal?: AbortSignal): Promise<WordResult> {
+/** ttranslatev3 免密钥流程：GET translator 页取 IG/token，再 POST 表单拿译文。方案链与单词源池共用。 */
+export async function requestBingTranslate(text: string, fromLang: string, to: string, signal?: AbortSignal): Promise<string> {
   const pageResponse = await fetchWithTimeout(BING_TRANSLATOR_PAGE, { headers: { Accept: 'text/html' } }, REQUEST_TIMEOUT_MS, signal)
   if (!pageResponse.ok) throw new Error(`HTTP ${pageResponse.status}`)
   const { ig, key, token } = parseBingPage(await pageResponse.text())
 
-  const body = new URLSearchParams({
-    fromLang: 'en',
-    text: word.toLowerCase(),
-    to: bingTargetCode(targetLanguage),
-    token,
-    key,
-  })
+  const body = new URLSearchParams({ fromLang, text, to, token, key })
   const response = await fetchWithTimeout(
     `${BING_TRANSLATE_ENDPOINT}?isVertical=1&&IG=${encodeURIComponent(ig)}&IID=translator.5028`,
     {
@@ -208,7 +203,11 @@ export async function lookupBing(word: string, targetLanguage: string, accent: '
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const text = parseBingTranslation(await response.json())
+  return parseBingTranslation(await response.json())
+}
+
+export async function lookupBing(word: string, targetLanguage: string, accent: 'us' | 'uk', signal?: AbortSignal): Promise<WordResult> {
+  const text = await requestBingTranslate(word.toLowerCase(), 'en', bingTargetCode(targetLanguage), signal)
 
   // 音标是锦上添花：词典页抓不到（限流 / 结构变更）不影响译文返回。
   let pronunciation = ''
@@ -241,19 +240,24 @@ export function parseGoogleTranslation(payload: unknown): string {
   return text
 }
 
-export async function lookupGoogleFree(word: string, targetLanguage: string, signal?: AbortSignal): Promise<WordResult> {
+/** Google Free 免密钥端点：POST 表单取译文。超时由调用方给出（方案链 15s、源池 8s）。 */
+export async function requestGoogleFree(text: string, targetLanguage: string, timeoutMs: number, signal?: AbortSignal): Promise<string> {
   const response = await fetchWithTimeout(
     `${GOOGLE_FREE_ENDPOINT}&tl=${encodeURIComponent(googleTargetCode(targetLanguage))}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-      body: new URLSearchParams({ q: word }).toString(),
+      body: new URLSearchParams({ q: text }).toString(),
     },
-    REQUEST_TIMEOUT_MS,
+    timeoutMs,
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  const text = parseGoogleTranslation(await response.json())
+  return parseGoogleTranslation(await response.json())
+}
+
+export async function lookupGoogleFree(word: string, targetLanguage: string, signal?: AbortSignal): Promise<WordResult> {
+  const text = await requestGoogleFree(word, targetLanguage, REQUEST_TIMEOUT_MS, signal)
   return {
     pronunciation: '',
     meanings: [{ partOfSpeech: '', translations: [text] }],
@@ -281,7 +285,7 @@ export async function fetchWordResult(
 ): Promise<WordResult> {
   switch (source) {
     case 'youdao':
-      return lookupYoudao(word, options.accent, signal)
+      return lookupYoudao(word, signal)
     case 'bing':
       return lookupBing(word, options.targetLanguage, options.accent, signal)
     case 'google':

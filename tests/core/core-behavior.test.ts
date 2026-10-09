@@ -14,7 +14,6 @@ import {
   migrateSettings,
   resetToDefaults,
   validateAiUrl,
-  wordLookupDelay,
 } from '../../src/core/settings'
 import { classifySelection, extractSingleWord, getWordAtOffset, isIgnorableElement, isSelectionIgnorableElement, normalizeSourceText } from '../../src/core/text'
 import { toContentSettings } from '../../src/extension/storage'
@@ -115,10 +114,6 @@ describe('text classification', () => {
 })
 
 describe('settings', () => {
-  it('honors a zero-millisecond word lookup delay', () => {
-    expect(wordLookupDelay(0)).toBe(0)
-  })
-
   it('migrates partial and invalid values safely', () => {
     const migrated = migrateSettings({ hoverDelayMs: 9999, bubble: { side: 'invalid', gap: -5 } })
     expect(migrated.version).toBe(2)

@@ -80,11 +80,6 @@ export const SHADOWS: Record<BubbleSettings['shadow'], string> = {
   strong: '0 16px 44px rgba(27, 34, 46, 0.26)',
 }
 
-/** 单词翻译遵守用户设置；快速切词由交互层取消在途请求。 */
-export function wordLookupDelay(hoverDelayMs: number): number {
-  return hoverDelayMs
-}
-
 export const DEFAULT_GOOGLE_SCHEME: GoogleSchemeSettings = { id: 'default-google', type: 'google', enabled: true }
 export const DEFAULT_BING_SCHEME: BingSchemeSettings = { id: 'default-bing', type: 'bing', enabled: true }
 export const DEFAULT_MYMEMORY_SCHEME: MyMemorySchemeSettings = { id: 'default-mymemory', type: 'mymemory', enabled: true }

@@ -1,7 +1,6 @@
 import { getBubblePlacement, getBubbleSizing } from '../core/bubble'
 import { isTargetLanguageText } from '../core/lang'
 import type { ExtensionResponse } from '../core/messages'
-import { wordLookupDelay } from '../core/settings'
 import type { TranslationSettings } from '../core/types'
 import { classifySelection, getCaretFromPoint, getWordAtOffset, hasActiveSelection, isIgnorableElement, isSelectionIgnorableElement } from '../core/text'
 import { hideHighlight, showHighlight } from './highlight'
@@ -179,7 +178,7 @@ export function createInteraction(host: InteractionHost) {
       currentRange = range
       currentText = word.word
       void submit('dictionary', word.word, range)
-    }, wordLookupDelay(settings.hoverDelayMs))
+    }, settings.hoverDelayMs)
   }
 
   function handleSelection(): void {
@@ -213,7 +212,7 @@ export function createInteraction(host: InteractionHost) {
       submitTimer = window.setTimeout(() => {
         submitTimer = 0
         void submit('dictionary', action.text, range)
-      }, wordLookupDelay(settings.hoverDelayMs))
+      }, settings.hoverDelayMs)
     } else {
       void submit(action.type, action.text, range)
     }

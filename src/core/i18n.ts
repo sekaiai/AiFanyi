@@ -594,7 +594,7 @@ export function translate(locale: UiLocale, key: MessageKey, params?: Record<str
 }
 
 /** 各方案新手指南的文案键；链接 href 等语言无关数据仍由 scheme-guides.ts 提供。 */
-export interface SchemeGuideKeys {
+interface SchemeGuideKeys {
   title: MessageKey
   tagline: MessageKey
   steps: MessageKey[]

@@ -14,12 +14,9 @@ import {
   type WordProbeState,
 } from '../../src/core/word-sources'
 import type { WordSourceId } from '../../src/core/types'
+import { jsonResponse } from './helpers'
 
 const fetchMock = vi.fn()
-
-function jsonResponse(payload: unknown, status = 200): Response {
-  return new Response(JSON.stringify(payload), { status, headers: { 'content-type': 'application/json' } })
-}
 
 beforeEach(() => {
   // mockReset（而非 clearAllMocks）：连 mockResolvedValueOnce 的排队值一起清掉，
@@ -56,7 +53,7 @@ const YOUDAO_LOVED = {
 
 describe('parseYoudaoResult', () => {
   it('解析真实返回体：英美音标与词性释义（音频改为点击朗读时懒加载，结果不再携带）', () => {
-    const result = parseYoudaoResult(YOUDAO_LOVED, 'loved', 'us')
+    const result = parseYoudaoResult(YOUDAO_LOVED)
 
     expect(result.pronunciation).toBe('/lʌvd/')
     expect(result.meanings).toEqual([
@@ -71,7 +68,7 @@ describe('parseYoudaoResult', () => {
   })
 
   it('未收录的词抛错（由源池换下一个源）', () => {
-    expect(() => parseYoudaoResult({}, 'zzzqqq', 'us')).toThrow('未收录')
+    expect(() => parseYoudaoResult({})).toThrow('未收录')
   })
 
   it('解析无词性前缀的释义行', () => {

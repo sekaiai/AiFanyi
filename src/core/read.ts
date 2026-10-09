@@ -13,3 +13,10 @@ export function readArray(value: unknown): unknown[] {
 export function readText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
+
+/** 上游错误码常见数字与纯数字字符串两种形态，统一读成数字；其他类型回退 null。 */
+export function readNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value)
+  return null
+}

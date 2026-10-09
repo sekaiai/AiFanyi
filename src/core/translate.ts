@@ -9,7 +9,7 @@ import { readArray, readRecord, readText } from './read'
 import { translateWithReverso } from './reverso'
 import { extractSingleWord, normalizeSourceText } from './text'
 import { translateWithYandex } from './yandex'
-import { GOOGLE_TARGET_CODES, lookupWord, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
+import { GOOGLE_TARGET_CODES, lookupWord, requestGoogleFree, shuffle, WORD_SOURCE_IDS, type WordProbeState, type WordResult } from './word-sources'
 import type {
   AiSchemeSettings,
   DeeplSchemeSettings,
@@ -24,7 +24,6 @@ const SCHEME_TIMEOUT_MS = 15000
 const schemeCooldown = createCooldownTracker()
 const DEEPL_FREE_ENDPOINT = 'https://api-free.deepl.com/v2/translate'
 const DEEPL_PRO_ENDPOINT = 'https://api.deepl.com/v2/translate'
-const GOOGLE_FREE_ENDPOINT = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&dt=t'
 const GOOGLE_CLOUD_ENDPOINT = 'https://translation.googleapis.com/language/translate/v2'
 
 // DeepL 保守收录确定支持的语言；不确定的（tr/th/vi/id/ms/hi）不收录，
@@ -166,7 +165,7 @@ async function dispatchScheme(
     case 'deepl':
       return { kind: 'text', text: await translateWithDeepl(scheme, source, targetLanguage, signal) }
     case 'google':
-      return { kind: 'text', text: await translateWithGoogle(source, targetLanguage, signal) }
+      return { kind: 'text', text: await requestGoogleFree(source, targetLanguage, SCHEME_TIMEOUT_MS, signal) }
     case 'googleCloud':
       return { kind: 'text', text: await translateWithGoogleCloud(scheme, source, targetLanguage, signal) }
     case 'baidu':
@@ -262,18 +261,6 @@ async function translateWithDeepl(
   const translations = readArray(readRecord(payload).translations)
   const text = readText(readRecord(translations[0]).text)
   if (!text) throw new Error('DeepL 返回内容为空。')
-  return text
-}
-
-async function translateWithGoogle(source: string, targetLanguage: string, signal?: AbortSignal): Promise<string> {
-  const payload = await requestJson(`${GOOGLE_FREE_ENDPOINT}&tl=${encodeURIComponent(googleTargetCode(targetLanguage))}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-    body: new URLSearchParams({ q: source }).toString(),
-  }, SCHEME_TIMEOUT_MS, signal)
-  const segments = readArray(readArray(payload)[0])
-  const text = segments.map((segment) => readText(readArray(segment)[0])).join('').trim()
-  if (!text) throw new Error('Google 返回内容为空。')
   return text
 }
 
