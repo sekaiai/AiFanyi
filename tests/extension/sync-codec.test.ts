@@ -3,7 +3,7 @@ import { cloneDefaultSettings } from '../../src/core/settings'
 import { SYNC_CHUNK_MAX_BYTES, byteSize, decodeSyncSettings, encodeSyncSettings, splitSyncPayload } from '../../src/extension/sync-codec'
 
 describe('sync codec', () => {
-  it('round-trips compact settings with every credential-bearing scheme', () => {
+  it('round-trips settings with every credential-bearing scheme', () => {
     const settings = cloneDefaultSettings()
     settings.uiLocale = 'en'
     settings.siteBlacklist = ['例子.中国', 'example.com']
@@ -22,19 +22,18 @@ describe('sync codec', () => {
     expect(decodeSyncSettings(payload)).toEqual(settings)
   })
 
-  it('omits defaults and safely splits unicode payloads', () => {
-    const defaults = cloneDefaultSettings()
-    const compact = encodeSyncSettings(defaults)
-    expect(compact.length).toBeLessThan(JSON.stringify(defaults).length)
+  it('safely splits unicode payloads into quota-sized chunks', () => {
     const changed = cloneDefaultSettings()
     changed.schemes.push({ id: 'ai', type: 'ai', enabled: true, label: '', apiUrl: 'https://example.com', apiKey: '密钥🙂'.repeat(3000), model: 'm', timeoutMs: 5000 })
-    const chunks = splitSyncPayload(encodeSyncSettings(changed))
-    expect(chunks.join('')).toBe(encodeSyncSettings(changed))
+    const payload = encodeSyncSettings(changed)
+    const chunks = splitSyncPayload(payload)
+    expect(chunks.join('')).toBe(payload)
     expect(chunks.every((chunk) => byteSize(JSON.stringify(chunk)) <= SYNC_CHUNK_MAX_BYTES)).toBe(true)
   })
 
-  it('rejects unsupported or malformed compact payloads', () => {
+  it('rejects unsupported or malformed payloads', () => {
     expect(() => decodeSyncSettings('not-json')).toThrow('同步数据不是有效 JSON')
     expect(() => decodeSyncSettings('[2,0]')).toThrow('同步数据格式不受支持')
+    expect(() => decodeSyncSettings('{"v":2,"s":{}}')).toThrow('同步数据格式不受支持')
   })
 })

@@ -38,7 +38,7 @@ const SettingsHarness = defineComponent({
     <form>
       <output data-testid="status">{{ stateLabel }}</output>
       <output data-testid="sync-status">{{ syncStatus }}</output>
-      <output data-testid="sync-state">{{ syncState.kind }}</output>
+      <output data-testid="sync-state">{{ syncState?.kind }}</output>
       <input name="hoverDelay" type="number" v-model.number="settings.hoverDelayMs" />
       <input name="targetLanguage" v-model="settings.targetLanguage" />
       <span data-testid="schemes-count">{{ settings.schemes.length }}</span>
@@ -89,12 +89,12 @@ describe('useSettingsModel', () => {
     const { storage } = createStorage()
     const remote = cloneDefaultSettings()
     remote.hoverDelayMs = 900
-    vi.mocked(storage.download).mockResolvedValueOnce({ settings: remote, snapshot: { revision: 'remote', checksum: 'checksum', uploadedAt: 1 } })
+    vi.mocked(storage.download).mockResolvedValueOnce({ settings: remote, snapshot: null })
     const wrapper = mount(SettingsHarness, { props: { storage } })
     await flushPromises()
     await wrapper.get('[data-testid="download"]').trigger('click')
     await flushPromises()
-    expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ hoverDelayMs: 900 }), expect.objectContaining({ revision: 'remote' }))
+    expect(storage.save).toHaveBeenCalledWith(expect.objectContaining({ hoverDelayMs: 900 }))
     expect((wrapper.find('input[name="hoverDelay"]').element as HTMLInputElement).value).toBe('900')
     expect(wrapper.get('[data-testid="sync-status"]').text()).toBe('更新成功')
   })
@@ -103,10 +103,10 @@ describe('useSettingsModel', () => {
     const { storage, triggerSyncStateChange } = createStorage()
     const wrapper = mount(SettingsHarness, { props: { storage } })
     await flushPromises()
-    vi.mocked(storage.inspectSyncState).mockResolvedValueOnce({ kind: 'remoteChanges', uploadedAt: 2 })
+    vi.mocked(storage.inspectSyncState).mockResolvedValueOnce({ kind: 'different', uploadedAt: 2 })
     triggerSyncStateChange()
     await flushPromises()
-    expect(wrapper.get('[data-testid="sync-state"]').text()).toBe('remoteChanges')
+    expect(wrapper.get('[data-testid="sync-state"]').text()).toBe('different')
     expect(storage.download).not.toHaveBeenCalled()
   })
 

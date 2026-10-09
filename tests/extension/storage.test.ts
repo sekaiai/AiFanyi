@@ -59,7 +59,7 @@ describe('browser settings storage', () => {
     const remote = await createBrowserSettingsStorage().download()
     expect(remote.settings.hoverDelayMs).toBe(333)
     expect(remote.settings.targetLanguage).toBe('English')
-    expect((await createBrowserSettingsStorage().inspectSyncState(remote.settings)).kind).toBe('legacy')
+    expect((await createBrowserSettingsStorage().inspectSyncState(remote.settings)).kind).toBe('different')
   })
 
   it('notifies subscribers only for local writes', async () => {
@@ -83,21 +83,17 @@ describe('browser settings storage', () => {
     expect((await storage.download()).settings.hoverDelayMs).toBe(800)
   })
 
-  it('distinguishes local changes, remote updates, conflicts, and unknown differences', async () => {
+  it('reports when local and cloud data differ', async () => {
     const storage = createBrowserSettingsStorage()
     const shared = cloneDefaultSettings()
     await storage.upload(shared)
 
     const local = { ...shared, hoverDelayMs: 500 }
-    expect((await storage.inspectSyncState(local)).kind).toBe('localChanges')
+    expect((await storage.inspectSyncState(local)).kind).toBe('different')
 
     const remote = { ...shared, hoverDelayMs: 700 }
     await setRemoteSettings(remote, 'remote-update', 123)
-    expect((await storage.inspectSyncState(shared)).kind).toBe('remoteChanges')
-    expect((await storage.inspectSyncState(local)).kind).toBe('conflict')
-
-    await browser.storage.local.remove('af:s:b')
-    expect((await storage.inspectSyncState(local)).kind).toBe('different')
+    expect((await storage.inspectSyncState(shared)).kind).toBe('different')
   })
 
   it('reports an empty sync area and watches remote metadata changes', async () => {

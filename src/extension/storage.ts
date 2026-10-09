@@ -6,14 +6,12 @@ import { SYNC_TOTAL_MAX_BYTES, byteSize, decodeSyncSettings, encodeSyncSettings,
 const SYNC_MANIFEST_KEY = 'af:s:m'
 const SYNC_CHUNK_KEY = 'af:s:c:'
 const SYNC_INFO_KEY = 'af:s:i'
-const SYNC_BASELINE_KEY = 'af:s:b'
 const SYNC_FORMAT_VERSION = 1
 
 type SyncManifest = readonly [version: number, revision: string, chunks: number, bytes: number, checksum: string]
 type SyncInfo = readonly [revision: string, uploadedAt: number]
-type SyncBaseline = readonly [revision: string, checksum: string]
 
-export type SyncStateKind = 'checking' | 'unavailable' | 'notUploaded' | 'legacy' | 'upToDate' | 'localChanges' | 'remoteChanges' | 'conflict' | 'different'
+type SyncStateKind = 'notUploaded' | 'upToDate' | 'different'
 
 export interface SyncState {
   kind: SyncStateKind
@@ -44,10 +42,8 @@ async function loadSettings(): Promise<TranslationSettings> {
   return fresh
 }
 
-async function saveSettings(settings: TranslationSettings, baseline?: SyncSnapshot | null): Promise<void> {
-  const values: Record<string, unknown> = { [SETTINGS_STORAGE_KEY]: migrateSettings(settings) }
-  if (baseline !== undefined) values[SYNC_BASELINE_KEY] = baseline ? [baseline.revision, baseline.checksum] : null
-  await browser.storage.local.set(values)
+async function saveSettings(settings: TranslationSettings): Promise<void> {
+  await browser.storage.local.set({ [SETTINGS_STORAGE_KEY]: migrateSettings(settings) })
 }
 
 async function resetSettings(): Promise<TranslationSettings> {
@@ -73,10 +69,9 @@ export async function uploadSettingsToSync(settings: TranslationSettings): Promi
   const revision = crypto.randomUUID()
   const manifest: SyncManifest = [SYNC_FORMAT_VERSION, revision, chunks.length, byteSize(payload), checksum]
   const uploadedAt = Date.now()
-  const snapshot: SyncSnapshot = { revision, checksum, uploadedAt }
   const values: Record<string, unknown> = {
     [SYNC_MANIFEST_KEY]: manifest,
-    [SYNC_INFO_KEY]: [snapshot.revision, uploadedAt] satisfies SyncInfo,
+    [SYNC_INFO_KEY]: [revision, uploadedAt] satisfies SyncInfo,
   }
   for (const [index, chunk] of chunks.entries()) values[`${SYNC_CHUNK_KEY}${index}`] = chunk
 
@@ -94,7 +89,6 @@ export async function uploadSettingsToSync(settings: TranslationSettings): Promi
   if (obsolete.length || !oldManifest) {
     await browser.storage.sync.remove([...obsolete, ...(oldManifest ? [] : [SETTINGS_STORAGE_KEY])]).catch(() => undefined)
   }
-  await saveSyncBaseline(snapshot)
 }
 
 export async function downloadSettingsFromSync(): Promise<DownloadedSyncSettings> {
@@ -127,23 +121,14 @@ export async function downloadSettingsFromSync(): Promise<DownloadedSyncSettings
 export async function inspectSyncState(settings: TranslationSettings): Promise<SyncState> {
   const remote = await browser.storage.sync.get([SYNC_MANIFEST_KEY, SYNC_INFO_KEY, SETTINGS_STORAGE_KEY])
   const manifest = parseManifest(remote[SYNC_MANIFEST_KEY])
-  if (!manifest) return { kind: remote[SETTINGS_STORAGE_KEY] === undefined ? 'notUploaded' : 'legacy', uploadedAt: null }
-
-  const info = parseSyncInfo(remote[SYNC_INFO_KEY])
-  const snapshot: SyncSnapshot = { revision: manifest[1], checksum: manifest[4], uploadedAt: info?.[0] === manifest[1] ? info[1] : null }
-  const checksum = await sha256(encodeSyncSettings(settings))
-  if (checksum === snapshot.checksum) {
-    await saveSyncBaseline(snapshot)
-    return { kind: 'upToDate', uploadedAt: snapshot.uploadedAt }
+  if (!manifest) {
+    // 旧版仅写入 SETTINGS_STORAGE_KEY 的云端数据仍可手动下载，一并算作与本地不同。
+    return { kind: remote[SETTINGS_STORAGE_KEY] === undefined ? 'notUploaded' : 'different', uploadedAt: null }
   }
-
-  const local = await browser.storage.local.get(SYNC_BASELINE_KEY)
-  const baseline = parseSyncBaseline(local[SYNC_BASELINE_KEY])
-  if (!baseline) return { kind: 'different', uploadedAt: snapshot.uploadedAt }
-  const localChanged = checksum !== baseline[1]
-  const remoteChanged = snapshot.revision !== baseline[0] || snapshot.checksum !== baseline[1]
-  if (!remoteChanged) return { kind: 'localChanges', uploadedAt: snapshot.uploadedAt }
-  return { kind: localChanged ? 'conflict' : 'remoteChanges', uploadedAt: snapshot.uploadedAt }
+  const info = parseSyncInfo(remote[SYNC_INFO_KEY])
+  const uploadedAt = info?.[0] === manifest[1] ? info[1] : null
+  const checksum = await sha256(encodeSyncSettings(settings))
+  return { kind: checksum === manifest[4] ? 'upToDate' : 'different', uploadedAt }
 }
 
 export function watchSyncState(callback: () => void): () => void {
@@ -203,15 +188,6 @@ function parseManifest(value: unknown): SyncManifest | null {
 function parseSyncInfo(value: unknown): SyncInfo | null {
   if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== 'string' || !Number.isSafeInteger(value[1]) || value[1] < 0) return null
   return value as unknown as SyncInfo
-}
-
-function parseSyncBaseline(value: unknown): SyncBaseline | null {
-  if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== 'string' || typeof value[1] !== 'string') return null
-  return value as unknown as SyncBaseline
-}
-
-async function saveSyncBaseline(snapshot: SyncSnapshot): Promise<void> {
-  await browser.storage.local.set({ [SYNC_BASELINE_KEY]: [snapshot.revision, snapshot.checksum] satisfies SyncBaseline })
 }
 
 async function sha256(value: string): Promise<string> {

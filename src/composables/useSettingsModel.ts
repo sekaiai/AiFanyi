@@ -1,12 +1,12 @@
 import { computed, nextTick, onUnmounted, reactive, shallowRef, watch } from 'vue'
 import { cloneDefaultSettings, migrateSettings } from '../core/settings'
 import type { TranslationSettings } from '../core/settings'
-import type { DownloadedSyncSettings, SyncSnapshot, SyncState } from '../extension/storage'
+import type { DownloadedSyncSettings, SyncState } from '../extension/storage'
 import { provideUiLocale } from './useUiLocale'
 
 export function useSettingsModel(storage: {
   load(): Promise<TranslationSettings>
-  save(settings: TranslationSettings, baseline?: SyncSnapshot | null): Promise<void>
+  save(settings: TranslationSettings): Promise<void>
   reset(): Promise<TranslationSettings>
   subscribe(callback: (settings: TranslationSettings) => void): () => void
   upload(settings: TranslationSettings): Promise<void>
@@ -22,7 +22,7 @@ export function useSettingsModel(storage: {
   const syncing = shallowRef(false)
   const syncBusy = shallowRef(false)
   const syncStatus = shallowRef('')
-  const syncState = shallowRef<SyncState>({ kind: 'checking', uploadedAt: null })
+  const syncState = shallowRef<SyncState | null>(null)
   let latestSave = 0
   let latestSyncState = 0
   let saveQueue = Promise.resolve()
@@ -116,7 +116,7 @@ export function useSettingsModel(storage: {
 
   const stateLabel = computed(() => saving.value ? t('status.saving') : status.value)
 
-  async function saveNow(next: TranslationSettings, baseline?: SyncSnapshot | null): Promise<void> {
+  async function saveNow(next: TranslationSettings): Promise<void> {
     if (saveTimer !== undefined) {
       clearTimeout(saveTimer)
       saveTimer = undefined
@@ -124,7 +124,7 @@ export function useSettingsModel(storage: {
     latestSave++
     saving.value = true
     try {
-      saveQueue = saveQueue.catch(() => undefined).then(() => storage.save(next, baseline))
+      saveQueue = saveQueue.catch(() => undefined).then(() => storage.save(next))
       await saveQueue
     } finally {
       saving.value = false
@@ -150,7 +150,7 @@ export function useSettingsModel(storage: {
     syncBusy.value = true
     try {
       const remote = await storage.download()
-      await saveNow(remote.settings, remote.snapshot)
+      await saveNow(remote.settings)
       syncing.value = true
       Object.assign(settings, remote.settings)
       syncStatus.value = t('status.syncDownloaded')
@@ -170,7 +170,8 @@ export function useSettingsModel(storage: {
       const next = await storage.inspectSyncState(migrateSettings(settings))
       if (active && request === latestSyncState) syncState.value = next
     } catch {
-      if (active && request === latestSyncState) syncState.value = { kind: 'unavailable', uploadedAt: null }
+      // 无法读取云端状态时回到未知，由状态栏文案提示，避免展示过期结论。
+      if (active && request === latestSyncState) syncState.value = null
     }
   }
 

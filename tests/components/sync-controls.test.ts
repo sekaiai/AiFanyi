@@ -28,10 +28,10 @@ describe('SyncControls', () => {
       props: {
         busy: false,
         status: '',
-        state: { kind: 'localChanges', uploadedAt: Date.UTC(2029, 11, 23, 12, 34) },
+        state: { kind: 'different', uploadedAt: Date.UTC(2029, 11, 23, 12, 34) },
       },
     })
-    expect(wrapper.get('[data-testid="sync-summary"]').text()).toContain('本地有更新未同步，云端数据更新于')
+    expect(wrapper.get('[data-testid="sync-summary"]').text()).toContain('本地和云端不同，云端数据更新于')
   })
 
   it('uses cloud update wording after a download', () => {
@@ -47,8 +47,7 @@ describe('SyncControls', () => {
 
   it.each([
     [{ kind: 'upToDate' as const, uploadedAt: Date.UTC(2029, 11, 23, 12, 34) }, '已同步，云端数据更新于'],
-    [{ kind: 'remoteChanges' as const, uploadedAt: Date.UTC(2029, 11, 23, 12, 34) }, '未同步，云端数据更新于'],
-    [{ kind: 'conflict' as const, uploadedAt: Date.UTC(2029, 11, 23, 12, 34) }, '本地和云端不同，云端数据更新于'],
+    [{ kind: 'different' as const, uploadedAt: Date.UTC(2029, 11, 23, 12, 34) }, '本地和云端不同，云端数据更新于'],
     [{ kind: 'notUploaded' as const, uploadedAt: null }, '未同步，暂无云端数据'],
   ])('summarizes %o as %s', (state, expected) => {
     const wrapper = mount(SyncControls, { props: { busy: false, status: '', state } })
@@ -56,7 +55,7 @@ describe('SyncControls', () => {
   })
 
   it('disables transfer actions while a transfer is active', () => {
-    const wrapper = mount(SyncControls, { props: { busy: true, status: '', state: { kind: 'checking', uploadedAt: null } } })
+    const wrapper = mount(SyncControls, { props: { busy: true, status: '', state: null } })
     expect(wrapper.get('[data-testid="sync-upload"]').attributes('disabled')).toBeDefined()
     expect(wrapper.get('[data-testid="sync-download"]').attributes('disabled')).toBeDefined()
   })

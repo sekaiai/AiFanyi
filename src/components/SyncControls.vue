@@ -7,7 +7,7 @@ import type { SyncState } from '../extension/storage'
 const props = defineProps<{
   busy: boolean
   status: string
-  state: SyncState
+  state: SyncState | null
 }>()
 
 const emit = defineEmits<{
@@ -18,22 +18,16 @@ const emit = defineEmits<{
 const { locale, t } = useUiLocale()
 
 const SYNC_STATE_LABELS: Record<SyncState['kind'], MessageKey> = {
-  checking: 'schemes.syncState.checking',
-  unavailable: 'schemes.syncState.unavailable',
   notUploaded: 'schemes.syncState.notUploaded',
-  legacy: 'schemes.syncState.legacy',
   upToDate: 'schemes.syncState.upToDate',
-  localChanges: 'schemes.syncState.localChanges',
-  remoteChanges: 'schemes.syncState.remoteChanges',
-  conflict: 'schemes.syncState.conflict',
   different: 'schemes.syncState.different',
 }
 
-const uploadedAt = computed(() => props.state.uploadedAt === null
+const uploadedAt = computed(() => props.state?.uploadedAt == null
   ? null
   : new Intl.DateTimeFormat(locale.value === 'zh' ? 'zh-CN' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(props.state.uploadedAt))
-const stateLabel = computed(() => t(SYNC_STATE_LABELS[props.state.kind]))
-const stateWarning = computed(() => ['remoteChanges', 'conflict', 'different', 'unavailable'].includes(props.state.kind))
+const stateLabel = computed(() => props.state ? t(SYNC_STATE_LABELS[props.state.kind]) : '')
+const stateWarning = computed(() => props.state?.kind === 'different')
 const summary = computed(() => {
   const text = props.status || stateLabel.value
   if (uploadedAt.value === null) return text
