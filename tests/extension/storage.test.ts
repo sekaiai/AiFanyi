@@ -49,7 +49,7 @@ describe('browser settings storage', () => {
     const storage = createBrowserSettingsStorage()
     await storage.upload(value)
     expect((await browser.storage.sync.get('af:s:m'))['af:s:m']).toBeDefined()
-    expect((await storage.download()).settings).toEqual(value)
+    expect(await storage.download()).toEqual(value)
     expect((await storage.inspectSyncState(value)).kind).toBe('upToDate')
     expect((await browser.storage.sync.get('af:s:i'))['af:s:i']).toEqual(expect.arrayContaining([expect.any(String), expect.any(Number)]))
   })
@@ -57,9 +57,9 @@ describe('browser settings storage', () => {
   it('reads legacy sync settings for a one-time manual migration', async () => {
     await browser.storage.sync.set({ [KEY]: { hoverDelayMs: 333, targetLanguage: 'English' } })
     const remote = await createBrowserSettingsStorage().download()
-    expect(remote.settings.hoverDelayMs).toBe(333)
-    expect(remote.settings.targetLanguage).toBe('English')
-    expect((await createBrowserSettingsStorage().inspectSyncState(remote.settings)).kind).toBe('different')
+    expect(remote.hoverDelayMs).toBe(333)
+    expect(remote.targetLanguage).toBe('English')
+    expect((await createBrowserSettingsStorage().inspectSyncState(remote)).kind).toBe('different')
   })
 
   it('notifies subscribers only for local writes', async () => {
@@ -80,7 +80,7 @@ describe('browser settings storage', () => {
     await storage.save({ ...cloneDefaultSettings(), hoverDelayMs: 600 })
     const next = await storage.reset()
     expect(next.hoverDelayMs).toBe(200)
-    expect((await storage.download()).settings.hoverDelayMs).toBe(800)
+    expect((await storage.download()).hoverDelayMs).toBe(800)
   })
 
   it('reports when local and cloud data differ', async () => {

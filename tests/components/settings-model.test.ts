@@ -19,7 +19,7 @@ function createStorage(initial: TranslationSettings = cloneDefaultSettings()) {
     }),
     subscribe: vi.fn(() => vi.fn()),
     upload: vi.fn(async () => undefined),
-    download: vi.fn(async () => ({ settings: structuredClone(initial), snapshot: null })),
+    download: vi.fn(async () => structuredClone(initial)),
     inspectSyncState: vi.fn(async () => ({ kind: 'upToDate' as const, uploadedAt: 1 })),
     subscribeSyncState: vi.fn((callback) => {
       onSyncStateChange = callback
@@ -89,7 +89,7 @@ describe('useSettingsModel', () => {
     const { storage } = createStorage()
     const remote = cloneDefaultSettings()
     remote.hoverDelayMs = 900
-    vi.mocked(storage.download).mockResolvedValueOnce({ settings: remote, snapshot: null })
+    vi.mocked(storage.download).mockResolvedValueOnce(remote)
     const wrapper = mount(SettingsHarness, { props: { storage } })
     await flushPromises()
     await wrapper.get('[data-testid="download"]').trigger('click')

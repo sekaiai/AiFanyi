@@ -35,5 +35,7 @@ describe('sync codec', () => {
     expect(() => decodeSyncSettings('not-json')).toThrow('同步数据不是有效 JSON')
     expect(() => decodeSyncSettings('[2,0]')).toThrow('同步数据格式不受支持')
     expect(() => decodeSyncSettings('{"v":2,"s":{}}')).toThrow('同步数据格式不受支持')
+    expect(() => decodeSyncSettings('{"v":1}')).toThrow('同步数据格式不受支持')
+    expect(() => decodeSyncSettings('{"v":1,"s":null}')).toThrow('同步数据格式不受支持')
   })
 })

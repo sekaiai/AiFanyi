@@ -1,7 +1,7 @@
 import { migrateSettings } from '../core/settings'
 import type { TranslationSettings } from '../core/types'
 
-const SYNC_FORMAT_VERSION = 1
+export const SYNC_FORMAT_VERSION = 1
 
 export const SYNC_CHUNK_MAX_BYTES = 6000
 export const SYNC_TOTAL_MAX_BYTES = 90 * 1024
@@ -18,10 +18,11 @@ export function decodeSyncSettings(payload: string): TranslationSettings {
   } catch {
     throw new Error('同步数据不是有效 JSON')
   }
-  if (typeof packed !== 'object' || packed === null || Array.isArray(packed) || (packed as Record<string, unknown>).v !== SYNC_FORMAT_VERSION) {
+  const record = typeof packed === 'object' && packed !== null && !Array.isArray(packed) ? packed as Record<string, unknown> : null
+  if (!record || record.v !== SYNC_FORMAT_VERSION || typeof record.s !== 'object' || record.s === null) {
     throw new Error('同步数据格式不受支持')
   }
-  return migrateSettings((packed as Record<string, unknown>).s)
+  return migrateSettings(record.s)
 }
 
 /** Produces strings whose JSON storage value stays within the per-item quota. */

@@ -1,12 +1,11 @@
 import { browser } from 'wxt/browser'
 import { DEFAULT_SETTINGS, SETTINGS_STORAGE_KEY, detectUiLocale, migrateSettings, resetToDefaults, type TranslationSettings } from '../core/settings'
 import { isPublicSettingsUpdate, type PublicSettingsResponse } from '../core/messages'
-import { SYNC_TOTAL_MAX_BYTES, byteSize, decodeSyncSettings, encodeSyncSettings, splitSyncPayload } from './sync-codec'
+import { SYNC_FORMAT_VERSION, SYNC_TOTAL_MAX_BYTES, byteSize, decodeSyncSettings, encodeSyncSettings, splitSyncPayload } from './sync-codec'
 
 const SYNC_MANIFEST_KEY = 'af:s:m'
 const SYNC_CHUNK_KEY = 'af:s:c:'
 const SYNC_INFO_KEY = 'af:s:i'
-const SYNC_FORMAT_VERSION = 1
 
 type SyncManifest = readonly [version: number, revision: string, chunks: number, bytes: number, checksum: string]
 type SyncInfo = readonly [revision: string, uploadedAt: number]
@@ -16,17 +15,6 @@ type SyncStateKind = 'notUploaded' | 'upToDate' | 'different'
 export interface SyncState {
   kind: SyncStateKind
   uploadedAt: number | null
-}
-
-export interface SyncSnapshot {
-  revision: string
-  checksum: string
-  uploadedAt: number | null
-}
-
-export interface DownloadedSyncSettings {
-  settings: TranslationSettings
-  snapshot: SyncSnapshot | null
 }
 
 function getBrowserLanguage(): string {
@@ -91,13 +79,13 @@ export async function uploadSettingsToSync(settings: TranslationSettings): Promi
   }
 }
 
-export async function downloadSettingsFromSync(): Promise<DownloadedSyncSettings> {
+export async function downloadSettingsFromSync(): Promise<TranslationSettings> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const manifestRecord = await browser.storage.sync.get([SYNC_MANIFEST_KEY, SYNC_INFO_KEY, SETTINGS_STORAGE_KEY])
+    const manifestRecord = await browser.storage.sync.get([SYNC_MANIFEST_KEY, SETTINGS_STORAGE_KEY])
     const manifest = parseManifest(manifestRecord[SYNC_MANIFEST_KEY])
     if (!manifest) {
       if (manifestRecord[SETTINGS_STORAGE_KEY] === undefined) throw new Error('浏览器同步区没有可下载的配置')
-      return { settings: migrateSettings(manifestRecord[SETTINGS_STORAGE_KEY]), snapshot: null }
+      return migrateSettings(manifestRecord[SETTINGS_STORAGE_KEY])
     }
 
     const keys = Array.from({ length: manifest[2] }, (_, index) => `${SYNC_CHUNK_KEY}${index}`)
@@ -106,11 +94,7 @@ export async function downloadSettingsFromSync(): Promise<DownloadedSyncSettings
     if (chunks.every((chunk): chunk is string => typeof chunk === 'string')) {
       const payload = chunks.join('')
       if (byteSize(payload) === manifest[3] && await sha256(payload) === manifest[4]) {
-        const info = parseSyncInfo(manifestRecord[SYNC_INFO_KEY])
-        return {
-          settings: decodeSyncSettings(payload),
-          snapshot: { revision: manifest[1], checksum: manifest[4], uploadedAt: info?.[0] === manifest[1] ? info[1] : null },
-        }
+        return decodeSyncSettings(payload)
       }
     }
     if (attempt < 2) await delay((attempt + 1) * 100)

@@ -1,7 +1,7 @@
 import { computed, nextTick, onUnmounted, reactive, shallowRef, watch } from 'vue'
 import { cloneDefaultSettings, migrateSettings } from '../core/settings'
 import type { TranslationSettings } from '../core/settings'
-import type { DownloadedSyncSettings, SyncState } from '../extension/storage'
+import type { SyncState } from '../extension/storage'
 import { provideUiLocale } from './useUiLocale'
 
 export function useSettingsModel(storage: {
@@ -10,7 +10,7 @@ export function useSettingsModel(storage: {
   reset(): Promise<TranslationSettings>
   subscribe(callback: (settings: TranslationSettings) => void): () => void
   upload(settings: TranslationSettings): Promise<void>
-  download(): Promise<DownloadedSyncSettings>
+  download(): Promise<TranslationSettings>
   inspectSyncState(settings: TranslationSettings): Promise<SyncState>
   subscribeSyncState(callback: () => void): () => void
 }) {
@@ -150,9 +150,9 @@ export function useSettingsModel(storage: {
     syncBusy.value = true
     try {
       const remote = await storage.download()
-      await saveNow(remote.settings)
+      await saveNow(remote)
       syncing.value = true
-      Object.assign(settings, remote.settings)
+      Object.assign(settings, remote)
       syncStatus.value = t('status.syncDownloaded')
       await nextTick()
       syncing.value = false

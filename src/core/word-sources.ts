@@ -81,7 +81,7 @@ export const GOOGLE_TARGET_CODES: Record<string, string> = {
   'Українська': 'uk',
   'हिन्दी': 'hi',
 }
-export const BING_TARGET_CODES: Record<string, string> = { ...GOOGLE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
+const BING_TARGET_CODES: Record<string, string> = { ...GOOGLE_TARGET_CODES, '简体中文': 'zh-Hans', '繁體中文': 'zh-Hant', 'Norsk': 'nb' }
 
 function googleTargetCode(targetLanguage: string): string {
   const code = GOOGLE_TARGET_CODES[targetLanguage]
@@ -89,9 +89,10 @@ function googleTargetCode(targetLanguage: string): string {
   return code
 }
 
-function bingTargetCode(targetLanguage: string): string {
+/** 目标语言 → Bing 语言码；方案链与单词源池共用同一校验与文案。 */
+export function bingTargetCode(targetLanguage: string): string {
   const code = BING_TARGET_CODES[targetLanguage]
-  if (!code) throw new Error(`Bing 词典不支持目标语言「${targetLanguage}」`)
+  if (!code) throw new Error(`必应翻译不支持目标语言「${targetLanguage}」，请换用其他翻译方案`)
   return code
 }
 
@@ -253,7 +254,7 @@ export async function requestGoogleFree(text: string, targetLanguage: string, ti
     signal,
   )
   if (!response.ok) throw new Error(`HTTP ${response.status}`)
-  return parseGoogleTranslation(await response.json())
+  return parseGoogleTranslation(await response.json().catch(() => null))
 }
 
 export async function lookupGoogleFree(word: string, targetLanguage: string, signal?: AbortSignal): Promise<WordResult> {
